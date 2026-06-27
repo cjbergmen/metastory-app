@@ -9075,6 +9075,7 @@ function _suppPlan(){try{return JSON.parse(lsGet('_supps_plan','[]'))||[];}catch
 function _suppSave(p){lsSet('_supps_plan',JSON.stringify(p));try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}}
 function _suppTaken(){try{return JSON.parse(lsGet('supptk_'+viewDate,'[]'))||[];}catch(e){return [];}}
 function toggleSupp(id){let t=_suppTaken();t=t.includes(id)?t.filter(x=>x!==id):t.concat(id);lsSet('supptk_'+viewDate,JSON.stringify(t));rSupps();}
+function takeAllSlot(slot){const plan=_suppPlan();let t=_suppTaken();const ids=plan.filter(s=>s.slot===slot).map(s=>s.id);ids.forEach(id=>{if(!t.includes(id))t.push(id);});lsSet('supptk_'+viewDate,JSON.stringify(t));showToast('All '+slot+' supplements logged ✅');rSupps();}
 function _titr(){try{return JSON.parse(lsGet('_supp_titr','null'));}catch(e){return null;}}
 function titrFine(){const t=_titr();if(!t)return;t.day=(t.day||1)+1;lsSet('_supp_titr',JSON.stringify(t));showToast('Logged — steady as you go');rSupps();}
 function titrOff(){const t=_titr();if(!t)return;t.offCount=(t.offCount||0)+1;t.status='hold';lsSet('_supp_titr',JSON.stringify(t));showToast(t.offCount>=2?'Two off days — consider pausing this one':'Held at last good dose');rSupps();}
@@ -9119,12 +9120,20 @@ function rSupps(){
     ['morning','midday','evening'].forEach(slot=>{
       const items=plan.filter(s=>s.slot===slot);if(!items.length)return;
       const label={morning:'Morning · with breakfast',midday:'Midday',evening:'Evening · before bed'}[slot];
-      h+=`<div class="supp-slot"><h5>${label}</h5>`;
-      items.forEach(s=>{
+      // Sort: untaken first, taken (completed) sink to bottom
+      const pending=items.filter(s=>!taken.includes(s.id));
+      const done=items.filter(s=>taken.includes(s.id));
+      const sorted=[...pending,...done];
+      const allDone=pending.length===0;
+      h+=`<div class="supp-slot"><div style="display:flex;align-items:center;justify-content:space-between"><h5 style="margin:12px 0 4px">${label}</h5>`;
+      if(!allDone&&items.length>1) h+=`<button onclick="takeAllSlot('${slot}')" style="background:none;border:none;color:var(--green);font-size:11px;font-weight:700;cursor:pointer;padding:4px 0">Take all</button>`;
+      if(allDone) h+=`<span style="font-size:11px;color:var(--purple);font-weight:600">All done ✓</span>`;
+      h+=`</div>`;
+      sorted.forEach(s=>{
         const on=taken.includes(s.id);const titring=t&&t.id===s.id;
-        h+=`<div class="supp-row">
+        h+=`<div class="supp-row" style="${on?'opacity:.55;':''}">
           <div class="chk-box ${on?'on':''}" onclick="toggleSupp('${s.id}')" style="cursor:pointer">${on?'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>':''}</div>
-          <div style="flex:1;cursor:pointer" onclick="openSuppModal('${s.id}')"><div style="font-size:13.5px;font-weight:700">${s.emoji?s.emoji+' ':''}${s.name}</div><small style="font-size:11px;color:var(--sub)">${s.dose||''}${titring?' · titrating':''}</small></div>
+          <div style="flex:1;cursor:pointer${on?';text-decoration:line-through;text-decoration-color:var(--border)':''}" onclick="openSuppModal('${s.id}')"><div style="font-size:13.5px;font-weight:700">${s.emoji?s.emoji+' ':''}${s.name}</div><small style="font-size:11px;color:var(--sub)">${s.dose||''}${titring?' · titrating':''}</small></div>
           ${!titring&&!t?`<button onclick="startTitr('${s.id}')" style="background:none;border:none;color:var(--green);font-size:11px;font-weight:700;cursor:pointer">Titrate</button>`:''}
         </div>`;
       });
