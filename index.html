@@ -385,6 +385,21 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .mood-row{display:flex;gap:8px;margin-top:11px}
 .mood-row button{flex:1;text-align:center;font-size:12px;font-weight:700;padding:11px 0;border-radius:12px;border:1.5px solid var(--border);color:var(--sub);background:var(--surface);cursor:pointer}
 .mood-row button.sel{background:var(--text);border-color:var(--text);color:#f4f1ea}
+/* polyvagal check-in */
+.pv-ladder{display:flex;flex-direction:column;gap:7px;margin-top:12px}
+.pv-state{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:11px 13px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;transition:border-color .15s,background .15s}
+.pv-state .pv-state-txt{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.pv-state .pv-state-txt b{font-size:14px;font-weight:700;color:var(--text)}
+.pv-state .pv-state-txt small{font-size:11px;color:var(--sub);margin-top:1px}
+.pv-state .pv-check{font-size:15px;font-weight:700;flex-shrink:0}
+.pv-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;display:inline-block}
+.pv-chip-row{display:flex;flex-wrap:wrap;gap:6px}
+.pv-chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--text);padding:5px 10px;border-radius:999px;border:1.5px solid var(--border);background:var(--surface)}
+.pv-distro{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--surface2)}
+.pv-distro span{height:100%}
+.pv-legend{display:flex;flex-wrap:wrap;gap:11px;margin-top:11px}
+.pv-leg{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--sub)}
+.pv-leg b{color:var(--text);font-weight:700}
 .wk-bars{display:flex;gap:7px;align-items:flex-end;height:70px;margin-top:12px}
 .wk-bars .d{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px}
 .wk-bars .b{width:100%;border-radius:6px 6px 3px 3px;background:var(--purple);min-height:5px}
@@ -2959,25 +2974,64 @@ let _nsExpanded = null;
 function rRecovery(){
   let h = _tabRoutineHTML('recovery');
 
-  // ── FDN state check-in + suggested practice (mockup Stress board) ──
-  const _ss=lsGet('stress_'+viewDate,'');
-  const _states=[['wired','Wired'],['steady','Steady'],['foggy','Foggy'],['drained','Drained']];
-  h += `<div class="card"><span class="kicker" style="color:var(--sub)">Quick check-in</span>
-    <h3 class="mk-q">How's your system right now?</h3>
-    <div class="mood-row">${_states.map(([k,l])=>`<button class="${_ss===k?'sel':''}" onclick="setStressState('${k}')">${l}</button>`).join('')}</div>
-    <p style="font-size:11.5px;color:var(--sub);margin-top:9px;line-height:1.45">Your answer shapes today's suggestion — wired days get grounding, drained days get gentleness.</p></div>`;
-  if(_ss){
-    const sg=(typeof STRESS_SUGGEST!=='undefined'&&STRESS_SUGGEST[_ss])?STRESS_SUGGEST[_ss]:{};
-    const act=(typeof _stressPick==='function')?_stressPick(_ss):null;
+  // ── Polyvagal nervous-system check-in + quick suggested practice ──
+  const _todayLog = pvLog(viewDate);
+  const _ss = pvLatest(viewDate);
+
+  // The ladder selector: one row per state, ordered high→low activation.
+  let _ladder = '';
+  PV_ORDER.forEach(id=>{
+    const s=PV_STATES[id];const sel=_ss===id;
+    _ladder += `<button class="pv-state${sel?' sel':''}" onclick="pvAddCheckin('${id}')" style="${sel?`border-color:${s.color};background:${s.color}1f`:''}">
+      <span class="pv-dot" style="background:${s.color}"></span>
+      <span class="pv-state-txt"><b>${s.label}</b><small>${s.plain} · ${s.poly}</small></span>
+      ${sel?'<span class="pv-check" style="color:'+s.color+'">✓</span>':''}
+    </button>`;
+  });
+  h += `<div class="card"><span class="kicker" style="color:var(--sub)">Nervous-system check-in</span>
+    <h3 class="mk-q">What state is your system in right now?</h3>
+    <div class="pv-ladder">${_ladder}</div>
+    <p style="font-size:11.5px;color:var(--sub);margin-top:10px;line-height:1.45">Polyvagal theory: the middle three are regulated (safe) states; the top and bottom are the activated and shut-down edges. Check in as many times a day as you like — each one shapes the suggestion below and builds your pattern over time.</p>`;
+
+  // Today's timeline of check-ins
+  if(_todayLog.length){
+    const chips=_todayLog.slice(-8).map(e=>{const s=PV_STATES[e.s];if(!s)return '';
+      const tm=new Date(e.t).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+      return `<span class="pv-chip" style="border-color:${s.color}55"><span class="pv-dot" style="background:${s.color}"></span>${s.label} <small style="color:var(--sub)">${tm}</small></span>`;
+    }).join('');
+    h += `<div class="pv-today"><div class="ct" style="margin:14px 0 7px">Today · ${_todayLog.length} check-in${_todayLog.length>1?'s':''}</div><div class="pv-chip-row">${chips}</div></div>`;
+  }
+  h += `</div>`;
+
+  // ── 7-day pattern (the "what state am I most often in" tracker) ──
+  const _wk = pvCounts(7);
+  if(_wk.total){
+    const dom = PV_STATES[_wk.dominant];
+    let _bar='';
+    PV_ORDER.forEach(id=>{const c=(_wk.arr.find(x=>x.id===id)||{}).n||0;if(!c)return;
+      const pct=Math.round(c/_wk.total*100);const s=PV_STATES[id];
+      _bar+=`<span style="width:${pct}%;background:${s.color}" title="${s.label} ${pct}%"></span>`;
+    });
+    const _legend = _wk.arr.map(x=>{const s=PV_STATES[x.id];return `<span class="pv-leg"><span class="pv-dot" style="background:${s.color}"></span>${s.label} <b>${Math.round(x.n/_wk.total*100)}%</b></span>`;}).join('');
+    h += `<div class="card" style="margin-bottom:14px">
+      <span class="kicker" style="color:var(--sub)">Last 7 days</span>
+      <h3 class="mk-q" style="margin-bottom:4px">Most often: <span style="color:${dom.color}">${dom.label}</span></h3>
+      <p style="font-size:11.5px;color:var(--sub);margin:0 0 11px">${_wk.total} check-in${_wk.total>1?'s':''} logged · ${dom.plain.toLowerCase()}</p>
+      <div class="pv-distro">${_bar}</div>
+      <div class="pv-legend">${_legend}</div></div>`;
+  }
+
+  // ── Quick suggested practice (≤5 min, do-it-now) ──
+  if(_ss && PV_STATES[_ss]){
+    const sg=PV_SUGGEST[_ss]||{};
+    const act=_pvPick(_ss);
     if(act){
       h += `<div class="fdn-focus" style="margin-bottom:14px;padding:18px">
-        <span class="kicker">Today's practice · for feeling ${_ss}</span>
+        <span class="kicker">${sg.k||'Suggested now'}</span>
         <h3 style="font-size:22px;margin:7px 0 5px">${act.n}</h3>
-        <p>${sg.b||act.tag||''}</p>
-        <div style="font-size:11.5px;color:#c8cdd2;margin-top:8px">${act.dur||''}${act.dur&&act.tag?' · ':''}${act.tag||''}</div>
+        <p>${sg.blurb||act.tag||''}</p>
+        <div style="font-size:11.5px;color:#c8cdd2;margin-top:8px">⏱ ${act.dur||''}${act.dur&&act.tag?' · ':''}${act.tag||''}</div>
         <button class="btn" style="margin-top:14px;background:var(--purple);color:var(--text);border:none" onclick="beginPractice('${act.id}')">Begin this practice</button></div>`;
-    } else if(sg.t){
-      h += `<div class="fdn-focus" style="margin-bottom:14px;padding:18px"><span class="kicker">${sg.k||'Suggested'}</span><h3>${sg.t}</h3><p>${sg.b}</p></div>`;
     }
   }
   h += `<div class="ct" style="padding:4px 3px 8px">More practices</div>`;
@@ -9328,25 +9382,86 @@ function _exHeroBlock(wo){
   </div>`;
 }
 
-/* ════════════ STRESS suggestions (mockup) ════════════ */
-const STRESS_SUGGEST={
-  wired:{k:'Suggested for wired',t:'Long, slow exhale',b:'When the system is revved, lengthening the exhale signals the threat has passed. Try 4 in, 8 out for a few minutes — and reduce inputs.',cat:'breathing'},
-  steady:{k:'Suggested for steady',t:'Keep the tone up',b:'You\'re in a good window. A few minutes of calm breathing or a short walk banks resilience for the harder moments later.',cat:'breathing'},
-  foggy:{k:'Suggested for foggy',t:'Light and movement first',b:'Fog usually lifts faster with outdoor light and a short walk than with more caffeine. Ten minutes outside is the experiment.',cat:'rest'},
-  drained:{k:'Suggested for drained',t:'Do less, gently',b:'Nothing left in the tank means the move is gentleness — warmth, rest, easy connection. Pushing harder digs the hole deeper.',cat:'rest'}
+/* ════════════ POLYVAGAL nervous-system check-in ════════════ */
+// The five states form a polyvagal "ladder": pure sympathetic (mobilized) and
+// pure dorsal (immobilized) are the dysregulated poles; the three ventral-flavored
+// states in the middle are the regulated/safe zone. The two blends are ventral
+// mixing with each branch — ventral+sympathetic = work/play (engaged),
+// ventral+dorsal = rest/wind-down (restful).
+const PV_STATES = {
+  mobilized:   {id:'mobilized',   label:'Mobilized',   plain:'Fight or flight',          poly:'Sympathetic',           color:'#c4855f', zone:'dysreg', order:1},
+  engaged:     {id:'engaged',     label:'Engaged',     plain:'Work or play',             poly:'Ventral + sympathetic', color:'#bfa15f', zone:'safe',   order:2},
+  ventral:     {id:'ventral',     label:'Grounded',    plain:'Safe & connected',         poly:'Ventral',               color:'#b7baa7', zone:'safe',   order:3},
+  restful:     {id:'restful',     label:'Restful',     plain:'Rest & wind-down',         poly:'Ventral + dorsal',      color:'#94a89e', zone:'safe',   order:4},
+  immobilized: {id:'immobilized', label:'Immobilized', plain:'Frozen or shut down',      poly:'Dorsal',                color:'#7a9aab', zone:'dysreg', order:5},
 };
-function _stressPick(state){
-  if(typeof NS_ACT==='undefined')return null;
-  const ids={wired:['extended-exhale','box-breath','phys-sigh'],drained:['yoga-nidra','body-scan','floor-time'],foggy:['orienting-walk','zone2-walk','five-senses'],steady:['box-breath','coherent-breath','gratitude']}[state]||[];
-  for(const id of ids){const a=NS_ACT.find(x=>x.id===id);if(a)return a;}
-  const cat={wired:'breathing',drained:'mindfulness',foggy:'movement',steady:'breathing'}[state];
-  return NS_ACT.find(x=>x.cat===cat)||NS_ACT[0]||null;
+const PV_ORDER = ['mobilized','engaged','ventral','restful','immobilized'];
+
+// Each state → only quick (≤5 min) do-it-now practices, ordered by best-fit.
+const PV_SUGGEST = {
+  mobilized:   {k:'When you\'re mobilized', blurb:'Fight-or-flight energy is up. The move is to signal "the threat has passed" — lengthen the exhale and discharge the charge. A long exhale, a physiological sigh, or cold water on the face all settle the system in under a few minutes.', ids:['extended-exhale','phys-sigh','cold-face','orienting','gentle-shaking']},
+  engaged:     {k:'When you\'re engaged', blurb:'This is a regulated, energized state — good for work and play. Keep it from tipping into overdrive: a 60-second reset between tasks holds the tone without draining it.', ids:['transition-reset','phys-sigh','joint-circles','gratitude']},
+  ventral:     {k:'When you\'re grounded', blurb:'You\'re in the window — calm and connected. This is the moment to bank resilience. A few minutes of savoring or specific gratitude deepens the state so it\'s easier to return to later.', ids:['somatic-pleasure','gratitude','transition-reset','grounding-contact']},
+  restful:     {k:'When you\'re restful', blurb:'Settled and winding down — protect it. Warmth, slow breath, and gentle vibration support the rest rather than stirring the system back up. Keep inputs low.', ids:['grounding-contact','extended-exhale','humming','somatic-pleasure']},
+  immobilized: {k:'When you\'re immobilized', blurb:'Shutdown and freeze need a gentle nudge toward connection — never a push. Orienting your eyes around the room, cold water on the face, or a few hummed breaths each signal safety and begin to bring the system back online.', ids:['orienting','cold-face','humming','five-senses','gentle-shaking']},
+};
+
+// Duration parser → max minutes implied by an activity's `dur` string.
+function _actMaxMin(act){
+  const d=String((act&&act.dur)||'').toLowerCase();
+  if(d.includes('sec'))return 0.5;            // any "30 sec"/"60 sec" = quick
+  const nums=(d.match(/\d+(?:\.\d+)?/g)||[]).map(Number);
+  if(!nums.length)return 99;                  // "Daily","Any","Before bed" → not quick
+  return Math.max.apply(null,nums);
 }
-function setStressState(s){lsSet('stress_'+viewDate,s);try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}rRecovery();}
+function _isQuick(act){return _actMaxMin(act)<=5;}
+
+// Pick the best available quick practice for a state.
+function _pvPick(state){
+  if(typeof NS_ACT==='undefined')return null;
+  const ids=((PV_SUGGEST[state]||{}).ids)||[];
+  for(const id of ids){const a=NS_ACT.find(x=>x.id===id);if(a&&_isQuick(a))return a;}
+  return NS_ACT.find(a=>_isQuick(a))||null;    // safe fallback: any quick practice
+}
+
+/* ── Timestamped daily log: pvlog_<date> = [{s,t}, …] ── */
+function pvLog(date){
+  try{const a=JSON.parse(lsGet('pvlog_'+(date||viewDate),'[]'));return Array.isArray(a)?a:[];}catch(e){return [];}
+}
+function pvLatest(date){
+  const a=pvLog(date);
+  if(a.length)return a[a.length-1].s;
+  return lsGet('stress_'+(date||viewDate),'')||'';   // back-compat: old single-state days
+}
+function pvAddCheckin(s){
+  if(!PV_STATES[s])return;
+  const a=pvLog(viewDate);a.push({s,t:Date.now()});
+  lsSet('pvlog_'+viewDate,JSON.stringify(a));
+  lsSet('stress_'+viewDate,s);                        // keep latest-state mirror for global profile
+  try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}
+  rRecovery();
+}
+// Back-compat alias (older code/UI paths may still call this).
+function setStressState(s){pvAddCheckin(s);}
+
+// Aggregate counts across the last N days → sorted [{id,n}], plus dominant.
+function pvCounts(days){
+  const counts={};const today=new Date();
+  for(let i=0;i<(days||7);i++){
+    const d=new Date(today);d.setDate(today.getDate()-i);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    const log=pvLog(key);
+    if(log.length){log.forEach(e=>{if(PV_STATES[e.s])counts[e.s]=(counts[e.s]||0)+1;});}
+    else{const s=lsGet('stress_'+key,'');if(PV_STATES[s])counts[s]=(counts[s]||0)+1;}
+  }
+  const arr=Object.entries(counts).map(([id,n])=>({id,n})).sort((a,b)=>b.n-a.n);
+  return {arr,total:arr.reduce((s,x)=>s+x.n,0),dominant:arr[0]?arr[0].id:null};
+}
+function pvDominant(days){return pvCounts(days).dominant;}
+
 function beginSuggested(){
-  const s=lsGet('stress_'+viewDate,'steady');const cat=(STRESS_SUGGEST[s]||{}).cat;
-  try{const act=(typeof NS_ACT!=='undefined')?NS_ACT.find(a=>a.cat===cat):null;
-    if(act&&typeof setNSExpand==='function'){setNSExpand(act.id);return;}}catch(e){}
+  const act=_pvPick(pvLatest(viewDate));
+  if(act&&typeof beginPractice==='function'){beginPractice(act.id);return;}
   showToast('Pick a practice below');
 }
 
@@ -9626,10 +9741,11 @@ function _dressData(){
   const t=(typeof getTgt==='function')?getTgt():{};
   const a=_avg7();
   const ss=lsGet('stress_'+dk(),'');
+  let pv30=null;try{pv30=(typeof pvCounts==='function')?pvCounts(30):null;}catch(e){}
   let supps=[];try{supps=JSON.parse(lsGet('_supps_plan','[]'))||[];}catch(e){}
   let titr=null;try{titr=JSON.parse(lsGet('_supp_titr','null'));}catch(e){}
   const tm=p.times||{};
-  return {p,ns,gut,aa,lever,t,a,ss,supps,titr,tm,goal:p.goal||'general wellness',name:p.name||''};
+  return {p,ns,gut,aa,lever,t,a,ss,pv30,supps,titr,tm,goal:p.goal||'general wellness',name:p.name||''};
 }
 // "Your story" — the long-term, global synthesis (vs. Weekly Review = recent).
 // Draws on all assessments + the 30-day DRESS picture from computeProgress.
@@ -9650,6 +9766,10 @@ function _dressStorySynth(d){
   if(d.ns&&d.ns.pattern){
     const nm=(typeof _nsDisplayName==='function')?_nsDisplayName(d.ns.pattern):d.ns.pattern;
     parts.push(`Your nervous-system read is <b>${nm}</b>${d.lever?(' — the first lever is '+d.lever.title.charAt(0).toLowerCase()+d.lever.title.slice(1)):''}.`);
+  }
+  if(d.pv30&&d.pv30.total>=4&&d.pv30.dominant&&typeof PV_STATES!=='undefined'&&PV_STATES[d.pv30.dominant]){
+    const ds=PV_STATES[d.pv30.dominant];const reg=ds.zone==='safe';
+    parts.push(`Across your recent check-ins your system most often sits in <b>${ds.label.toLowerCase()}</b> (${ds.plain.toLowerCase()})${reg?' — a regulated state, which is a good sign.':' — worth gently widening your window with daily regulation.'}`);
   }
   if(d.gut&&d.gut.severity){ parts.push(`Digestive load is reading <b>${String(d.gut.severity).toLowerCase()}</b> right now.`); }
   let done=0;try{done=(pr&&pr.stats&&pr.stats.assessDone)||0;}catch(e){}
