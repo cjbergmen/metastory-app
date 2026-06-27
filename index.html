@@ -2905,75 +2905,10 @@ function rWorkout(){
 
 // ── FOOD ──────────────────────────────────────────────────────────────────────
 function rFood(){
-  const log=getLog(),m=getMacros(),t=getTgt();
-  let h=`<div class="card">
-    <div class="mr" style="margin-bottom:11px">
-      <div class="mi"><div class="mv" style="color:var(--green)">${Math.round(m.p)}</div><div class="ml">Protein</div><div class="mt">/${t.p}g</div></div>
-      <div class="mi"><div class="mv" style="color:var(--orange)">${Math.round(m.c)}</div><div class="ml">Carbs</div><div class="mt">/${t.c}g</div></div>
-      <div class="mi"><div class="mv" style="color:var(--blue)">${Math.round(m.f)}</div><div class="ml">Fat</div><div class="mt">/${t.f}g</div></div>
-      <div class="mi"><div class="mv" style="color:var(--text)">${Math.round(m.k)}</div><div class="ml">Kcal</div><div class="mt">/${t.k}</div></div>
-    </div>
-    <div style="margin-bottom:5px"><div class="pw"><div class="pb" style="width:${pct(m.p,t.p)}%;background:var(--green)"></div></div></div>
-    <div style="margin-bottom:5px"><div class="pw"><div class="pb" style="width:${pct(m.c,t.c)}%;background:var(--orange)"></div></div></div>
-    <div style="margin-bottom:5px"><div class="pw"><div class="pb" style="width:${pct(m.f,t.f)}%;background:var(--blue)"></div></div></div>
-    <div><div class="pw"><div class="pb" style="width:${pct(m.k,t.k)}%;background:var(--text)"></div></div></div>
-  </div>
-  <div class="food-tabs">
-    <button class="food-tab${_foodTab==='log'?' active':''}" onclick="_foodTab='log';rFood()">Today's Log</button>
-    <button class="food-tab${_foodTab==='library'?' active':''}" onclick="_foodTab='library';rFood()">Library</button>
-  </div>`;
-  if(_foodTab==='log'){
-    h+=`<div style="display:flex;gap:8px;margin-bottom:10px">
-      <button class="btn btn-g" style="flex:1" onclick="openFood()">+ Log Food</button>
-      <button class="btn btn-s" style="color:var(--purple);white-space:nowrap" onclick="openRecipeImport()">Import Recipe</button>
-    </div>`;
-    h+=`<button class="suggest-btn" onclick="_showSuggest=!_showSuggest;rFood()">
-      ${_showSuggest?'▾':'✨'} ${_showSuggest?'Hide Suggestions':'Suggest Foods'}
-    </button>`;
-    if(_showSuggest)h+=rSuggestPanel();
-    if(!log.length){
-      h+=`<div class="empty"><div style="margin-bottom:8px"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--border)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3v2"/><path d="M21 22v-7"/></svg></div><div>No meals logged yet today</div></div>`;
-    }else{
-      h+=`<div class="ct" style="padding:0 3px 9px">Today's Meals</div>`;
-      log.slice().reverse().forEach((e,ri)=>{
-        const i=log.length-1-ri;
-        h+=`<div class="fe">
-          <div class="fth">${e.photo?`<img src="${e.photo}" alt="">`:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3v2"/><path d="M21 22v-7"/></svg>`}</div>
-          <div style="flex:1">
-            <div class="fn">${e.name}</div>
-            <div class="ftm">${e.time||e.t||(e.ts?new Date(e.ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'')}</div>
-            <div class="fm">
-              <div class="fmv" style="color:var(--green)">${e.p}g <span>P</span></div>
-              <div class="fmv" style="color:var(--orange)">${e.c}g <span>C</span></div>
-              <div class="fmv" style="color:var(--blue)">${e.f}g <span>F</span></div>
-              <div class="fmv" style="color:var(--text)">${e.k} <span>kcal</span></div>
-            </div>
-          </div>
-          <button class="db" onclick="delFood(${i})">✕</button>
-        </div>`;
-      });
-    }
-  } else {
-    h+=rFoodLibHTML();
-  }
-  document.getElementById('page-food').innerHTML=h;
-  if(_foodTab==='library'){
-    if(_libExpandedId){
-      const lib=getLib();
-      const item=lib.find(x=>x.id===_libExpandedId);
-      if(item&&item.perGram){
-        // Restore gram preview if value was saved
-        if(_libGrams[_libExpandedId]) setTimeout(()=>libGramPreview(_libExpandedId),0);
-      } else {
-        libUpdateTotals(_libExpandedId);
-      }
-    }
-    // Restore focus to search input if user was typing
-    if(_libSearch){
-      const si=document.getElementById('lib-si');
-      if(si){si.focus();const l=si.value.length;si.setSelectionRange(l,l);}
-    }
-  }
+  // Redirect to the new Diet page renderer — rFood() is kept as an alias
+  // so that all existing call sites (saveFood, delFood, closeFood, etc.)
+  // render the updated Diet view instead of the legacy food screen.
+  rDiet();
 }
 
 // ── WATER ─────────────────────────────────────────────────────────────────────
