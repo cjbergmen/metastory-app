@@ -400,6 +400,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .pv-legend{display:flex;flex-wrap:wrap;gap:11px;margin-top:11px}
 .pv-leg{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--sub)}
 .pv-leg b{color:var(--text);font-weight:700}
+.pv-suggest{animation:pvPop .45s cubic-bezier(.2,.7,.3,1)}
+@keyframes pvPop{from{opacity:0;transform:translateY(-12px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
 .wk-bars{display:flex;gap:7px;align-items:flex-end;height:70px;margin-top:12px}
 .wk-bars .d{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px}
 .wk-bars .b{width:100%;border-radius:6px 6px 3px 3px;background:var(--purple);min-height:5px}
@@ -2988,22 +2990,23 @@ function rRecovery(){
       ${sel?'<span class="pv-check" style="color:'+s.color+'">✓</span>':''}
     </button>`;
   });
-  h += `<div class="card"><span class="kicker" style="color:var(--sub)">Nervous-system check-in</span>
+  // Build the three blocks separately, then order them by whether a check-in exists.
+  // After a check-in, the suggestion pops to the very top and the check-in settles below it.
+  let _checkinCard = `<div class="card"><span class="kicker" style="color:var(--sub)">Nervous-system check-in</span>
     <h3 class="mk-q">What state is your system in right now?</h3>
     <div class="pv-ladder">${_ladder}</div>
-    <p style="font-size:11.5px;color:var(--sub);margin-top:10px;line-height:1.45">Polyvagal theory: the middle three are regulated (safe) states; the top and bottom are the activated and shut-down edges. Check in as many times a day as you like — each one shapes the suggestion below and builds your pattern over time.</p>`;
-
-  // Today's timeline of check-ins
+    <p style="font-size:11.5px;color:var(--sub);margin-top:10px;line-height:1.45">Polyvagal theory: the middle three are regulated (safe) states; the top and bottom are the activated and shut-down edges. Check in as many times a day as you like — each one shapes today's practice and builds your pattern over time.</p>`;
   if(_todayLog.length){
     const chips=_todayLog.slice(-8).map(e=>{const s=PV_STATES[e.s];if(!s)return '';
       const tm=new Date(e.t).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
       return `<span class="pv-chip" style="border-color:${s.color}55"><span class="pv-dot" style="background:${s.color}"></span>${s.label} <small style="color:var(--sub)">${tm}</small></span>`;
     }).join('');
-    h += `<div class="pv-today"><div class="ct" style="margin:14px 0 7px">Today · ${_todayLog.length} check-in${_todayLog.length>1?'s':''}</div><div class="pv-chip-row">${chips}</div></div>`;
+    _checkinCard += `<div class="pv-today"><div class="ct" style="margin:14px 0 7px">Today · ${_todayLog.length} check-in${_todayLog.length>1?'s':''}</div><div class="pv-chip-row">${chips}</div></div>`;
   }
-  h += `</div>`;
+  _checkinCard += `</div>`;
 
-  // ── 7-day pattern (the "what state am I most often in" tracker) ──
+  // 7-day pattern (the "what state am I most often in" tracker)
+  let _trackerCard='';
   const _wk = pvCounts(7);
   if(_wk.total){
     const dom = PV_STATES[_wk.dominant];
@@ -3013,7 +3016,7 @@ function rRecovery(){
       _bar+=`<span style="width:${pct}%;background:${s.color}" title="${s.label} ${pct}%"></span>`;
     });
     const _legend = _wk.arr.map(x=>{const s=PV_STATES[x.id];return `<span class="pv-leg"><span class="pv-dot" style="background:${s.color}"></span>${s.label} <b>${Math.round(x.n/_wk.total*100)}%</b></span>`;}).join('');
-    h += `<div class="card" style="margin-bottom:14px">
+    _trackerCard = `<div class="card" style="margin-bottom:14px">
       <span class="kicker" style="color:var(--sub)">Last 7 days</span>
       <h3 class="mk-q" style="margin-bottom:4px">Most often: <span style="color:${dom.color}">${dom.label}</span></h3>
       <p style="font-size:11.5px;color:var(--sub);margin:0 0 11px">${_wk.total} check-in${_wk.total>1?'s':''} logged · ${dom.plain.toLowerCase()}</p>
@@ -3021,19 +3024,26 @@ function rRecovery(){
       <div class="pv-legend">${_legend}</div></div>`;
   }
 
-  // ── Quick suggested practice (≤5 min, do-it-now) ──
+  // Quick suggested practice (≤5 min, do-it-now) — opens the immersive full-screen player
+  let _suggestCard='';
   if(_ss && PV_STATES[_ss]){
     const sg=PV_SUGGEST[_ss]||{};
     const act=_pvPick(_ss);
     if(act){
-      h += `<div class="fdn-focus" style="margin-bottom:14px;padding:18px">
+      const sc=PV_STATES[_ss].color;
+      _suggestCard = `<div class="fdn-focus pv-suggest" style="margin-bottom:14px;padding:18px;border-left:3px solid ${sc}">
         <span class="kicker">${sg.k||'Suggested now'}</span>
         <h3 style="font-size:22px;margin:7px 0 5px">${act.n}</h3>
         <p>${sg.blurb||act.tag||''}</p>
         <div style="font-size:11.5px;color:#c8cdd2;margin-top:8px">⏱ ${act.dur||''}${act.dur&&act.tag?' · ':''}${act.tag||''}</div>
-        <button class="btn" style="margin-top:14px;background:var(--purple);color:var(--text);border:none" onclick="beginPractice('${act.id}')">Begin this practice</button></div>`;
+        <button class="btn" style="margin-top:14px;background:var(--purple);color:var(--text);border:none" onclick="openPractice('${act.id}')">Begin this practice</button></div>`;
     }
   }
+
+  // Order: with a check-in, suggestion leads (pops to top); otherwise check-in leads.
+  if(_suggestCard){ h += _suggestCard + _checkinCard + _trackerCard; }
+  else { h += _checkinCard + _trackerCard; }
+
   h += `<div class="ct" style="padding:4px 3px 8px">More practices</div>`;
 
   // Category filter
@@ -3071,6 +3081,8 @@ function rRecovery(){
       if(act.why){
         h += `<div style="margin-top:10px;padding:10px;background:rgba(122,154,171,.08);border-radius:var(--rs);font-size:12px;color:var(--sub);line-height:1.6"><strong style="color:var(--blue)">Why it works:</strong> ${act.why}</div>`;
       }
+      // Begin in the immersive full-screen player (same feel as guided prayer)
+      h += `<button class="btn" style="margin-top:12px;width:100%;background:var(--purple);color:var(--text);border:none;font-weight:700" onclick="event.stopPropagation();openPractice('${act.id}')">Begin practice</button>`;
       // Timer buttons for thermal activities
       if(act.id==='cold-plunge'){
         const tr=isTrain();
@@ -9123,6 +9135,99 @@ async function _fetchPrayerReading(slot,mode){
     } else { set(`<div style="font-size:16px;color:rgba(255,255,255,.85)">Sit with a passage that's meaningful to you today.</div>`); }
   }catch(e){ set(`<div style="font-size:16px;color:rgba(255,255,255,.85)">Couldn't load today's reading — sit with a passage that's meaningful to you today.</div>`); }
 }
+
+/* ════════════ IMMERSIVE PRACTICE PLAYER ════════════ */
+// Full-screen, swipeable, one step at a time — the exact feel of the Rhythm of Rest
+// guided prayer, in the regulation-green palette (#b7baa7). Launched from the Stress
+// suggestion card and from any practice in the library.
+const _PRACTICE_BG='linear-gradient(165deg,#cdd0c1 0%,#b7baa7 44%,#465044 100%)';
+function _practiceDoneToday(){try{return JSON.parse(lsGet('pcdone_'+dk(),'[]'))||[];}catch(e){return [];}}
+function _practiceMarkDone(id){const d=_practiceDoneToday();if(!d.includes(id)){d.push(id);lsSet('pcdone_'+dk(),JSON.stringify(d));}}
+
+function _practicePage(kind,opts){
+  opts=opts||{};
+  const SERIF='font-family:var(--font-serif)';
+  const wrap=inner=>`<div class="pc-page" style="flex:0 0 100%;width:100%;height:100%;overflow-y:auto;box-sizing:border-box;padding:182px 28px 96px;color:#fff;font-family:var(--font-sans);-webkit-overflow-scrolling:touch">${inner}</div>`;
+  const H=t=>`<div style="${SERIF};font-size:38px;font-weight:500;line-height:1.08;letter-spacing:-.3px;margin-bottom:20px;text-shadow:0 1px 14px rgba(0,0,0,.22)">${t}</div>`;
+  const body=t=>`<div style="${SERIF};font-size:23px;font-weight:400;line-height:1.55;white-space:pre-line;text-shadow:0 1px 12px rgba(0,0,0,.22)">${t}</div>`;
+  if(kind==='title'){
+    return wrap(`<div><div style="font-family:var(--font-sans);font-size:11px;text-transform:uppercase;letter-spacing:.11em;color:rgba(255,255,255,.82);margin-bottom:14px">${opts.over||'Practice'}</div>
+      <div style="${SERIF};font-size:50px;font-weight:500;line-height:1.0;letter-spacing:-.5px;text-shadow:0 2px 18px rgba(0,0,0,.25)">${opts.title}</div>
+      <div style="width:88px;height:3px;background:rgba(255,255,255,.9);border-radius:3px;margin:18px 0 16px"></div>
+      <div style="font-family:var(--font-sans);font-size:15px;letter-spacing:.02em;color:rgba(255,255,255,.92)">${opts.sub||''}</div>
+      ${opts.tag?`<div style="font-family:var(--font-sans);font-size:14.5px;color:rgba(255,255,255,.84);margin-top:9px;line-height:1.5">${opts.tag}</div>`:''}
+      <div style="font-family:var(--font-sans);font-size:12.5px;color:rgba(255,255,255,.7);margin-top:22px">Swipe to move through · or tap the dots below</div></div>`);
+  }
+  if(kind==='step'){
+    const overline=`<div style="font-family:var(--font-sans);font-size:11px;text-transform:uppercase;letter-spacing:.11em;color:rgba(255,255,255,.8);margin-bottom:18px">Step ${opts.idx} of ${opts.total}</div>`;
+    return wrap(overline+body(opts.text||''));
+  }
+  if(kind==='why'){
+    return wrap(`<div style="font-family:var(--font-sans);font-size:11px;text-transform:uppercase;letter-spacing:.11em;color:rgba(255,255,255,.8);margin-bottom:16px">Why it works</div>`+body(opts.text||''));
+  }
+  if(kind==='complete'){
+    return wrap(H(opts.title||'Well done')+body(opts.text||''));
+  }
+  return wrap(body(opts.text||''));
+}
+
+function _buildPracticePages(act){
+  const P=[];
+  const add=h=>P.push(h);
+  add(_practicePage('title',{over:'Practice',title:act.n,sub:'⏱ '+(act.dur||''),tag:act.tag||''}));
+  (act.steps||[]).forEach((s,i)=>add(_practicePage('step',{idx:i+1,total:(act.steps||[]).length,text:s})));
+  if(act.why) add(_practicePage('why',{text:act.why}));
+  add(_practicePage('complete',{title:'Well done',text:'Notice how your body feels now compared to when you began. Even a small shift counts — that’s your nervous system responding.'}));
+  return P;
+}
+
+let _pcStep=0,_pcPages=[],_pcId='';
+function openPractice(id){
+  const act=(typeof NS_ACT!=='undefined')?NS_ACT.find(a=>a.id===id):null;
+  if(!act)return;
+  _pcId=id; _pcStep=0; _pcPages=_buildPracticePages(act);
+  const panels=_pcPages.map((p,i)=>`<div class="pc-panel" style="position:absolute;inset:0;opacity:${i===0?1:0};transition:opacity .55s ease;pointer-events:${i===0?'auto':'none'}">${p}</div>`).join('');
+  const ov=document.createElement('div');
+  ov.id='practice-overlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:9999;background:'+_PRACTICE_BG;
+  ov.innerHTML=`<style>@keyframes pcBreathe{0%,100%{transform:scale(.84)}50%{transform:scale(1.12)}}</style>
+    <div id="pc-dark" style="position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .55s"></div>
+    <div id="pc-ring" style="position:absolute;top:44px;left:50%;transform:translateX(-50%);width:116px;height:116px;pointer-events:none;z-index:4;transition:opacity .2s ease"><div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.5);animation:pcBreathe 11s ease-in-out infinite"></div><div style="position:absolute;inset:15px;border-radius:50%;border:1px solid rgba(255,255,255,.28);animation:pcBreathe 11s ease-in-out infinite"></div></div>
+    <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:rgba(255,255,255,.16);z-index:5"><div id="pc-progress" style="position:absolute;left:0;top:0;width:100%;height:0;background:rgba(255,255,255,.85);transition:height .55s ease"></div></div>
+    <div id="practice-stage" style="position:absolute;inset:0">${panels}</div>
+    <div style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;padding:16px 22px 30px;z-index:6">
+      <button onclick="closePractice()" aria-label="Close practice" style="background:none;border:none;color:#fff;cursor:pointer;flex:none;display:flex;align-items:center;padding:4px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+      <div id="pc-dots" style="flex:1;display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap"></div>
+      <button id="pc-finish" onclick="completePractice()" aria-label="Complete" style="flex:none;width:30px;height:30px;border-radius:50%;border:none;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;cursor:pointer;visibility:hidden"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#222" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+    </div>`;
+  document.body.appendChild(ov);
+  document.body.style.overflow='hidden';
+  ov.querySelectorAll('.pc-page').forEach(p=>p.addEventListener('scroll',_pcRingFade,{passive:true}));
+  ov.addEventListener('touchstart',_pcTouchStart,{passive:true});
+  ov.addEventListener('touchend',_pcTouchEnd,{passive:true});
+  _renderPracticeStep();
+}
+function _pcRingFade(e){const ring=document.getElementById('pc-ring');if(!ring)return;const st=(e.target&&e.target.scrollTop)||0;ring.style.opacity=Math.max(0,1-st/100).toFixed(2);}
+function _renderPracticeStep(){
+  const ov=document.getElementById('practice-overlay');if(!ov)return;
+  const n=_pcPages.length;
+  ov.querySelectorAll('#practice-stage > .pc-panel').forEach((el,i)=>{const on=i===_pcStep;el.style.opacity=on?1:0;el.style.pointerEvents=on?'auto':'none';const pg=el.querySelector('.pc-page');if(on&&pg)pg.scrollTop=0;});
+  const ring=document.getElementById('pc-ring');if(ring)ring.style.opacity=1;
+  const dk2=document.getElementById('pc-dark');if(dk2)dk2.style.opacity=(n>1?_pcStep/(n-1)*0.5:0).toFixed(3);
+  const pg=document.getElementById('pc-progress');if(pg)pg.style.height=((_pcStep+1)/n*100)+'%';
+  const last=_pcStep===n-1;
+  const dots=document.getElementById('pc-dots');
+  if(dots){let dh='';for(let i=0;i<n;i++){const on=i===_pcStep;dh+=`<button onclick="_practiceGo(${i})" aria-label="Step ${i+1}" style="flex:none;height:7px;width:${on?'20px':'7px'};border-radius:4px;border:none;padding:0;margin:0;cursor:pointer;background:rgba(255,255,255,${on?'.95':'.4'});transition:width .25s ease,background .25s ease"></button>`;}dots.innerHTML=dh;}
+  const fin=document.getElementById('pc-finish');if(fin)fin.style.visibility=last?'visible':'hidden';
+}
+function _practiceGo(i){if(i>=0&&i<_pcPages.length){_pcStep=i;_renderPracticeStep();}}
+function practiceNext(){if(_pcStep<_pcPages.length-1){_pcStep++;_renderPracticeStep();}}
+function practicePrev(){if(_pcStep>0){_pcStep--;_renderPracticeStep();}}
+let _pcTouchX=0,_pcTouchY=0;
+function _pcTouchStart(e){const t=e.touches&&e.touches[0];if(t){_pcTouchX=t.clientX;_pcTouchY=t.clientY;}}
+function _pcTouchEnd(e){const t=e.changedTouches&&e.changedTouches[0];if(!t)return;const dx=t.clientX-_pcTouchX,dy=t.clientY-_pcTouchY;if(dy>100&&dy>Math.abs(dx)*1.5){closePractice();return;}if(Math.abs(dx)>48&&Math.abs(dx)>Math.abs(dy)*1.3){if(dx<0)practiceNext();else practicePrev();}}
+function closePractice(){const ov=document.getElementById('practice-overlay');if(ov)ov.remove();document.body.style.overflow='';}
+function completePractice(){_practiceMarkDone(_pcId);closePractice();showToast('Practice complete');try{rRecovery();}catch(e){}}
 
 /* ════════════ SUPPS TAB ════════════ */
 function _suppPlan(){try{return JSON.parse(lsGet('_supps_plan','[]'))||[];}catch(e){return [];}}
