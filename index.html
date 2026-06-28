@@ -1137,6 +1137,8 @@ async function fbPullAll(){
         if(s.username && !getUsername()) lsSet('_username', s.username);
         if(s.qmOverrides) lsSet('_qmIng', JSON.stringify(s.qmOverrides));
         if(s.qmFreq) lsSet('_qmFreq', JSON.stringify(s.qmFreq));
+        // Restore supplement plan (Supps tab) from cloud — cloud wins if local is empty
+        if(s.suppsPlan && s.suppsPlan.length){ let _lp=[]; try{_lp=JSON.parse(lsGet('_supps_plan','[]'))||[];}catch(e){} if(!_lp.length) lsSet('_supps_plan', JSON.stringify(s.suppsPlan)); }
         // Restore supplements — cloud wins if local is empty
         if(s.supps && s.supps.length) {
           const localSupps = getSupps();
@@ -9238,7 +9240,8 @@ function completePractice(){_practiceMarkDone(_pcId);closePractice();showToast('
 
 /* ════════════ SUPPS TAB ════════════ */
 function _suppPlan(){try{return JSON.parse(lsGet('_supps_plan','[]'))||[];}catch(e){return [];}}
-function _suppSave(p){lsSet('_supps_plan',JSON.stringify(p));try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}}
+function cloudWriteSuppsPlan(p){ if(!fbUser || !fbDb) return; try{ fbDb.collection('users').doc(fbUser.uid).set({ settings:{ suppsPlan:p }, updated: Date.now() }, {merge:true}).catch(()=>{}); }catch(e){} }
+function _suppSave(p){try{cloudWriteSuppsPlan(p);}catch(e){}lsSet('_supps_plan',JSON.stringify(p));try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}}
 function _suppTaken(){try{return JSON.parse(lsGet('supptk_'+viewDate,'[]'))||[];}catch(e){return [];}}
 function toggleSupp(id){let t=_suppTaken();t=t.includes(id)?t.filter(x=>x!==id):t.concat(id);lsSet('supptk_'+viewDate,JSON.stringify(t));rSupps();}
 function takeAllSlot(slot){const plan=_suppPlan();let t=_suppTaken();const ids=plan.filter(s=>s.slot===slot).map(s=>s.id);ids.forEach(id=>{if(!t.includes(id))t.push(id);});lsSet('supptk_'+viewDate,JSON.stringify(t));showToast('All '+slot+' supplements logged ✅');rSupps();}
