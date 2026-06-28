@@ -1055,7 +1055,7 @@ function fbSyncSettings(){
     try { settings.qmOverrides = JSON.parse(lsGet('_qmIng','{}')); } catch(e){}
     try { settings.qmFreq = JSON.parse(lsGet('_qmFreq','{}')); } catch(e){}
     try { settings.foodLib = JSON.parse(lsGet('_foodlib','[]')); } catch(e){}
-    try { settings.supps = JSON.parse(lsGet('_supps','[]')); } catch(e){}
+    try { const _sv = JSON.parse(lsGet('_supps','[]')); if(_sv && _sv.length) settings.supps = _sv; } catch(e){}
     try { const rt=lsGet('_routineTR',''); if(rt) settings.routineTR=JSON.parse(rt); } catch(e){}
     try { const rr=lsGet('_routineRS',''); if(rr) settings.routineRS=JSON.parse(rr); } catch(e){}
     try { const ut=lsGet('_userTargets',''); if(ut) settings.userTargets=JSON.parse(ut); } catch(e){}
@@ -6490,11 +6490,18 @@ document.addEventListener('click', function(e){
 // ── SUPPLEMENT TRACKER ───────────────────────────────────────────────────────
 function getSupps(){try{return JSON.parse(lsGet('_supps','[]'))||[];}catch{return[];}}
 function setSupps(a){
+  // Cloud-first: write the real list straight to the user's account so it persists
+  // immediately, even if this device's localStorage is full or evicted.
+  cloudWriteSupps(a);
   if(!lsSet('_supps',JSON.stringify(a))){
-    // Quota — value sits in MEM only, won't survive reload.
-    try{showToast('Storage full — supplement won\'t persist after reload');}catch(e){}
+    try{showToast('Saved to your account (this device\'s storage is full)');}catch(e){}
   }
-  fbSyncSettings();
+}
+// Writes the supplement list directly to Firestore using the explicit array,
+// so a full/evicted local store can never push an empty list over a good cloud copy.
+function cloudWriteSupps(a){
+  if(!fbUser || !fbDb) return;
+  try{ fbDb.collection('users').doc(fbUser.uid).set({ settings:{ supps:a }, updated: Date.now() }, {merge:true}).catch(()=>{}); }catch(e){}
 }
 // Supp log is keyed to viewDate (the date currently being viewed) — not
 // new Date() — so each day has its own independent set of taken supplements.
