@@ -803,8 +803,18 @@ function lsGet(k,d){
   try{const v=localStorage.getItem(k);return v!==null?v:d}catch(e){return d}
 }
 function lsSet(k,v){
-  try{localStorage.setItem(k,v);delete MEM[k];return true}
-  catch(e){MEM[k]=v;return false}
+  let _r;try{localStorage.setItem(k,v);delete MEM[k];_r=true;}catch(e){MEM[k]=v;_r=false;}
+  try{fbSyncDayMisc(k,v);}catch(e){}
+  return _r;
+}
+var _daySyncOff=false;
+const SYNC_DAY_PREFIXES=['supptk_','pvlog_','stress_','wd_','rest_','restdone_','wind_','pcdone_','bs_','routedone_'];
+function fbSyncDayMisc(k,v){
+  if(_daySyncOff||!fbUser||!fbDb)return;
+  var pref=null;for(var i=0;i<SYNC_DAY_PREFIXES.length;i++){if(k.indexOf(SYNC_DAY_PREFIXES[i])===0){pref=SYNC_DAY_PREFIXES[i];break;}}
+  if(!pref)return;
+  var field=pref.slice(0,-1);var date=k.slice(pref.length);if(!date)return;
+  try{var o={updated:Date.now()};o[field]=v;fbSet('dayMisc',date,o);}catch(e){}
 }
 
 // ── FIREBASE ─────────────────────────────────────────────────────────────────
@@ -1103,6 +1113,16 @@ async function fbPullAll(){
         if(d.water > localWater) lsSet('wa_'+date, String(d.water));
       }
     });
+    // Pull misc daily logs (supps taken, stress, rest/prayer, wind-down, blood sugar, routines)
+    _daySyncOff=true;
+    try{
+      const miscSnap = await fbDb.collection('users').doc(uid).collection('dayMisc').get();
+      miscSnap.forEach(doc => {
+        const d = doc.data(); const date = doc.id;
+        SYNC_DAY_PREFIXES.forEach(p=>{ const f=p.slice(0,-1); const val=d[f]; if(val!==undefined&&val!==null&&val!==''){ const key=f+'_'+date; if(!lsGet(key,'')) lsSet(key, val); } });
+      });
+    }catch(e){}
+    _daySyncOff=false;
     // Pull workout logs
     const woSnap = await fbDb.collection('users').doc(uid).collection('workoutLogs').get();
     woSnap.forEach(doc => {
@@ -1318,6 +1338,7 @@ async function fbPushLogsOnly(){
       try { const ex = JSON.parse(val); if(ex.length) fbSyncWorkoutLog(date, ex); } catch(e){}
     }
   }
+  try{ Object.keys(localStorage).concat(Object.keys(MEM)).forEach(function(k){ for(var mi=0;mi<SYNC_DAY_PREFIXES.length;mi++){ var mp=SYNC_DAY_PREFIXES[mi]; if(k.indexOf(mp)===0){ var mv=lsGet(k,''); if(mv){ var mdt=k.slice(mp.length); var mf=mp.slice(0,-1); var moo={updated:Date.now()}; moo[mf]=mv; fbSet('dayMisc',mdt,moo); } break; } } }); }catch(e){}
 }
 
 // Clear all user-specific local data (call on sign-out or account switch)
