@@ -5401,7 +5401,20 @@ function _logFoodByWeight(id){ try{
   if(window.showToast) showToast(g+'g '+it.n+' logged');
   if(window.openMealCheckin) openMealCheckin();
 }catch(e){} }
-function _logWeightPrompt(id){ try{
+function _logWeightPrompt(id){return _logFoodPrompt2(id);}
+function _logFoodPrompt2(id){ try{
+  var it=getLib().find(function(x){return x.id===id;}); if(!it) return;
+  var ov=document.getElementById('wlog-ov'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='wlog-ov';
+  ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  var em=it.e||'🍽'; var sid=String(id).replace(/'/g,"\\'");
+  ov.innerHTML="<div style=\"background:var(--surface,#fff);width:100%;max-width:480px;border-radius:18px 18px 0 0;padding:18px 18px 26px;font-family:inherit\"><div style=\"font-size:16px;font-weight:700;color:var(--text,#222);margin-bottom:2px\">"+em+" "+(it.n||'').replace(/</g,'&lt;')+"</div><div style=\"font-size:12px;color:var(--sub,#888);margin-bottom:14px\">Saved: P "+it.p+"g · C "+it.c+"g · F "+it.f+"g · "+it.k+" kcal</div><button onclick=\"document.getElementById('wlog-ov').remove();_quickLibAddOrig('"+sid+"')\" style=\"width:100%;padding:14px;border-radius:10px;border:none;background:var(--green,#b7baa7);color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:14px\">Log as saved</button><div style=\"display:flex;align-items:center;gap:10px;margin-bottom:12px\"><div style=\"flex:1;height:1px;background:var(--border,#ddd)\"></div><div style=\"font-size:11px;color:var(--sub,#999);text-transform:uppercase;letter-spacing:.05em\">or by weight</div><div style=\"flex:1;height:1px;background:var(--border,#ddd)\"></div></div><div style=\"font-size:11px;color:var(--sub,#888);margin-bottom:6px\">Enter grams (scaled from saved as per 100g)</div><div style=\"display:flex;gap:10px\"><input id=\"wlog-g\" type=\"number\" inputmode=\"decimal\" placeholder=\"grams\" style=\"flex:1;font-size:18px;padding:11px;border:1px solid var(--border,#ccc);border-radius:10px;font-family:inherit;box-sizing:border-box\"><button onclick=\"_logFoodByWeight('"+sid+"')\" style=\"flex:0 0 auto;padding:0 18px;border-radius:10px;border:none;background:var(--blue,#424c57);color:#fff;font-size:14px;font-weight:700;cursor:pointer\">Log</button></div><div id=\"wlog-prev\" style=\"font-size:13px;color:var(--text,#222);margin:10px 0 0;min-height:16px\"></div><button onclick=\"document.getElementById('wlog-ov').remove()\" style=\"width:100%;padding:11px;margin-top:14px;border-radius:10px;border:1px solid var(--border,#ccc);background:transparent;color:var(--sub,#777);font-size:13px;font-weight:600;cursor:pointer\">Cancel</button></div>";
+  document.body.appendChild(ov);
+  var inp=document.getElementById('wlog-g'); inp.oninput=function(){ _wlogPreview(it); }; inp.onkeydown=function(e){ if(e.key==='Enter') _logFoodByWeight(id); };
+  setTimeout(function(){ inp.focus(); },50);
+}catch(e){} }
+function _logWeightPromptDead(id){ try{
   var it=getLib().find(function(x){return x.id===id;}); if(!it) return;
   var ov=document.getElementById('wlog-ov'); if(ov) ov.remove();
   ov=document.createElement('div'); ov.id='wlog-ov';
