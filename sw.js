@@ -1,4 +1,4 @@
-const VERSION = '20260630-authdomain';
+const VERSION = '20260630-authrevert';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
