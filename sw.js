@@ -1,4 +1,4 @@
-const VERSION = '20260630-food-suggest';
+const VERSION = '20260630-weight-swap';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
