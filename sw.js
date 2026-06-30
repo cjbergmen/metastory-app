@@ -1,4 +1,4 @@
-const VERSION = '20260630-sugglabel';
+const VERSION = '20260630-suggcards';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
