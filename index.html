@@ -2428,7 +2428,29 @@ function setSwapTab(group){
   renderSwapTabs();
   renderSwapList();
 }
-function renderSwapList(){
+function renderSwapList(){if(window._swapEquip===undefined)window._swapEquip='all';_renderSwapListOrig();try{_ensureSwapEquipBar();_applySwapEquip();}catch(e){}return;}
+function _classifyEquip(t){ t=(t||'').toLowerCase();
+  if(/\bdb\b|dumbbell|goblet/.test(t)) return 'dumbbell';
+  if(/push.?up|pull.?up|chin.?up|\bdip\b|plank|sit.?up|crunch|leg raise|knee raise|hanging|bodyweight|body weight|burpee|mountain climber|glute bridge|superman|bird.?dog|hollow|pistol|nordic|inverted row|step.?up|split squat|calf raise|wall sit|l-sit/.test(t)) return 'bodyweight';
+  return 'other'; }
+function _applySwapEquip(){ var list=document.getElementById('swap-list'); if(!list) return;
+  var mode=window._swapEquip||'all';
+  [].forEach.call(list.querySelectorAll('.swap-item'),function(row){
+    var cls=_classifyEquip(row.textContent||'');
+    var show=(mode==='all')||(mode==='dumbbell'&&cls==='dumbbell')||(mode==='bodyweight'&&cls==='bodyweight');
+    row.style.display=show?'':'none'; }); }
+function _setSwapEquip(m){ window._swapEquip=m; var bar=document.getElementById('swap-equip-bar');
+  if(bar){[].forEach.call(bar.querySelectorAll('button'),function(b){var a=b.getAttribute('data-eq')===m;b.style.background=a?'var(--blue,#424c57)':'transparent';b.style.color=a?'#fff':'var(--sub,#777)';});}
+  _applySwapEquip(); }
+function _ensureSwapEquipBar(){ var list=document.getElementById('swap-list'); if(!list||document.getElementById('swap-equip-bar')) return;
+  if(window._swapEquip===undefined) window._swapEquip='all';
+  var bar=document.createElement('div'); bar.id='swap-equip-bar'; bar.style.cssText='display:flex;gap:8px;margin:0 0 10px';
+  var modes=[['all','All'],['dumbbell','Dumbbell'],['bodyweight','Bodyweight']];
+  bar.innerHTML=modes.map(function(m){var a=(window._swapEquip||'all')===m[0];
+    return "<button data-eq='"+m[0]+"' onclick=\"_setSwapEquip('"+m[0]+"')\" style=\"flex:1;padding:7px;border-radius:8px;border:1px solid var(--border,#ccc);font-size:12px;font-weight:600;cursor:pointer;background:"+(a?'var(--blue,#424c57)':'transparent')+";color:"+(a?'#fff':'var(--sub,#777)')+"\">"+m[1]+"</button>";
+  }).join('');
+  list.parentNode.insertBefore(bar,list); }
+function _renderSwapListOrig(){
   const wo=getWO(); if(!wo)return;
   const currentName=_woExList[_swapModalIdx]||'';
   const items=EX_LIBRARY[_swapMuscleFilter]||[];
@@ -5365,7 +5387,34 @@ function renderQuickGrid(cat){
     return`<div class="qp-w"><div class="qp" onclick="quickLibAdd('${sid}')">${it.e||'🍽️'} ${it.n}</div></div>`;
   }).join('');
 }
-function quickLibAdd(sid){
+function quickLibAdd(sid){return _logWeightPrompt(sid);}
+function _wlogPreview(it){ var inp=document.getElementById('wlog-g'); var prev=document.getElementById('wlog-prev'); if(!inp||!prev) return;
+  var g=parseFloat(inp.value)||0, s=g/100;
+  prev.innerHTML="<b>"+Math.round(it.k*s)+" kcal</b> · P "+(Math.round(it.p*s*10)/10)+"g · C "+(Math.round(it.c*s*10)/10)+"g · F "+(Math.round(it.f*s*10)/10)+"g"; }
+function _logFoodByWeight(id){ try{
+  var it=getLib().find(function(x){return x.id===id;}); if(!it) return;
+  var inp=document.getElementById('wlog-g'); var g=inp?parseFloat(inp.value):0; if(!g||g<=0){ if(inp){inp.style.borderColor='var(--red,#c00)';inp.focus();} return; }
+  var s=g/100;
+  var entry={name:it.n, emoji:it.e||'🍽', p:Math.round(it.p*s*10)/10, c:Math.round(it.c*s*10)/10, f:Math.round(it.f*s*10)/10, k:Math.round(it.k*s), ts:Date.now(), t:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})};
+  var log=getLog(); log.push(entry); putLog(log);
+  var ov=document.getElementById('wlog-ov'); if(ov) ov.remove();
+  if(window.showToast) showToast(g+'g '+it.n+' logged');
+  if(window.openMealCheckin) openMealCheckin();
+}catch(e){} }
+function _logWeightPrompt(id){ try{
+  var it=getLib().find(function(x){return x.id===id;}); if(!it) return;
+  var ov=document.getElementById('wlog-ov'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='wlog-ov';
+  ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  var em=it.e||'🍽';
+  ov.innerHTML="<div style=\"background:var(--surface,#fff);width:100%;max-width:480px;border-radius:18px 18px 0 0;padding:18px 18px 26px;font-family:inherit\"><div style=\"font-size:16px;font-weight:700;color:var(--text,#222);margin-bottom:2px\">"+em+" "+(it.n||'').replace(/</g,'&lt;')+"</div><div style=\"font-size:12px;color:var(--sub,#888);margin-bottom:14px\">Per 100g: P "+it.p+"g · C "+it.c+"g · F "+it.f+"g · "+it.k+" kcal</div><label style=\"font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--sub,#888)\">Weight (grams)</label><input id=\"wlog-g\" type=\"number\" inputmode=\"decimal\" value=\"100\" style=\"width:100%;font-size:18px;padding:11px;border:1px solid var(--border,#ccc);border-radius:10px;margin:6px 0 10px;font-family:inherit;box-sizing:border-box\"><div id=\"wlog-prev\" style=\"font-size:14px;color:var(--text,#222);margin-bottom:16px\"></div><div style=\"display:flex;gap:10px\"><button onclick=\"document.getElementById('wlog-ov').remove()\" style=\"flex:1;padding:13px;border-radius:10px;border:1px solid var(--border,#ccc);background:transparent;color:var(--sub,#777);font-size:14px;font-weight:600;cursor:pointer\">Cancel</button><button onclick=\"_logFoodByWeight('"+String(id).replace(/'/g,"\\'")+"')\" style=\"flex:2;padding:13px;border-radius:10px;border:none;background:var(--green,#b7baa7);color:#fff;font-size:14px;font-weight:700;cursor:pointer\">Log it</button></div></div>";
+  document.body.appendChild(ov);
+  var inp=document.getElementById('wlog-g'); inp.oninput=function(){ _wlogPreview(it); }; inp.onkeydown=function(e){ if(e.key==='Enter') _logFoodByWeight(id); };
+  setTimeout(function(){ inp.focus(); inp.select(); },50);
+  _wlogPreview(it);
+}catch(e){} }
+function _quickLibAddOrig(sid){
   const lib=getLib();
   const it=lib.find(x=>x.id===sid||x.id.replace(/['"]/g,'')===sid);
   if(!it)return;
