@@ -1,4 +1,4 @@
-const VERSION = '20260630-norecent';
+const VERSION = '20260630-bwlog';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately

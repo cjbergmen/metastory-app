@@ -2346,7 +2346,7 @@ function buildExCard(e,idx,num,col,wdone){
     const isBW=BW_EX.includes(name);
     const selVal=st.selW===0?'bw':(st.selW!==null?String(st.selW):'');
     let opts='';
-    if(isBW)opts+=`<option value="bw"${selVal==='bw'?' selected':''}>Bodyweight (BW)</option>`;
+    if(true)opts+=`<option value="bw"${selVal==='bw'?' selected':''}>Bodyweight (BW)</option>`;
     DB_WEIGHTS.forEach(w=>{
       const v=String(w);
       opts+=`<option value="${v}"${selVal===v?' selected':''}>${w} lbs</option>`;
@@ -2428,7 +2428,7 @@ function setSwapTab(group){
   renderSwapTabs();
   renderSwapList();
 }
-function renderSwapList(){if(window._swapEquip===undefined)window._swapEquip='all';_renderSwapListOrig();try{_ensureSwapEquipBar();_applySwapEquip();}catch(e){}return;}
+function renderSwapList(){_renderSwapListOrig();return;}
 function _classifyEquip(t){ t=(t||'').toLowerCase();
   if(/\bdb\b|dumbbell|goblet/.test(t)) return 'dumbbell';
   if(/push.?up|pull.?up|chin.?up|\bdip\b|plank|sit.?up|crunch|leg raise|knee raise|hanging|bodyweight|body weight|burpee|mountain climber|glute bridge|superman|bird.?dog|hollow|pistol|nordic|inverted row|step.?up|split squat|calf raise|wall sit|l-sit/.test(t)) return 'bodyweight';
