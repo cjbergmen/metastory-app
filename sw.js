@@ -1,4 +1,4 @@
-const VERSION = '20260630-logassaved';
+const VERSION = '20260630-sugglabel';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
