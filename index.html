@@ -2946,7 +2946,8 @@ function rWorkout(){
 }
 
 // ── FOOD ──────────────────────────────────────────────────────────────────────
-function rFood(){
+function rFood(){var _w=document.getElementById('food-lib-wrap');if(_w&&_w.offsetParent!==null&&_w.getAttribute('data-fulllib')==='1'){try{_w.innerHTML=rFoodLibHTML();}catch(e){}return;}return _rFoodOrig();}
+function _rFoodOrig(){
   // Redirect to the new Diet page renderer — rFood() is kept as an alias
   // so that all existing call sites (saveFood, delFood, closeFood, etc.)
   // render the updated Diet view instead of the legacy food screen.
@@ -4486,7 +4487,8 @@ function setFoodModalTab(tab){
 }
 let _libArchived=false;
 const _ARCH_SVG='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v3H3zM5 10v9h14v-9M9 13h6"/></svg>';
-function rFoodModalLib(){
+function rFoodModalLib(){var w=document.getElementById('food-lib-wrap');if(w){w.setAttribute('data-fulllib','1');try{w.innerHTML=rFoodLibHTML();}catch(e){}}return;}
+function _fmlOrigDead(){
   const q=(document.getElementById('fml-q').value||'').toLowerCase().trim();
   const all=getLib();
   const archived=all.filter(it=>it.cat==='archived');
@@ -5306,7 +5308,22 @@ function _topItems(n){
 function renderFavs(){try{_favsOrig();}catch(_e){}try{_renderSuggestStrip();}catch(_e){}return;}
 function _mealSuggest(maxN){try{var norm=function(s){return (s||'').toLowerCase().replace(/\s+/g,' ').trim();};var lib=getLib();var libByName={};lib.forEach(function(it){if(it&&it.n&&it.cat!=='archived')libByName[norm(it.n)]=it;});var stats={};for(var i=0;i<localStorage.length;i++){var key=localStorage.key(i);if(!key||key.indexOf('fl_')!==0)continue;var dayMs=Date.parse(key.slice(3));if(isNaN(dayMs))dayMs=0;var arr=[];try{arr=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){}for(var j=0;j<arr.length;j++){var e=arr[j];if(!e||!e.name)continue;var n=norm(e.name);if(!stats[n])stats[n]={count:0,lastDay:0,hours:[]};stats[n].count++;if(dayMs>stats[n].lastDay)stats[n].lastDay=dayMs;if(typeof e.ts==='number')stats[n].hours.push(new Date(e.ts).getHours());}}var H=new Date().getHours(),today=Date.now();var hourScore=function(hours){if(!hours.length)return 0;var sum=0;for(var k=0;k<hours.length;k++){var d=Math.abs(hours[k]-H);d=Math.min(d,24-d);sum+=Math.max(0,1-d/4);}return sum/hours.length;};var ranked=[];for(var nm in stats){if(!libByName[nm])continue;var st=stats[nm];var daysAgo=st.lastDay?(today-st.lastDay)/86400000:999;var recency=Math.max(0,1-daysAgo/30);var freq=Math.log(st.count+1);var tod=hourScore(st.hours);ranked.push({it:libByName[nm],score:freq*1.0+recency*1.2+tod*1.6});}ranked.sort(function(a,b){return b.score-a.score;});return ranked.slice(0,maxN||8).map(function(r){return r.it;});}catch(e){return [];}}
 function _suggestLabel(){var H=new Date().getHours();if(H<5)return'Suggested · late night';if(H<11)return'Suggested · morning';if(H<14)return'Suggested · midday';if(H<17)return'Suggested · afternoon';if(H<21)return'Suggested · evening';return'Suggested · night';}
-function _renderSuggestStrip(){try{var grid=document.getElementById('quick-grid');if(!grid)return;var strip=document.getElementById('quick-suggest');if(!strip){strip=document.createElement('div');strip.id='quick-suggest';strip.style.marginBottom='10px';grid.parentNode.insertBefore(strip,grid);}var items=_mealSuggest(8);if(!items.length){strip.style.display='none';strip.innerHTML='';return;}strip.style.display='block';var chips=items.map(function(it){var sid=String(it.id).replace(/'/g,"\\'");var em=it.e||'🍽';var nm=(it.n||'').replace(/</g,'&lt;');return '<button onclick="quickLibAdd(\''+sid+'\')" style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:3px;background:var(--surface2,#fff);border:1px solid var(--border,#ddd);border-radius:12px;padding:8px 10px;min-width:66px;max-width:98px;cursor:pointer;font-family:inherit"><span style="font-size:20px">'+em+'</span><span style="font-size:10px;line-height:1.15;color:var(--text,#333);text-align:center">'+nm+'</span></button>';}).join('');strip.innerHTML='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--sub,#888);margin:2px 0 7px">'+_suggestLabel()+'</div><div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">'+chips+'</div>';}catch(e){}}
+function _renderSuggestStrip(){return _renderSuggestRow();}
+function _renderSuggestRow(){
+  try{
+    var list=document.getElementById('fav-list'); if(!list) return;
+    var items=_mealSuggest(8); if(!items.length) return;
+    list.innerHTML=items.map(function(it){
+      var sid=String(it.id).replace(/'/g,"\\'");
+      var em=it.e||'🍽'; var nm=(it.n||'').replace(/</g,'&lt;');
+      return "<div class='qp' style='flex-shrink:0' onclick=\"quickLibAdd('"+sid+"')\">"+em+" "+nm+"</div>";
+    }).join('');
+    var row=document.getElementById('fav-row');
+    if(row){ row.style.display=''; var lbl=row.children[0]; if(lbl && lbl.id!=='fav-list'){ lbl.textContent='✨ '+_suggestLabel(); } }
+    var old=document.getElementById('quick-suggest'); if(old) old.remove();
+  }catch(e){}
+}
+function _rssDead(){try{var grid=document.getElementById('quick-grid');if(!grid)return;var strip=document.getElementById('quick-suggest');if(!strip){strip=document.createElement('div');strip.id='quick-suggest';strip.style.marginBottom='10px';grid.parentNode.insertBefore(strip,grid);}var items=_mealSuggest(8);if(!items.length){strip.style.display='none';strip.innerHTML='';return;}strip.style.display='block';var chips=items.map(function(it){var sid=String(it.id).replace(/'/g,"\\'");var em=it.e||'🍽';var nm=(it.n||'').replace(/</g,'&lt;');return '<button onclick="quickLibAdd(\''+sid+'\')" style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:3px;background:var(--surface2,#fff);border:1px solid var(--border,#ddd);border-radius:12px;padding:8px 10px;min-width:66px;max-width:98px;cursor:pointer;font-family:inherit"><span style="font-size:20px">'+em+'</span><span style="font-size:10px;line-height:1.15;color:var(--text,#333);text-align:center">'+nm+'</span></button>';}).join('');strip.innerHTML='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--sub,#888);margin:2px 0 7px">'+_suggestLabel()+'</div><div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">'+chips+'</div>';}catch(e){}}
 function _favsOrig(){
   // Show recently logged items from the last 14 days
   const row=document.getElementById('fav-row');
