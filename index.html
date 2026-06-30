@@ -2471,8 +2471,7 @@ function _renderSwapListOrig(){
   document.getElementById('swap-list').innerHTML=h;
 }
 function applyManualSwap(){var inp=document.getElementById('swap-manual');var name=(inp&&inp.value||'').trim();if(!name){try{showToast('Type an exercise name first');}catch(e){}return;}var base=(_swapCandidates&&_swapCandidates.length)?Object.assign({},_swapCandidates[0]):{};base.n=name;base.manual=true;base.muscle=base.muscle||_swapMuscleFilter;_swapCandidates=_swapCandidates||[];_swapCandidates.push(base);applySwap(_swapModalIdx,_swapCandidates.length-1);}
-function applySwap(idx, ci){_applySwapOrig(idx,ci);try{saveWorkoutToday();}catch(e){}try{_swapResetLog(idx);}catch(e){}return;}
-function _swapResetLog(idx){try{var wo=getWO();if(!wo||!wo.ex||!wo.ex[idx])return;var nn=wo.ex[idx].n;var wl=getWL();if(!Array.isArray(wl))return;while(wl.length<=idx)wl.push({ex:'',sets:[],done:false});wl[idx]={ex:nn,sets:[],done:false};putWL(wl);if(window.rWorkout)rWorkout();}catch(e){}}
+function applySwap(idx, ci){_applySwapOrig(idx,ci);try{saveWorkoutToday();}catch(e){}return;}
 function _applySwapOrig(idx, ci){
   const newEx=_swapCandidates[ci]; if(!newEx)return;
   closeSwapModal();

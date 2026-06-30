@@ -1,4 +1,4 @@
-const VERSION = '20260630-swapdup';
+const VERSION = '20260630-swaprevert';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
