@@ -5925,7 +5925,7 @@ async function searchFood(){
     const resp=await fetch(
       `${GEMINI_WORKER_URL}/gemini-2.5-flash`,
       {method:'POST',headers:{'content-type':'application/json'},
-       body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.2,maxOutputTokens:1024}})}
+       body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.2,maxOutputTokens:1024,thinkingConfig:{thinkingBudget:0}}})}
     );
     const data=await resp.json();
     if(data.error)throw new Error(data.error.message||'Gemini error');
@@ -6874,7 +6874,7 @@ If this is genuinely not a supplement at all: {"error":"not a supplement"}`;
     {method:'POST',headers:{'content-type':'application/json'},
      body:JSON.stringify({
        contents:[{parts:[{inlineData:{mimeType:'image/jpeg',data:_suppScanPhoto.b64}},{text:prompt}]}],
-       generationConfig:{temperature:0.2,maxOutputTokens:1024}
+       generationConfig:{temperature:0.2,maxOutputTokens:1024,thinkingConfig:{thinkingBudget:0}}
      })}
   );
   const data=await resp.json();
