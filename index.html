@@ -44,8 +44,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .nb svg{width:20px;height:20px}
 #mini-player{display:none;position:relative;align-items:center;gap:4px;background:var(--text);color:#fff;padding:9px 10px 9px 6px;flex-shrink:0;overflow:hidden}
 #mini-player.on{display:flex}
-#mp-prog{position:absolute;top:0;left:0;right:0;height:2px;background:rgba(255,255,255,.18)}
-#mp-fill{height:100%;width:0%;background:var(--purple)}
+#mp-prog{position:absolute;top:0;left:0;right:0;height:2px;background:rgba(255,255,255,.18);cursor:pointer}
+#mp-prog::after{content:"";position:absolute;top:0;left:0;right:0;height:9px}
+#mp-fill{height:100%;width:0%;background:var(--purple);pointer-events:none}
+#mus-seek,input.dial{-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;background:var(--border);outline:none;margin:0;width:100%}
+#mus-seek::-webkit-slider-thumb,input.dial::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--green);cursor:pointer;border:none}
+#mus-seek::-moz-range-thumb,input.dial::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:var(--green);border:none}
 .mp-b{background:none;border:none;color:#fff;padding:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .mp-b svg{width:19px;height:19px}
 #mp-meta{flex:1;min-width:0;cursor:pointer}
@@ -548,7 +552,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     <div class="page" id="page-summary"></div>
   </div>
   <div id="mini-player">
-    <div id="mp-prog"><div id="mp-fill"></div></div>
+    <div id="mp-prog" onclick="musSeekBar(event)"><div id="mp-fill"></div></div>
     <button class="mp-b" id="mp-play" onclick="musToggle()" aria-label="Play or pause">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
     </button>
@@ -1108,6 +1112,8 @@ function fbSyncSettings(){
     try { const rp=lsGet('_restProfile',''); if(rp) settings.restProfile=JSON.parse(rp); } catch(e){}
     try { const rh=lsGet('_restRhythms',''); if(rh) settings.restRhythms=JSON.parse(rh); } catch(e){}
     try { const rm=lsGet('_restMode',''); if(rm) settings.restMode=rm; } catch(e){}
+    try { const ljv=lsGet('_listenJourney',''); if(ljv) settings.listenJourney=JSON.parse(ljv); } catch(e){}
+    try { const ldv=lsGet('_listenDials',''); if(ldv) settings.listenDials=JSON.parse(ldv); } catch(e){}
     fbDb.collection('users').doc(fbUser.uid).set({ settings, updated: Date.now() }, {merge:true}).catch(()=>{});
   } catch(e){}
 }
@@ -1206,6 +1212,8 @@ async function fbPullAll(){
         if(s.restProfile) lsSet('_restProfile', JSON.stringify(s.restProfile));
         if(s.restRhythms) lsSet('_restRhythms', JSON.stringify(s.restRhythms));
         if(s.restMode) lsSet('_restMode', s.restMode);
+        if(s.listenJourney) lsSet('_listenJourney', JSON.stringify(s.listenJourney));
+        if(s.listenDials) lsSet('_listenDials', JSON.stringify(s.listenDials));
         if(s.onboardDone || s.userProfile || s.userTargets || s.routineTR) lsSet('_onboardDone', '1');
         if(s.detFlags) lsSet('_detFlags', JSON.stringify(s.detFlags));
         if(s.customWorkouts) lsSet('_customWorkouts', JSON.stringify(s.customWorkouts));
@@ -3068,9 +3076,8 @@ function rWater(){
 let _nsCat = 'all';
 let _nsExpanded = null;
 
-function rRecovery(){
-  let h = _tabRoutineHTML('recovery');
-
+function _pvBlockHTML(){
+  let h='';
   // ── Polyvagal nervous-system check-in + quick suggested practice ──
   const _todayLog = pvLog(viewDate);
   const _ss = pvLatest(viewDate);
@@ -3135,10 +3142,13 @@ function rRecovery(){
     }
   }
 
-  // Order: with a check-in, suggestion leads (pops to top); otherwise check-in leads.
   if(_suggestCard){ h += _suggestCard + _checkinCard + _trackerCard; }
   else { h += _checkinCard + _trackerCard; }
+  return h;
+}
 
+function _practicesListHTML(){
+  let h='';
   h += `<div class="ct" style="padding:4px 3px 8px">More practices</div>`;
 
   // Category filter
@@ -3200,25 +3210,83 @@ function rRecovery(){
     h += `</div>`;
   });
 
+  return h;
+}
+
+function _stressAssessCardsHTML(){
+  const nsResult=_parseAssessResult(lsGet('_assess_ns_result',null));
+  const gutResult=_parseAssessResult(lsGet('_assess_gut_result',null));
+  const aaResult=_parseAssessResult(lsGet('_assess_aa_result',null));
+  const anyDone=nsResult||gutResult||aaResult;
+  function card(assess,result){
+    const done=!!result;
+    return `<div class="card" style="margin-bottom:12px">
+      <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px">
+        <div style="width:36px;height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${assess.icon}</svg></div>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:700;margin-bottom:3px">${assess.title}</div>
+          <div style="font-size:12px;color:var(--sub);line-height:1.45">${assess.sub}</div>
+        </div>
+      </div>
+      ${done?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${renderAssessScoreBadges(assess.id,result)}</div>
+        <div style="font-size:11px;color:var(--sub);margin-bottom:10px">Completed ${result.date||'previously'}</div>`:''}
+      <button class="btn ${done?'btn-s':'btn-g'} btn-sm btn-f" onclick="stressStartAssess('${assess.id}')">${done?'&#8617; Retake':'Start Assessment &#8594;'}</button>
+    </div>`;
+  }
+  let h='';
+  if(anyDone){
+    h+=`<div style="background:var(--surface);border:1px solid var(--green);border-radius:var(--r);padding:14px;margin-bottom:14px;cursor:pointer" onclick="stressOpenInsights()">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:15px;font-weight:700;margin-bottom:3px">Assessment Insights</div>
+          <div style="font-size:12px;color:var(--sub)">Your NS profile, protocol recommendations &amp; AI plan review</div>
+        </div>
+        <div style="font-size:20px;color:var(--green)">&#8594;</div>
+      </div></div>`;
+  }
+  const pairs=[[ASSESS_NS,nsResult],[ASSESS_GUT,gutResult],[ASSESS_AA,aaResult]];
+  h+=pairs.filter(pr=>pr[1]).map(pr=>card(pr[0],pr[1])).join('');
+  const todo=pairs.filter(pr=>!pr[1]).map(pr=>card(pr[0],pr[1])).join('');
+  if(todo)h+=`<div style="font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:16px;padding:12px;background:var(--surface);border-radius:var(--rs);border:1px solid var(--border)">These assessments build your health profile. Your scores inform your recommendations, recovery activities, and practitioner reports. Retake any assessment when you notice changes.</div>`+todo;
+  return h;
+}
+function stressStartAssess(id){_assessPage=id;_assessAnswers={};_assessSection=0;goPage('assess');}
+function stressOpenInsights(){_assessPage='insights';goPage('assess');}
+
+function rRecovery(){
+  let h = _tabRoutineHTML('recovery');
+  // ── Environmental load — what this page is about ──
+  h += `<div class="fdn-focus" style="margin-bottom:14px">
+    <span class="kicker">Stress</span>
+    <h3>What is your system carrying?</h3>
+    <p>Stress is not only in the mind &mdash; it is everything your body has to process and defend against. Sleep debt, blood-sugar swings, stimulants and alcohol, screens late at night, ultra-processed food, noise, mold and toxins, unresolved relational strain. Each one adds load. The assessments below show where that load is landing &mdash; and your daily rhythms on the Rest tab are how you lower it.</p></div>`;
+  // ── Progress & Weekly Review (moved from the top menu) ──
+  try{setTimeout(maybeAutoWeekly,400);}catch(e){}
+  try{h += rProgressCard();}catch(e){}
+  try{h += rAIWeeklyCard();}catch(e){}
+  // ── Assessments (moved from the top menu) ──
+  h += `<div class="ct" style="padding:10px 3px 8px">Assessments</div>`;
+  h += _stressAssessCardsHTML();
   document.getElementById('page-recovery').innerHTML = h;
 }
 
+function _repaintRegulation(){try{if(curPage==='rest')rRest();else if(curPage==='recovery')rRecovery();}catch(e){}}
 function setNSCat(cat){
   _nsCat = cat;
   _nsExpanded = null;
-  rRecovery();
+  _repaintRegulation();
 }
 
 function setNSExpand(id){
   _nsExpanded = _nsExpanded === id ? null : id;
-  rRecovery();
+  _repaintRegulation();
 }
 // "Begin this practice" — make sure the suggested practice is visible: clear any
 // category filter so it's in the list, expand it, then scroll it into view.
 function beginPractice(id){
   _nsCat = 'all';
   _nsExpanded = id;
-  rRecovery();
+  _repaintRegulation();
   setTimeout(()=>{const el=document.getElementById('ns-act-'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},60);
 }
 
@@ -3499,7 +3567,7 @@ function _dayFacts(d){
   const tgt=_tgtFor(isT);
   const f={planned:isT?1:0,woAny:0,logged:0,protHit:0,calOk:0,waterTracked:0,waterMet:0,
     ctxGood:0,ctxTot:0,moodReg:0,moodTot:0,pairs:0,improved:0,suppTaken:0,suppSched:0,suppDay:0,ckAny:0,
-    restDone:0,restPlanned:0,restAny:0};
+    restDone:0,restPlanned:0,restAny:0,lisDay:0,lisHit:0,lisMin:0};
   // Workout done = "Mark Complete" flag OR any logged sets (lenient, matches week heatmap)
   if(lsGet('wd_'+key,'0')==='1')f.woAny=1;
   else{try{const wl=JSON.parse(lsGet('wl_'+key,'[]'));if(Array.isArray(wl)&&wl.length>0)f.woAny=1;}catch(e){}}
@@ -3535,6 +3603,12 @@ function _dayFacts(d){
     f.restPlanned=1;
     if(rd.length){f.restDone=1;f.restAny=1;}
   }catch(e){}
+  try{
+    const _ls=parseInt(lsGet('listen_'+key,'0'),10)||0;
+    if(_ls>=60){f.lisDay=1;f.lisMin=_ls/60;}
+    const _lj=_ljGet();
+    if(_lj&&_lj.dose&&_ls>=_lj.dose*60)f.lisHit=1;
+  }catch(e){}
   return f;
 }
 function _sumFacts(days){
@@ -3560,12 +3634,13 @@ const _PROG_SCORERS={
     return Math.round((t.pairs?reg*0.7+(t.improved/t.pairs)*0.3:reg)*100);},
   supps:t=>t.suppSched?Math.round(t.suppTaken/t.suppSched*100):null,
   rest:t=>t.restPlanned?Math.round(t.restDone/t.restPlanned*100):null,
+  listen:t=>t.lisDay?Math.round(t.lisDay/t.n*100):null,
 };
 const _PROG_WEIGHTS={
-  muscle:     {workout:.28,food:.24,water:.10,mood:.07,ctx:.06,supps:.09,rest:.08,assess:.08},
-  fat_loss:   {workout:.24,food:.28,water:.10,mood:.07,ctx:.09,supps:.06,rest:.08,assess:.08},
-  fitness:    {workout:.28,food:.20,water:.11,mood:.07,ctx:.07,supps:.09,rest:.10,assess:.08},
-  maintenance:{workout:.18,food:.18,water:.11,mood:.11,ctx:.10,supps:.10,rest:.12,assess:.10}
+  muscle:     {workout:.27,food:.23,water:.09,mood:.07,ctx:.06,supps:.09,rest:.08,assess:.07,listen:.04},
+  fat_loss:   {workout:.23,food:.27,water:.09,mood:.07,ctx:.09,supps:.06,rest:.08,assess:.07,listen:.04},
+  fitness:    {workout:.27,food:.19,water:.10,mood:.07,ctx:.07,supps:.09,rest:.10,assess:.07,listen:.04},
+  maintenance:{workout:.17,food:.17,water:.10,mood:.11,ctx:.10,supps:.10,rest:.12,assess:.09,listen:.04}
 };
 const GOAL_LABELS={muscle:'Build Muscle & Strength',fat_loss:'Lose Fat & Get Lean',fitness:'Fitness & Endurance',maintenance:'Maintain & Feel Great'};
 function computeProgress(days){
@@ -3585,6 +3660,7 @@ function computeProgress(days){
     ctx:_sinceFirst(all,f=>f.ckAny>0),
     supps:_sinceFirst(all,f=>f.suppDay>0),
     rest:_sinceFirst(all,f=>f.restAny>0),
+    listen:_sinceFirst(all,f=>f.lisDay>0),
     assess:N
   };
   const nsR=_parseAssessResult(lsGet('_assess_ns_result',null));
@@ -3621,6 +3697,7 @@ function computeProgress(days){
     {id:'ctx',label:'Mindful eating',what:'Check-ins where you ate relaxed, with people, or unhurried'},
     {id:'supps',label:'Supplements',what:'Scheduled doses you took'},
     {id:'rest',label:'Daily prayer',what:'Days you completed a prayer / rest session'},
+    {id:'listen',label:'Listening',what:'Days you listened to calming music (a little most days beats a lot once)'},
     {id:'assess',label:'Assessments',what:'Health assessments completed (builds your profile)'}
   ];
   const cats=defs.map(c=>{
@@ -3635,6 +3712,7 @@ function computeProgress(days){
     else if(c.id==='ctx')detail=t.ctxTot?t.ctxGood+' of '+t.ctxTot+' check-ins':'No check-ins yet';
     else if(c.id==='supps')detail=t.suppSched?t.suppTaken+' of '+t.suppSched+' doses':'No supplements set up';
     else if(c.id==='rest')detail=t.restDone?t.restDone+' of '+t.restPlanned+' days prayed':'No prayer sessions yet';
+    else if(c.id==='listen')detail=t.lisDay?t.lisDay+' of '+cd.win+' days · '+Math.round(t.lisMin)+' min total'+(t.lisHit?' · dose met '+t.lisHit+' days':''):'No listening yet';
     else if(c.id==='assess')detail=assessDone+'/3 complete';
     if(cd.score!==null&&c.id!=='assess'&&cd.win<14)detail+=' · early data ('+cd.win+(cd.win===1?' day':' days')+')';
     return {...c,score:cd.score,weight:W[c.id],conf:cd.conf,win:cd.win,trend:cd.trend,arrow:cd.arrow,detail,_t:t};
@@ -3665,6 +3743,7 @@ function _focusLine(c,t,assessDone){
   if(c.id==='mood')return t.moodReg+' of '+t.moodTot+' meals ended regulated — pause for one slow breath before eating.';
   if(c.id==='ctx')return t.ctxGood+' of '+t.ctxTot+' meals were unhurried — slow down for one meal a day.';
   if(c.id==='supps')return t.suppTaken+' of '+t.suppSched+' doses taken — tie them to a daily habit.';
+  if(c.id==='listen')return t.lisDay+' listening days — even ten quiet minutes counts.';
   if(c.id==='assess')return assessDone+'/3 complete — each takes about 5 minutes.';
   return '';
 }
@@ -3738,7 +3817,7 @@ function maybeAutoWeekly(){
 async function runWeeklyReview(){
   if(_aiWeeklyLoading)return;
   _aiWeeklyLoading=true;_aiWeeklyErrMsg='';
-  if(curPage==='assess'&&(_assessPage==='progress'||_assessPage==='hub'))document.getElementById('page-assess').innerHTML=rAssess();
+  if(curPage==='assess'&&(_assessPage==='progress'||_assessPage==='hub'))document.getElementById('page-assess').innerHTML=rAssess();else if(curPage==='recovery'){try{rRecovery();}catch(e){}}
   try{
     const pr=computeProgress(PROG_REVIEW_DAYS);
     let profile={};try{profile=JSON.parse(lsGet('_userProfile','{}'))||{};}catch(e){}
@@ -3785,7 +3864,7 @@ Respond ONLY with valid JSON, no markdown:
     }
   }catch(e){console.error('weekly review error',e);_aiWeeklyErrMsg='Couldn\'t reach the AI service — check your connection and try again.';}
   _aiWeeklyLoading=false;
-  if(curPage==='assess'&&(_assessPage==='progress'||_assessPage==='hub'))document.getElementById('page-assess').innerHTML=rAssess();
+  if(curPage==='assess'&&(_assessPage==='progress'||_assessPage==='hub'))document.getElementById('page-assess').innerHTML=rAssess();else if(curPage==='recovery'){try{rRecovery();}catch(e){}}
 }
 function rAIWeeklyCard(){
   const r=getAIWeekly();
@@ -9033,8 +9112,7 @@ function openDrawer(){
 function closeDrawer(){document.getElementById('drawer-ov').classList.remove('open');}
 function drawerGo(p){
   closeDrawer();
-  if(p==='progress'){ try{_assessPage='progress';}catch(e){} goPage('assess'); return; }
-  if(p==='assess'){ try{_assessPage='hub';}catch(e){} goPage('assess'); return; }
+  if(p==='progress'||p==='assess'){ goPage('recovery'); return; }
   goPage(p);
 }
 function drawerDressSummary(){
@@ -9100,8 +9178,12 @@ function rRest(){
     <p>The hours before midnight do the heaviest lifting for recovery, hormones, and tomorrow's energy. Two hours of sleep before midnight are worth more than four after.</p></div>`;
   // Rhythm of Rest — immersive guided prayer / reflection by time of day
   h+=_prayerLauncherHTML();
-  // Listening — Safe Inside (Ventrality)
+  // Nervous-system check-in + suggested practice + 7-day pattern (moved from Stress)
+  try{h+=_pvBlockHTML();}catch(e){}
+  // Listening — Safe Inside (Ventrality) + listening protocol
   h+=_musicCardHTML();
+  // Regulating practices library (moved from Stress)
+  try{h+=_practicesListHTML();}catch(e){}
   // wind-down
   // Wind-down checklist only appears in the evening (after 5pm) on today's view,
   // when it's actually relevant — keeps the Rest tab clean during the day.
@@ -9124,26 +9206,31 @@ function rRest(){
 // guided prayer, regulating practices, or any tab. Listening seconds log to
 // 'listen_'+date (cloud-synced via dayMisc) and feed the 30-day DRESS snapshot.
 const MUSIC_ALBUM={title:'Safe Inside',artist:'Ventrality',dir:'audio/safe-inside/',tracks:[
-  {t:'Door Closes',f:'door-closes.mp3'},
-  {t:'Lights Down Low',f:'lights-down-low.mp3'},
-  {t:'Weighted Blanket',f:'weighted-blanket.mp3'},
-  {t:'Hum of the Fan',f:'hum-of-the-fan.mp3'},
-  {t:'Folded In',f:'folded-in.mp3'},
-  {t:'Slow Breath',f:'slow-breath.mp3'},
-  {t:'Empty Hallway',f:'empty-hallway.mp3'},
-  {t:'Window at Dusk',f:'window-at-dusk.mp3'},
-  {t:'Nothing Is Required',f:'nothing-is-required.mp3'},
-  {t:'Still Here',f:'still-here.mp3'}
+  {t:'Door Closes',f:'door-closes.mp3',hint:'A good place to begin — arrive, settle, let the day stay outside.'},
+  {t:'Lights Down Low',f:'lights-down-low.mp3',hint:'Pairs well with the evening wind-down.'},
+  {t:'Weighted Blanket',f:'weighted-blanket.mp3',hint:'Try it lying down with a slow body scan.'},
+  {t:'Hum of the Fan',f:'hum-of-the-fan.mp3',hint:'Steady background for slow, even breathing.'},
+  {t:'Folded In',f:'folded-in.mp3',hint:'Pairs well with guided prayer or reflection.'},
+  {t:'Slow Breath',f:'slow-breath.mp3',hint:'Match your breath to the pace — long, easy exhales.'},
+  {t:'Empty Hallway',f:'empty-hallway.mp3',hint:'Good for an unhurried pause between tasks.'},
+  {t:'Window at Dusk',f:'window-at-dusk.mp3',hint:'Pairs well with evening reflection.'},
+  {t:'Nothing Is Required',f:'nothing-is-required.mp3',hint:'Nothing to do here — just listen.'},
+  {t:'Still Here',f:'still-here.mp3',hint:'A gentle close — stay a moment after it ends.'}
 ]};
-let _mus={a:null,idx:-1,playing:false,accMs:0,lastTick:0};
+let _mus={a:null,idx:-1,playing:false,accMs:0,lastTick:0,repeat:'all',timerEnd:0,timerMin:0,timerEOT:false,_fade:null};
 function _musEl(){
   if(_mus.a)return _mus.a;
   const a=new Audio();
   a.preload='none';
-  a.addEventListener('ended',function(){musNext();});
+  a.addEventListener('ended',function(){
+    if(_mus.timerEOT){_mus.timerEOT=false;musClose();return;}
+    if(_mus.repeat==='one'&&_mus.idx>=0){a.currentTime=0;a.play().catch(function(){});return;}
+    if(_mus.repeat==='off'&&_mus.idx>=MUSIC_ALBUM.tracks.length-1){musClose();return;}
+    musNext();
+  });
   a.addEventListener('play',function(){_mus.playing=true;_mus.lastTick=Date.now();_musPaint();});
   a.addEventListener('pause',function(){_musLogFlush();_mus.playing=false;_musPaint();});
-  a.addEventListener('timeupdate',function(){_musTick();_musProg();});
+  a.addEventListener('timeupdate',function(){_musTick();_musTimerCheck();_musProg();});
   a.addEventListener('error',function(){if(_mus.idx>=0)showToast('Could not load that track');});
   // Save partial listening time if the app is backgrounded or closed
   document.addEventListener('visibilitychange',function(){if(document.hidden)_musLogFlush();});
@@ -9157,6 +9244,7 @@ function musPlay(i){
   _musLogFlush();
   _mus.idx=i;
   a.src=MUSIC_ALBUM.dir+tr.f;
+  try{if(!_mus._fade)a.volume=1;}catch(e){}
   a.play().catch(function(){});
   _musMediaSession(tr);
   _musPaint();
@@ -9173,6 +9261,9 @@ function musPrev(){if(_mus.idx<0){musPlay(0);return;}musPlay((_mus.idx-1+MUSIC_A
 function musClose(){
   const a=_musEl();
   a.pause();a.removeAttribute('src');try{a.load();}catch(e){}
+  if(_mus._fade){clearInterval(_mus._fade);_mus._fade=null;}
+  _mus.timerEnd=0;_mus.timerMin=0;_mus.timerEOT=false;
+  try{a.volume=1;}catch(e){}
   _mus.idx=-1;_mus.playing=false;
   _musPaint();
   if(typeof curPage!=='undefined'&&curPage==='rest')rRest();
@@ -9186,6 +9277,161 @@ function _musMediaSession(tr){
     navigator.mediaSession.setActionHandler('nexttrack',musNext);
     navigator.mediaSession.setActionHandler('previoustrack',musPrev);
   }catch(e){}
+}
+// ── sleep timer / repeat / seek ──
+const _MUS_TIMER_STEPS=[0,10,20,30,-1]; // -1 = end of current track
+function musTimerCycle(){
+  const cur=_mus.timerEOT?-1:(_mus.timerEnd?_mus.timerMin:0);
+  let i=_MUS_TIMER_STEPS.indexOf(cur);if(i<0)i=0;
+  const v=_MUS_TIMER_STEPS[(i+1)%_MUS_TIMER_STEPS.length];
+  _mus.timerEOT=false;_mus.timerEnd=0;_mus.timerMin=0;
+  if(v===-1){_mus.timerEOT=true;showToast('Music stops at the end of this track');}
+  else if(v>0){_mus.timerMin=v;_mus.timerEnd=Date.now()+v*60000;showToast('Sleep timer — '+v+' minutes, then a slow fade');}
+  else showToast('Sleep timer off');
+  if(typeof curPage!=='undefined'&&curPage==='rest')rRest();
+}
+function _musTimerCheck(){
+  if(!_mus.timerEnd||Date.now()<_mus.timerEnd||_mus._fade)return;
+  _mus.timerEnd=0;_mus.timerMin=0;
+  const a=_mus.a;if(!a)return;
+  _mus._fade=setInterval(function(){
+    let done=false;
+    try{if(a.volume>0.08)a.volume=Math.max(0,a.volume-0.08);else done=true;}catch(e){done=true;}
+    if(done){clearInterval(_mus._fade);_mus._fade=null;musClose();}
+  },1200);
+}
+function musRepeatCycle(){
+  _mus.repeat=_mus.repeat==='all'?'one':_mus.repeat==='one'?'off':'all';
+  showToast(_mus.repeat==='all'?'Repeating the album':_mus.repeat==='one'?'Repeating this track':'Album plays through once');
+  if(typeof curPage!=='undefined'&&curPage==='rest')rRest();
+}
+function _musFmt(s){s=Math.max(0,Math.floor(s||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
+function musSeekBar(ev){
+  const a=_mus.a;if(!a||!(a.duration>0))return;
+  const r=ev.currentTarget.getBoundingClientRect();
+  const x=(ev.touches&&ev.touches[0]?ev.touches[0].clientX:ev.clientX)-r.left;
+  a.currentTime=Math.max(0,Math.min(1,x/r.width))*a.duration;_musProg();
+}
+function musSeek(v){const a=_mus.a;if(!a||!(a.duration>0))return;a.currentTime=(v/1000)*a.duration;_musProg();}
+
+// ── protocol dials: three 1-10 sliders, nudged toward each check-in's anchors ──
+const _DIAL_ANCHORS={mobilized:{act:9,cap:4,pres:5},engaged:{act:6,cap:7,pres:7},ventral:{act:4,cap:8,pres:9},restful:{act:3,cap:7,pres:8},immobilized:{act:2,cap:3,pres:2}};
+function _dialsGet(){try{const v=JSON.parse(lsGet('_listenDials','null'));if(v&&v.act)return v;}catch(e){}return {act:5,cap:5,pres:5};}
+function _dialsSet(d){lsSet('_listenDials',JSON.stringify(d));try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}}
+function _dialsNudge(state){const a=_DIAL_ANCHORS[state];if(!a)return;const d=_dialsGet();const mv=function(cur,tgt){return tgt>cur?Math.ceil((cur+tgt)/2):Math.floor((cur+tgt)/2);};d.act=mv(d.act,a.act);d.cap=mv(d.cap,a.cap);d.pres=mv(d.pres,a.pres);d.ts=Date.now();_dialsSet(d);}
+function setDial(k,v){
+  const d=_dialsGet();d[k]=Math.max(1,Math.min(10,parseInt(v,10)||5));d.ts=Date.now();_dialsSet(d);
+  const el=document.getElementById('dial-val-'+k);if(el)el.textContent=d[k];
+  const rec=document.getElementById('mus-rec');if(rec)rec.innerHTML=_musRecInnerHTML();
+}
+function _musRec(){
+  const d=_dialsGet();
+  const lj=_ljGet();
+  const dose=(lj&&lj.dose&&lj.started)?lj.dose:(d.cap<=3?10:d.cap<=7?20:30);
+  let idx,why;
+  if(d.act>=7){idx=5;why='high activation settles fastest with a steady, rhythmic pace — let your exhale stretch to match it';}
+  else if(d.pres<=3){idx=2;why='when the system feels far away or shut down, warmth comes before stillness — stay wrapped, keep your eyes open';}
+  else if(d.act<=3){idx=9;why='your system is already quiet — this is deepening work, not rescue work';}
+  else {idx=0;why='a settled middle state — begin at the front door and let the album carry you';}
+  const pair=d.pres<=3?'orienting':(d.act>=7?'extended-exhale':null);
+  return {dose:dose,idx:idx,why:why,pair:pair};
+}
+function _musRecInnerHTML(){
+  const r=_musRec();
+  const tr=MUSIC_ALBUM.tracks[r.idx];
+  let pairLine='';
+  if(r.pair&&typeof NS_ACT!=='undefined'){
+    const a=NS_ACT.find(function(x){return x.id===r.pair;});
+    if(a)pairLine='<div style="font-size:11.5px;color:var(--sub);margin-top:6px">First: <span onclick="beginPractice(\''+r.pair+'\')" style="text-decoration:underline;cursor:pointer;color:var(--text)">'+a.n+'</span> ('+a.dur+') — it helps the listening land.</div>';
+  }
+  return '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--sub);margin-bottom:4px">Suggested session</div>'
+  +'<div style="font-size:14px;font-weight:700">'+r.dose+' minutes, starting with &ldquo;'+tr.t+'&rdquo;</div>'
+  +'<div style="font-size:12px;color:var(--sub);line-height:1.5;margin-top:3px">Because '+r.why+'.</div>'
+  +pairLine
+  +'<button class="btn btn-g btn-sm" style="width:100%;margin-top:9px" onclick="musBeginSession()">Begin '+r.dose+'-minute session</button>';
+}
+function musBeginSession(){
+  const r=_musRec();
+  _mus.timerEOT=false;_mus.timerMin=r.dose;_mus.timerEnd=Date.now()+r.dose*60000;
+  musPlay(r.idx);
+  showToast(r.dose+'-minute session — the music will fade out on its own');
+}
+function _dialRow(k,label,lo,hi){
+  const d=_dialsGet();
+  return '<div style="margin-bottom:10px">'
+  +'<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;margin-bottom:4px"><span style="font-weight:700">'+label+' <b id="dial-val-'+k+'" style="color:var(--green)">'+d[k]+'</b></span><span style="color:var(--sub)">'+lo+' &rarr; '+hi+'</span></div>'
+  +'<input type="range" class="dial" min="1" max="10" step="1" value="'+d[k]+'" oninput="setDial(\''+k+'\',this.value)">'
+  +'</div>';
+}
+
+// ── listening journey: a 15-day dosed arc (inspired by titrated listening protocols) ──
+function _ljGet(){try{const v=lsGet('_listenJourney','');return v?JSON.parse(v):null;}catch(e){return null;}}
+function _ljSet(j){lsSet('_listenJourney',JSON.stringify(j));try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}}
+function _ljDays(lj){
+  if(!lj||!lj.started||!lj.dose)return 0;
+  let n=0;const d=new Date(lj.started+'T12:00:00');const today=dk();
+  for(let i=0;i<400;i++){const k=_dkOf(d);if(k>today)break;if((parseInt(lsGet('listen_'+k,'0'),10)||0)>=lj.dose*60)n++;d.setDate(d.getDate()+1);}
+  return n;
+}
+function ljStart(dose){
+  const prev=_ljGet()||{};
+  const j={dose:dose,started:dk(),len:15,history:prev.history||[]};
+  if(prev.started&&prev.dose&&_ljDays(prev)>=(prev.len||15))j.history=j.history.concat([{started:prev.started,finished:dk(),dose:prev.dose}]);
+  _ljSet(j);
+  showToast('Journey started — '+dose+' minutes a day');
+  if(typeof curPage!=='undefined'&&curPage==='rest')rRest();
+}
+function ljEnd(){
+  if(!confirm('End this listening journey? Your listening history stays.'))return;
+  const lj=_ljGet();_ljSet({history:(lj&&lj.history)||[]});
+  if(typeof curPage!=='undefined'&&curPage==='rest')rRest();
+}
+function _ljHTML(){
+  const lj=_ljGet();const active=lj&&lj.dose&&lj.started;
+  const rec=_musRec();
+  const doseBtns=[10,20,30].map(function(d){return '<button class="btn btn-g btn-sm" style="flex:1" onclick="ljStart('+d+')">'+d+' min'+(d===(_dialsGet().cap<=3?10:_dialsGet().cap<=7?20:30)?' &middot; suggested':'')+'</button>';}).join('');
+  let inner='';
+  if(!active){
+    inner='<div style="font-size:13px;font-weight:700;margin-bottom:3px">Begin a listening journey</div>'
+    +'<div style="font-size:12px;color:var(--sub);line-height:1.5;margin-bottom:9px">Fifteen days of gentle, dosed listening. Like the therapeutic listening protocols this draws from, less is more — a small daily dose, repeated, is how the nervous system learns safety. Days don\'t have to be consecutive; missed days are simply skipped, never counted against you.</div>'
+    +'<div style="display:flex;gap:7px">'+doseBtns+'</div>';
+  }else{
+    const days=_ljDays(lj),len=lj.len||15;
+    const todaySec=parseInt(lsGet('listen_'+dk(),'0'),10)||0;
+    const doseSec=lj.dose*60;
+    if(days>=len){
+      inner='<div style="font-size:13px;font-weight:700;margin-bottom:3px">Journey complete — '+len+' listening days</div>'
+      +'<div style="font-size:12px;color:var(--sub);line-height:1.5;margin-bottom:9px">You gave your nervous system '+len+' days of steady, predictable calm. Take a few days to notice what feels different — then, if you like, begin again.</div>'
+      +'<div style="display:flex;gap:7px">'+doseBtns+'</div>';
+    }else{
+      let dots='';
+      for(let i=0;i<len;i++)dots+='<span style="width:10px;height:10px;border-radius:50%;display:inline-block;background:'+(i<days?'var(--green)':'var(--surface2)')+';border:1px solid '+(i<days?'var(--green)':'var(--border)')+'"></span>';
+      const doneToday=todaySec>=doseSec;
+      const overmuch=todaySec>=doseSec*2;
+      const todayPct=Math.min(100,Math.round(todaySec/doseSec*100));
+      inner='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">'
+      +'<span style="font-size:13px;font-weight:700">Listening journey &middot; day '+Math.min(days+(doneToday?0:1),len)+' of '+len+'</span>'
+      +'<span style="font-size:11px;color:var(--sub)">'+lj.dose+' min/day</span></div>'
+      +'<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px">'+dots+'</div>'
+      +'<div class="pw"><div class="pb" style="width:'+todayPct+'%;background:var(--green)"></div></div>'
+      +'<div style="font-size:11.5px;color:var(--sub);margin-top:5px">'
+      +(overmuch?'You\'ve listened well past today\'s dose. With this kind of listening, slow and steady is what helps it land — feel free to rest.'
+        :doneToday?'That\'s today\'s listening — done. Let it settle until tomorrow.'
+        :Math.floor(todaySec/60)+' of '+lj.dose+' minutes today')
+      +'</div>'
+      +'<div style="margin-top:7px"><span onclick="ljEnd()" style="font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer">End journey</span></div>';
+    }
+  }
+  return '<div style="margin-top:12px;padding-top:12px;border-top:0.5px solid var(--border)">'+inner+'</div>';
+}
+// ── listening stats: streak + minutes this week ──
+function _musStats(){
+  let week=0;
+  for(let i=0;i<7;i++){const d=new Date();d.setDate(d.getDate()-i);week+=parseInt(lsGet('listen_'+_dkOf(d),'0'),10)||0;}
+  let streak=0;
+  const startAt=((parseInt(lsGet('listen_'+dk(),'0'),10)||0)>=60)?0:1;
+  for(let i=startAt;i<400;i++){const d=new Date();d.setDate(d.getDate()-i);if((parseInt(lsGet('listen_'+_dkOf(d),'0'),10)||0)>=60)streak++;else break;}
+  return {weekMin:Math.round(week/60),streak:streak};
 }
 // ── listening log: seconds per day → 'listen_'+date (cloud-synced) ──
 function _musTick(){
@@ -9204,6 +9450,11 @@ function _musLogFlush(){
     const k='listen_'+dk();
     const prev=parseInt(lsGet(k,'0'),10)||0;
     lsSet(k,String(prev+secs));
+    const lj=_ljGet();
+    if(lj&&lj.dose&&lj.started){
+      const ds=lj.dose*60;
+      if(prev<ds&&prev+secs>=ds){showToast("That's today's listening — well done.");if(typeof curPage!=='undefined'&&curPage==='rest')rRest();}
+    }
   }catch(e){}
 }
 // ── UI ──
@@ -9222,6 +9473,18 @@ function _musProg(){
   const f=document.getElementById('mp-fill');if(!f)return;
   const a=_mus.a;
   f.style.width=(a&&a.duration>0)?Math.min(100,(a.currentTime/a.duration)*100)+'%':'0%';
+  const sub=document.getElementById('mp-sub');
+  if(sub){
+    let t='Ventrality · Safe Inside';
+    if(a&&a.duration>0)t=_musFmt(a.currentTime)+' / '+_musFmt(a.duration);
+    if(_mus.timerEOT)t+=' · stops after this track';
+    else if(_mus.timerEnd)t+=' · timer '+Math.max(1,Math.ceil((_mus.timerEnd-Date.now())/60000))+'m';
+    sub.textContent=t;
+  }
+  const sl=document.getElementById('mus-seek');
+  if(sl&&a&&a.duration>0)sl.value=Math.round(a.currentTime/a.duration*1000);
+  const te=document.getElementById('mus-time-el');if(te&&a)te.textContent=_musFmt(a.currentTime);
+  const td=document.getElementById('mus-time-dur');if(td&&a&&a.duration>0)td.textContent=_musFmt(a.duration);
 }
 function _musicCardHTML(){
   let rows='';
@@ -9236,14 +9499,49 @@ function _musicCardHTML(){
       +(cur?'<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">'+(_mus.playing?'Playing':'Paused')+'</span>':'')
       +'</div>';
   });
+  const st=_musStats();
+  const statsLine=(st.weekMin>0||st.streak>0)
+    ?'<div style="font-size:11.5px;color:var(--sub);margin-top:2px">'+(st.streak>0?st.streak+'-day streak &middot; ':'')+st.weekMin+' min this week</div>'
+    :'';
+  // now-playing: hint + seek + repeat/timer controls
+  let np='';
+  if(_mus.idx>=0){
+    const ctr=MUSIC_ALBUM.tracks[_mus.idx];
+    const a=_mus.a;
+    const repLbl=_mus.repeat==='all'?'Repeat: album':_mus.repeat==='one'?'Repeat: track':'Repeat: off';
+    const timLbl=_mus.timerEOT?'Timer: track end':(_mus.timerEnd?'Timer: '+Math.max(1,Math.ceil((_mus.timerEnd-Date.now())/60000))+'m':'Timer: off');
+    np='<div style="background:var(--surface2);border-radius:var(--rs);padding:10px 12px;margin-top:10px">'
+    +(ctr&&ctr.hint?'<div style="font-size:12px;color:var(--sub);line-height:1.45;margin-bottom:7px">'+ctr.hint+'</div>':'')
+    +'<div style="display:flex;align-items:center;gap:8px">'
+    +'<span id="mus-time-el" style="font-size:10.5px;color:var(--sub);min-width:30px">'+_musFmt(a?a.currentTime:0)+'</span>'
+    +'<input type="range" id="mus-seek" min="0" max="1000" value="'+((a&&a.duration>0)?Math.round(a.currentTime/a.duration*1000):0)+'" oninput="musSeek(this.value)" style="flex:1">'
+    +'<span id="mus-time-dur" style="font-size:10.5px;color:var(--sub);min-width:30px;text-align:right">'+_musFmt((a&&a.duration>0)?a.duration:0)+'</span>'
+    +'</div>'
+    +'<div style="display:flex;gap:7px;margin-top:9px">'
+    +'<button class="btn btn-s btn-sm" style="flex:1" onclick="musRepeatCycle()">'+repLbl+'</button>'
+    +'<button class="btn btn-s btn-sm" style="flex:1" onclick="musTimerCycle()">'+timLbl+'</button>'
+    +'</div></div>';
+  }
   return '<div class="card" style="margin-bottom:12px">'
     +'<span class="kicker">Listening</span>'
     +'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:5px">'
     +'<div style="min-width:0"><div style="font-family:var(--font-serif);font-size:24px;font-weight:500;line-height:1.15">Safe Inside</div>'
-    +'<div style="font-size:11.5px;color:var(--sub);margin-top:2px">Ventrality · music for settling the nervous system</div></div>'
+    +'<div style="font-size:11.5px;color:var(--sub);margin-top:2px">Ventrality · music for settling the nervous system</div>'
+    +statsLine+'</div>'
     +'<button class="btn btn-g btn-sm" style="flex-shrink:0" onclick="'+(_mus.idx>=0?'musToggle()':'musPlay(0)')+'">'+(_mus.playing?'Pause':'Play')+'</button>'
     +'</div>'
+    // protocol dials — hand-adjustable, nudged by each nervous-system check-in
+    +'<div style="margin-top:12px;padding-top:12px;border-top:0.5px solid var(--border)">'
+    +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--sub);margin-bottom:8px">Tune today\'s session</div>'
+    +_dialRow('act','Activation','settled','charged')
+    +_dialRow('cap','Capacity','depleted','resourced')
+    +_dialRow('pres','Presence','far away','connected')
+    +'<div style="font-size:11px;color:var(--sub);line-height:1.45;margin-bottom:10px">These move on their own when you check in above — adjust them any time they feel off.</div>'
+    +'<div id="mus-rec" style="background:var(--surface2);border-radius:var(--rs);padding:11px 12px">'+_musRecInnerHTML()+'</div>'
+    +'</div>'
+    +np
     +'<div style="margin-top:10px">'+rows+'</div>'
+    +_ljHTML()
     +'<div style="margin-top:10px;font-size:11.5px;color:var(--sub);line-height:1.5">Start a track, then begin your prayer, breathing, or any regulating practice — the music keeps playing as you move through the app. Slow, steady music gives your nervous system a cue of safety, which helps every other part of the session land deeper.</div>'
     +'</div>';
 }
@@ -9655,7 +9953,7 @@ let _pcTouchX=0,_pcTouchY=0;
 function _pcTouchStart(e){const t=e.touches&&e.touches[0];if(t){_pcTouchX=t.clientX;_pcTouchY=t.clientY;}}
 function _pcTouchEnd(e){const t=e.changedTouches&&e.changedTouches[0];if(!t)return;const dx=t.clientX-_pcTouchX,dy=t.clientY-_pcTouchY;if(dy>100&&dy>Math.abs(dx)*1.5){closePractice();return;}if(Math.abs(dx)>48&&Math.abs(dx)>Math.abs(dy)*1.3){if(dx<0)practiceNext();else practicePrev();}}
 function closePractice(){const ov=document.getElementById('practice-overlay');if(ov)ov.remove();document.body.style.overflow='';}
-function completePractice(){_practiceMarkDone(_pcId);closePractice();showToast('Practice complete');try{rRecovery();}catch(e){}}
+function completePractice(){_practiceMarkDone(_pcId);closePractice();showToast('Practice complete');_repaintRegulation();}
 
 /* ════════════ SUPPS TAB ════════════ */
 function _suppPlan(){try{return JSON.parse(lsGet('_supps_plan','[]'))||[];}catch(e){return [];}}
@@ -9981,8 +10279,9 @@ function pvAddCheckin(s){
   const a=pvLog(viewDate);a.push({s,t:Date.now()});
   lsSet('pvlog_'+viewDate,JSON.stringify(a));
   lsSet('stress_'+viewDate,s);                        // keep latest-state mirror for global profile
+  try{_dialsNudge(s);}catch(e){}
   try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}
-  rRecovery();
+  _repaintRegulation();
 }
 // Back-compat alias (older code/UI paths may still call this).
 function setStressState(s){pvAddCheckin(s);}
