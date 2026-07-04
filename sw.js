@@ -1,4 +1,4 @@
-const VERSION = '20260704-macroengine2';
+const VERSION = '20260704-macroengine3';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
