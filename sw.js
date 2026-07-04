@@ -1,4 +1,4 @@
-const VERSION = '20260630-foodsearch2';
+const VERSION = '20260704-macroengine1';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
