@@ -7234,14 +7234,20 @@ const WIZ_STEPS=[
     {val:'advanced',em:'🔱',label:'Advanced',sub:'3+ years'},
     {val:'athlete',em:'🏆',label:'Athlete',sub:'Competitive'},
   ]},
-  // 4: Equipment
-  {type:'opts',key:'equipment',title:'What equipment do you have?',sub:'Your plan will only use what you have available.',icon:'🏋️',
+  // 4: Equipment preferences (multi-select + other)
+  {type:'multi',key:'equipment',otherKey:'equipmentOther',title:'What do you prefer to use for your workouts?',sub:'Select all that apply — your plan is built around what you like to use.',icon:'🏋️',
    opts:[
-    {val:'dumbbells',em:'🏠',label:'Dumbbells at Home',desc:'Adjustable or fixed dumbbells (no machines)'},
-    {val:'home_gym',em:'💪',label:'Full Home Gym',desc:'Rack, barbell, cables, or full setup'},
-    {val:'gym',em:'🏟️',label:'Commercial Gym',desc:'Full access — all machines and equipment'},
-    {val:'bodyweight',em:'🤸',label:'No Equipment',desc:'Bodyweight only, anywhere'},
-  ]},
+    {val:'dumbbells',label:'Dumbbells',desc:'Adjustable or fixed dumbbells'},
+    {val:'barbell',label:'Barbell & Rack',desc:'Squat rack, bench, plates'},
+    {val:'machines',label:'Machines & Cables',desc:'Gym machines, cable stations'},
+    {val:'kettlebells',label:'Kettlebells',desc:'Swings, carries, presses'},
+    {val:'bands',label:'Resistance Bands',desc:'Loop or handle bands'},
+    {val:'treadmill',label:'Treadmill',desc:'Walking, jogging, incline work'},
+    {val:'peloton',label:'Peloton / Spin Bike',desc:'Indoor cycling'},
+    {val:'rower',label:'Rowing Machine',desc:'Full-body, low-impact cardio'},
+    {val:'elliptical',label:'Elliptical',desc:'Low-impact steady cardio'},
+    {val:'bodyweight',label:'Bodyweight Only',desc:'No equipment needed'},
+   ]},
   // 5: Training style (multi-select)
   {type:'multi',key:'style',title:'How do you like to train?',sub:'Select all that apply — your plan will blend these together.',icon:'⚡',
    opts:[
@@ -7494,14 +7500,14 @@ function renderWizStep(s){
       <div style="font-size:12px;color:var(--sub);margin-top:12px;line-height:1.5">We’ll build your starting routine around these — water on waking, sunlight, meals, wind-down — and you can fine-tune any of it later.</div>`;
   }
   if(s.type==='multi'){
-    const sel=_wiz.profile[s.key]||[];
+    const sel=Array.isArray(_wiz.profile[s.key])?_wiz.profile[s.key]:(s.key==='equipment'&&_wiz.profile[s.key]?_equipPrefs({equipment:_wiz.profile[s.key]}).list:[]);
     return `<div class="wiz-title">${s.title}</div>
       <div class="wiz-sub">${s.sub}</div>
       <div class="wiz-opts">${s.opts.map(o=>`
         <div class="wiz-opt${sel.includes(o.val)?' sel':''}" onclick="wizToggle('${s.key}','${o.val}')">
           <div class="wiz-opt-info"><div class="wiz-opt-label">${o.label}</div><div class="wiz-opt-desc">${o.desc}</div></div>
         </div>`).join('')}
-      </div>`;
+      </div>${s.otherKey?`<div class="wiz-fields" style="margin-top:12px"><div class="wiz-field"><textarea id="wi-equip-other" rows="2" placeholder="Anything else? e.g. TRX straps, sled, assault bike..." oninput="wizSaveText('${s.otherKey}',this.value)">${_wiz.profile[s.otherKey]||''}</textarea></div></div>`:''}`;
   }
   if(s.type==='allergens'){
     const ALLERGEN_OPTS=[
@@ -7632,7 +7638,7 @@ function wizSel(key,val){
 }
 
 function wizToggle(key,val){
-  if(!_wiz.profile[key])_wiz.profile[key]=[];
+  if(!Array.isArray(_wiz.profile[key]))_wiz.profile[key]=(key==='equipment'&&_wiz.profile[key])?_equipPrefs({equipment:_wiz.profile[key]}).list:[];
   const arr=_wiz.profile[key];
   const idx=arr.indexOf(val);
   if(idx>=0)arr.splice(idx,1);else arr.push(val);
@@ -7943,7 +7949,26 @@ function _pickStrengthSessions(p,n){
 }
 
 // ── EQUIPMENT & INJURY FILTERS ────────────────────────────────────────────────
+function _equipPrefs(p){
+  const LEGACY={home_gym:['dumbbells','barbell'],gym:['dumbbells','barbell','machines']};
+  const raw=p&&p.equipment;
+  const src=Array.isArray(raw)?raw:(typeof raw==='string'&&raw?[raw]:[]);
+  const list=[];
+  src.forEach(v=>(LEGACY[v]||[v]).forEach(x=>{if(!list.includes(x))list.push(x);}));
+  const other=((p&&p.equipmentOther)||'').trim();
+  return {list:list,other:other};
+}
+
 function _equipFilter(equipment){
+  if(Array.isArray(equipment)){
+    const list=_equipPrefs({equipment:equipment}).list;
+    if(!list.length)return ['bw','db','bb','cable','machine'];
+    const tags=['bw'];
+    if(list.includes('dumbbells')||list.includes('kettlebells')||list.includes('bands'))tags.push('db');
+    if(list.includes('barbell'))tags.push('bb');
+    if(list.includes('machines')){tags.push('cable');tags.push('machine');}
+    return tags;
+  }
   const map={
     bodyweight:['bw'],
     dumbbells:['bw','db'],
@@ -8281,7 +8306,19 @@ async function wizGenerate(){
         .map(([day,wo])=>({day:parseInt(day),name:wo.name,type:wo.type||'strength'}));
       if(strengthDays.length>0){
         const eqMap={bodyweight:'bodyweight only',dumbbells:'dumbbells only (10–30 lb range)',home_gym:'dumbbells and a barbell',gym:'full gym with machines and cables'};
-        const eqLabel=eqMap[p.equipment]||'dumbbells';
+        const EQ_NAMES={dumbbells:'dumbbells',barbell:'barbell and rack',machines:'weight machines and cables',kettlebells:'kettlebells',bands:'resistance bands',treadmill:'treadmill',peloton:'Peloton / spin bike',rower:'rowing machine',elliptical:'elliptical',bodyweight:'bodyweight'};
+        const CARDIO_EQ=['treadmill','peloton','rower','elliptical'];
+        const _prefs=_equipPrefs(p);
+        let eqLabel;
+        if(_prefs.list.length||_prefs.other){
+          const strengthNames=_prefs.list.filter(v=>!CARDIO_EQ.includes(v)).map(v=>EQ_NAMES[v]||v);
+          const cardioNames=_prefs.list.filter(v=>CARDIO_EQ.includes(v)).map(v=>EQ_NAMES[v]||v);
+          if(_prefs.other)strengthNames.push(_prefs.other);
+          eqLabel=(strengthNames.length?strengthNames.join(', '):'bodyweight only')+' (user-selected preferences — build the plan around these)';
+          if(cardioNames.length)eqLabel+='; also has for cardio: '+cardioNames.join(', ');
+        } else {
+          eqLabel=eqMap[p.equipment]||'dumbbells';
+        }
         const exPrompt=`You are a certified strength and conditioning coach. Generate a complete workout plan for each training day listed, using ONLY the equipment available to this user (see Equipment below).
 
 User profile:
