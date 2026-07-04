@@ -9570,15 +9570,27 @@ function _musLogFlush(){
 }
 // ── UI ──
 function _musPaint(){
-  const bar=document.getElementById('mini-player');if(!bar)return;
   const on=_mus.idx>=0;
-  bar.classList.toggle('on',on);
-  if(!on)return;
-  const tr=MUSIC_ALBUM.tracks[_mus.idx];
-  document.getElementById('mp-title').textContent=tr?tr.t:'';
-  document.getElementById('mp-play').innerHTML=_mus.playing
-    ?'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>'
-    :'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8V4z"/></svg>';
+  const tr=on?MUSIC_ALBUM.tracks[_mus.idx]:null;
+  const bar=document.getElementById('mini-player');
+  if(bar){
+    bar.classList.toggle('on',on);
+    if(on){
+      document.getElementById('mp-title').textContent=tr?tr.t:'';
+      document.getElementById('mp-play').innerHTML=_mus.playing
+        ?'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>'
+        :'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8V4z"/></svg>';
+    }
+  }
+  const om=document.getElementById('ov-mus');
+  if(om){
+    om.style.display=on?'flex':'none';
+    if(on){
+      const tt=document.getElementById('ov-mus-title');if(tt)tt.textContent=tr?tr.t:'';
+      const pb=document.getElementById('ov-mus-play');
+      if(pb)pb.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">'+(_mus.playing?'<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>':'<path d="M7 4l13 8-13 8V4z"/>')+'</svg>';
+    }
+  }
 }
 function _musProg(){
   const f=document.getElementById('mp-fill');if(!f)return;
@@ -9876,6 +9888,10 @@ function openPrayer(slot){
     <div id="prayer-dark" style="position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .55s"></div>
     <div id="pr-ring" style="position:absolute;top:44px;left:50%;transform:translateX(-50%);width:116px;height:116px;pointer-events:none;z-index:4;transition:opacity .2s ease"><div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.5);animation:prBreathe 11s ease-in-out infinite"></div><div style="position:absolute;inset:15px;border-radius:50%;border:1px solid rgba(255,255,255,.28);animation:prBreathe 11s ease-in-out infinite"></div></div>
     <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:rgba(255,255,255,.16);z-index:5"><div id="pr-progress" style="position:absolute;left:0;top:0;width:100%;height:0;background:rgba(255,255,255,.85);transition:height .55s ease"></div></div>
+    <div id="ov-mus" style="position:absolute;top:14px;right:14px;z-index:7;display:none;align-items:center;gap:8px;background:rgba(0,0,0,.30);border:1px solid rgba(255,255,255,.28);border-radius:22px;padding:5px 12px 5px 5px;max-width:58%">
+      <button id="ov-mus-play" onclick="musToggle()" aria-label="Play or pause music" style="flex:none;width:28px;height:28px;border-radius:50%;border:none;background:rgba(255,255,255,.92);color:#222;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0"></button>
+      <span id="ov-mus-title" style="font-family:var(--font-sans);font-size:11.5px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
+    </div>
     <div id="prayer-stage" style="position:absolute;inset:0">${panels}</div>
     <div style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;padding:16px 22px 30px;z-index:6">
       <button onclick="prayerMenu()" aria-label="Prayer times menu" style="background:none;border:none;color:#fff;cursor:pointer;flex:none;display:flex;align-items:center;padding:4px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
@@ -9888,6 +9904,7 @@ function openPrayer(slot){
   ov.addEventListener('touchstart',_prTouchStart,{passive:true});
   ov.addEventListener('touchend',_prTouchEnd,{passive:true});
   _renderPrayStep();
+  try{_musPaint();}catch(e){}
 }
 function _prayRingFade(e){
   const ring=document.getElementById('pr-ring'); if(!ring)return;
@@ -10031,6 +10048,10 @@ function openPractice(id){
     <div id="pc-dark" style="position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .55s"></div>
     <div id="pc-ring" style="position:absolute;top:44px;left:50%;transform:translateX(-50%);width:116px;height:116px;pointer-events:none;z-index:4;transition:opacity .2s ease"><div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.5);animation:pcBreathe 11s ease-in-out infinite"></div><div style="position:absolute;inset:15px;border-radius:50%;border:1px solid rgba(255,255,255,.28);animation:pcBreathe 11s ease-in-out infinite"></div></div>
     <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:rgba(255,255,255,.16);z-index:5"><div id="pc-progress" style="position:absolute;left:0;top:0;width:100%;height:0;background:rgba(255,255,255,.85);transition:height .55s ease"></div></div>
+    <div id="ov-mus" style="position:absolute;top:14px;right:14px;z-index:7;display:none;align-items:center;gap:8px;background:rgba(0,0,0,.30);border:1px solid rgba(255,255,255,.28);border-radius:22px;padding:5px 12px 5px 5px;max-width:58%">
+      <button id="ov-mus-play" onclick="musToggle()" aria-label="Play or pause music" style="flex:none;width:28px;height:28px;border-radius:50%;border:none;background:rgba(255,255,255,.92);color:#222;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0"></button>
+      <span id="ov-mus-title" style="font-family:var(--font-sans);font-size:11.5px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
+    </div>
     <div id="practice-stage" style="position:absolute;inset:0">${panels}</div>
     <div style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;padding:16px 22px 30px;z-index:6">
       <button onclick="closePractice()" aria-label="Close practice" style="background:none;border:none;color:#fff;cursor:pointer;flex:none;display:flex;align-items:center;padding:4px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
@@ -10043,6 +10064,7 @@ function openPractice(id){
   ov.addEventListener('touchstart',_pcTouchStart,{passive:true});
   ov.addEventListener('touchend',_pcTouchEnd,{passive:true});
   _renderPracticeStep();
+  try{_musPaint();}catch(e){}
 }
 function _pcRingFade(e){const ring=document.getElementById('pc-ring');if(!ring)return;const st=(e.target&&e.target.scrollTop)||0;ring.style.opacity=Math.max(0,1-st/100).toFixed(2);}
 function _renderPracticeStep(){
