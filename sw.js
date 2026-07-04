@@ -1,4 +1,4 @@
-const VERSION = '20260704-equipprefs1';
+const VERSION = '20260704-listening1';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
@@ -20,6 +20,9 @@ self.addEventListener('activate', e => {
 
 // Fetch: network first, fall back to cache
 self.addEventListener('fetch', e => {
+  // Audio streams (Safe Inside album) go straight to the network — the browser
+  // handles range requests natively, and partial (206) responses can't be cached.
+  if (e.request.url.includes('/audio/')) return;
   e.respondWith(
     fetch(e.request)
       .then(r => {
