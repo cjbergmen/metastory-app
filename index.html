@@ -3286,6 +3286,7 @@ function setNSExpand(id){
 function beginPractice(id){
   _nsCat = 'all';
   _nsExpanded = id;
+  try{if(curPage==='rest')_restView='practices';}catch(e){}
   _repaintRegulation();
   setTimeout(()=>{const el=document.getElementById('ns-act-'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},60);
 }
@@ -9139,10 +9140,14 @@ function saveRest(){
   try{if(typeof fbSyncSleep==='function')fbSyncSleep(viewDate,{h,bed,wake,source:'manual'});}catch(e){}
   showToast('Sleep logged'); rRest();
 }
-function rRest(){
+// ── REST TAB v2: glance dashboard + one-tap sub-views ──
+let _restView='home';
+function restGo(v){_restView=v;rRest();try{document.getElementById('pages').scrollTop=0;}catch(e){}}
+function _restBackHTML(t){return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><button onclick="restGo('home')" style="background:none;border:none;color:var(--sub);font-size:22px;cursor:pointer;padding:0;line-height:1">&#8592;</button><div style="font-size:16px;font-weight:700">${t}</div></div>`;}
+
+function _sleepFullHTML(){
   const r=_restGet()||{h:0,bed:'',wake:''};
-  const wind=_windGet();
-  let h=_tabRoutineHTML('rest');
+  let h='';
   // last night
   h+=`<div class="card" style="margin-bottom:12px">
     <span class="kicker">Last night</span>`;
@@ -9176,26 +9181,128 @@ function rRest(){
     <span class="kicker">This week's focus</span>
     <h3>In bed by 10:00 tonight</h3>
     <p>The hours before midnight do the heaviest lifting for recovery, hormones, and tomorrow's energy. Two hours of sleep before midnight are worth more than four after.</p></div>`;
-  // Rhythm of Rest — immersive guided prayer / reflection by time of day
-  h+=_prayerLauncherHTML();
-  // Nervous-system check-in + suggested practice + 7-day pattern (moved from Stress)
-  try{h+=_pvBlockHTML();}catch(e){}
-  // Listening — Safe Inside (Ventrality) + listening protocol
-  h+=_musicCardHTML();
-  // Regulating practices library (moved from Stress)
-  try{h+=_practicesListHTML();}catch(e){}
-  // wind-down
-  // Wind-down checklist only appears in the evening (after 5pm) on today's view,
-  // when it's actually relevant — keeps the Rest tab clean during the day.
-  const _isToday=(typeof dk==='function')?(viewDate===dk()):true;
-  if(_isToday && new Date().getHours()>=17){
-    h+=`<div class="card"><span class="kicker">Tonight's wind-down</span><div style="margin-top:8px">`;
-    WINDDOWN.forEach(w=>{
-      h+=`<div class="chk-row" onclick="toggleWind('${w.k}')">
-        <div class="chk-box ${wind[w.k]?'on':''}">${wind[w.k]?'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>':''}</div>
-        ${w.t}${w.s?`<small>${w.s}</small>`:''}</div>`;
-    });
-    h+=`</div></div>`;
+  return h;
+}
+function _sleepCompactHTML(){
+  const r=_restGet()||{h:0};
+  let mid;
+  if(r.h>0){
+    const diff=r.h-REST_GOAL;
+    const tag=diff<-0.25?`<span style="font-size:11px;color:var(--green);font-weight:700">${Math.abs(diff).toFixed(1)}h below goal</span>`
+              :`<span style="font-size:11px;color:#5d8a6e;font-weight:700">met your goal</span>`;
+    mid=`<div style="display:flex;align-items:baseline;gap:8px;margin-top:2px"><span style="font-family:var(--font-serif);font-size:26px;font-weight:500">${Math.floor(r.h)}h ${Math.round((r.h%1)*60)}m</span>${tag}</div>`;
+  }else{
+    mid=`<div style="font-size:14.5px;font-weight:600;margin-top:3px">Log last night's sleep</div>`;
+  }
+  return `<div class="card" style="margin-bottom:10px;cursor:pointer" onclick="restGo('sleep')">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <div style="min-width:0"><span class="kicker">Last night</span>${mid}</div>
+      <span style="color:var(--sub);font-size:18px;flex-shrink:0">&#8250;</span>
+    </div></div>`;
+}
+function _ckCompactHTML(){
+  const ss=pvLatest(viewDate);
+  const n=pvLog(viewDate).length;
+  let dots='';
+  PV_ORDER.forEach(id=>{
+    const s=PV_STATES[id];const sel=ss===id;
+    dots+=`<div onclick="pvAddCheckin('${id}')" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;padding:2px 0">
+      <span style="width:30px;height:30px;border-radius:50%;background:${s.color};opacity:${sel?'1':'.38'};border:2.5px solid ${sel?'var(--text)':'transparent'};box-sizing:border-box"></span>
+      <span style="font-size:9px;font-weight:${sel?'700':'500'};color:${sel?'var(--text)':'var(--sub)'};text-align:center">${s.label}</span></div>`;
+  });
+  const sub=(ss&&PV_STATES[ss])
+    ?`<div style="font-size:11.5px;color:var(--sub);margin-top:7px">${PV_STATES[ss].plain}${n>1?` &middot; ${n} check-ins today`:''}</div>`
+    :`<div style="font-size:11.5px;color:var(--sub);margin-top:7px">Tap the state that fits &mdash; it tunes today's suggestion and your listening dials.</div>`;
+  return `<div class="card" style="margin-bottom:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <span class="kicker">How is your system right now?</span>
+      <span onclick="restGo('checkin')" style="font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer">More</span>
+    </div>
+    <div style="display:flex;gap:2px;margin-top:9px">${dots}</div>
+    ${sub}</div>`;
+}
+function _suggestNowHTML(){
+  const ss=pvLatest(viewDate);
+  const slot=_slotNow(),mode=_restMode();
+  const prayerDone=_prayerDoneToday().includes(slot);
+  let kick='Suggested now',title='',line='',btn='',act='';
+  if(ss&&PV_STATES[ss]&&PV_STATES[ss].zone==='dysreg'){
+    const a=_pvPick(ss);
+    if(a){const sg=PV_SUGGEST[ss]||{};
+      kick=sg.k||'Suggested now';title=a.n;
+      line=sg.blurb||a.tag||'';if(line.length>160)line=line.slice(0,157)+'&hellip;';
+      btn='Begin this practice';act=`openPractice('${a.id}','${ss}')`;}
+  }
+  if(!title&&!prayerDone){
+    title=_slotTitle(slot,mode);
+    line='A few unhurried minutes to return to what holds you.';
+    btn='Begin';act=`openPrayer('${slot}')`;
+  }
+  if(!title){
+    const r=_musRec();const tr=MUSIC_ALBUM.tracks[r.idx];
+    title=r.dose+'-minute listen';
+    line='Starting with &ldquo;'+tr.t+'&rdquo; &mdash; tuned to your dials. The music fades out on its own.';
+    btn='Begin listening';act='musBeginSession()';
+  }
+  return `<div class="fdn-focus" style="margin-bottom:10px">
+    <span class="kicker">${kick}</span>
+    <h3 style="margin:6px 0 4px">${title}</h3>
+    <p style="margin:0">${line}</p>
+    <button class="btn" style="margin-top:12px;width:100%;background:var(--purple);color:var(--text);border:none;font-weight:700" onclick="${act}">${btn}</button>
+  </div>`;
+}
+function _restTilesHTML(){
+  const slot=_slotNow(),mode=_restMode();
+  const prayerDone=_prayerDoneToday().includes(slot);
+  const lj=_ljGet();const st=_musStats();
+  const todayMin=Math.floor((parseInt(lsGet('listen_'+dk(),'0'),10)||0)/60);
+  let lStat;
+  if(lj&&lj.dose&&lj.started){
+    const dn=_ljDays(lj),len=lj.len||15;
+    lStat=dn>=len?'Journey complete':'Day '+Math.min(dn+((todayMin>=lj.dose)?0:1),len)+' of '+len+(todayMin?' &middot; '+todayMin+' min today':'');
+  }else lStat=st.streak>0?st.streak+'-day streak &middot; '+st.weekMin+' min this week':'Safe Inside &middot; 10 tracks';
+  let pcN=0;try{pcN=(JSON.parse(lsGet('pcdone_'+dk(),'[]'))||[]).length;}catch(e){}
+  const wind=_windGet();const wDone=WINDDOWN.filter(w=>wind[w.k]).length;
+  const evening=new Date().getHours()>=17;
+  const ic=p=>`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+  const tile=(view,icon,name,stat)=>`<div class="card" style="margin-bottom:0;cursor:pointer" onclick="restGo('${view}')">
+    <div style="color:var(--green)">${icon}</div>
+    <div style="font-size:13.5px;font-weight:700;margin-top:6px">${name}</div>
+    <div style="font-size:10.5px;color:var(--sub);margin-top:2px;line-height:1.35">${stat}</div></div>`;
+  return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+    ${tile('prayer',ic('<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>'),_slotTitle(slot,mode),prayerDone?'Completed today':'Not yet today')}
+    ${tile('listen',ic('<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/>'),'Listening',lStat)}
+    ${tile('practices',ic('<path d="M5 14c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 9c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 19c2-1.5 4-1.5 6 0s4 1.5 6 0"/>'),'Practices',pcN?pcN+' done today &middot; '+NS_ACT.length+' total':NS_ACT.length+' ways to regulate')}
+    ${tile('wind',ic('<path d="M21 13.5A8.5 8.5 0 1 1 10.5 3a7 7 0 0 0 10.5 10.5z"/>'),'Wind-down',evening?(wDone?wDone+' of '+WINDDOWN.length+' tonight':'Ready for tonight'):'Opens at 5pm')}
+  </div>`;
+}
+function _windFullHTML(){
+  const wind=_windGet();
+  let h=`<div class="card"><span class="kicker">Tonight's wind-down</span>`;
+  if(new Date().getHours()<17)h+=`<div style="font-size:12px;color:var(--sub);margin-top:6px">Made for the evening &mdash; you can preview it or check things off any time.</div>`;
+  h+=`<div style="margin-top:8px">`;
+  WINDDOWN.forEach(w=>{
+    h+=`<div class="chk-row" onclick="toggleWind('${w.k}')">
+      <div class="chk-box ${wind[w.k]?'on':''}">${wind[w.k]?'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>':''}</div>
+      ${w.t}${w.s?`<small>${w.s}</small>`:''}</div>`;
+  });
+  h+=`</div></div>`;
+  return h;
+}
+function rRest(){
+  let h=_tabRoutineHTML('rest');
+  if(_restView==='sleep'){h+=_restBackHTML('Sleep');h+=_sleepFullHTML();}
+  else if(_restView==='prayer'){h+=_restBackHTML('Rhythm of rest');h+=_prayerLauncherHTML();}
+  else if(_restView==='checkin'){h+=_restBackHTML('Nervous-system check-in');try{h+=_pvBlockHTML();}catch(e){}}
+  else if(_restView==='listen'){h+=_restBackHTML('Listening');h+=_musicCardHTML();}
+  else if(_restView==='practices'){h+=_restBackHTML('Practices');try{h+=_practicesListHTML();}catch(e){}}
+  else if(_restView==='wind'){h+=_restBackHTML('Wind-down');h+=_windFullHTML();}
+  else{
+    _restView='home';
+    h+=_sleepCompactHTML();
+    h+=_ckCompactHTML();
+    try{h+=_suggestNowHTML();}catch(e){}
+    try{h+=_restTilesHTML();}catch(e){}
   }
   document.getElementById('page-rest').innerHTML=h;
 }
