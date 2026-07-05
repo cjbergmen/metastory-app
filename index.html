@@ -6,11 +6,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Metastory Health">
-<meta name="theme-color" content="#f1ed5">
+<meta name="theme-color" content="#f1ede5">
 <title>Metastory Health</title>
 <link rel="apple-touch-icon" href="https://app.metastoryhealth.com/apple-touch-icon.png">
 <link rel="manifest" href="https://app.metastoryhealth.com/manifest.json">
-<link rel="stylesheet" href="htt://cdn.jsdelivr.net/npm/@fontsource/cormorant-garamond/index.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/cormorant-garamond/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/dm-sans/index.css">
 <style>
 :root {
@@ -510,8 +510,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .ex-fig .hd,.ex-fig .bell{fill:var(--blue);stroke:none}
 .ex-fig .grnd{stroke:var(--border);stroke-width:3}
 /* motion is driven per-joint by SMIL <animate> generated in _exPose; reduced-motion handled in JS */
-.nsi{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-style:normal;font-size:11px;font-weight:600;opacity:.55;cursor:pointer;margin-left:5px;vertical-align:middle;border:1.5px solid currentColor;background:rgba(0,0,0,.06)}
-.nsi:hover{opacity:.9;background:rgba(0,0,0,.1)}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -1116,6 +1114,7 @@ function fbSyncSettings(){
     try { const rm=lsGet('_restMode',''); if(rm) settings.restMode=rm; } catch(e){}
     try { const ljv=lsGet('_listenJourney',''); if(ljv) settings.listenJourney=JSON.parse(ljv); } catch(e){}
     try { const ldv=lsGet('_listenDials',''); if(ldv) settings.listenDials=JSON.parse(ldv); } catch(e){}
+    try { const fo=lsGet('_fltOn',''); if(fo) settings.fltOn=fo; } catch(e){}
     fbDb.collection('users').doc(fbUser.uid).set({ settings, updated: Date.now() }, {merge:true}).catch(()=>{});
   } catch(e){}
 }
@@ -1216,6 +1215,7 @@ async function fbPullAll(){
         if(s.restMode) lsSet('_restMode', s.restMode);
         if(s.listenJourney) lsSet('_listenJourney', JSON.stringify(s.listenJourney));
         if(s.listenDials) lsSet('_listenDials', JSON.stringify(s.listenDials));
+        if(s.fltOn) lsSet('_fltOn', s.fltOn);
         if(s.onboardDone || s.userProfile || s.userTargets || s.routineTR) lsSet('_onboardDone', '1');
         if(s.detFlags) lsSet('_detFlags', JSON.stringify(s.detFlags));
         if(s.customWorkouts) lsSet('_customWorkouts', JSON.stringify(s.customWorkouts));
@@ -3090,7 +3090,7 @@ function _pvBlockHTML(){
     const s=PV_STATES[id];const sel=_ss===id;
     _ladder += `<button class="pv-state${sel?' sel':''}" onclick="pvAddCheckin('${id}')" style="${sel?`border-color:${s.color};background:${s.color}1f`:''}">
       <span class="pv-dot" style="background:${s.color}"></span>
-      <span class="pv-state-txt"><b>${s.label} <i class="nsi" data-k="${s.id}">?</i></b><small>${s.plain} · ${s.poly}</small></span>
+      <span class="pv-state-txt"><b>${s.label}</b><small>${s.plain} · ${s.poly}</small></span>
       ${sel?'<span class="pv-check" style="color:'+s.color+'">✓</span>':''}
     </button>`;
   });
@@ -9203,7 +9203,7 @@ function _sleepCompactHTML(){
     </div></div>`;
 }
 function _ckCompactHTML(){
-  const ss=(function(){var a=pvLog(viewDate);if(!a||!a.length)return null;var l=a[a.length-1];return(Date.now()-l.t<5000)?l.s:null})();
+  const ss=pvLatest(viewDate);
   const n=pvLog(viewDate).length;
   let dots='';
   PV_ORDER.forEach(id=>{
@@ -9218,7 +9218,7 @@ function _ckCompactHTML(){
   return `<div class="card" style="margin-bottom:10px">
     <div style="display:flex;align-items:center;justify-content:space-between">
       <span class="kicker">How is your system right now?</span>
-      <span onclick="restGo('checkin')" style="font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer">More</span> <i class="nsi" data-k="all" style="vertical-align:middle;margin-left:4px">?</i>
+      <span onclick="restGo('checkin')" style="font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer">More</span>
     </div>
     <div style="display:flex;gap:2px;margin-top:9px">${dots}</div>
     ${sub}</div>`;
@@ -9341,7 +9341,7 @@ function _musEl(){
     if(_mus.repeat==='off'&&_mus.idx>=MUSIC_ALBUM.tracks.length-1){musClose();return;}
     musNext();
   });
-  a.addEventListener('play',function(){_mus.playing=true;_mus.lastTick=Date.now();_musPaint();});
+  a.addEventListener('play',function(){_mus.playing=true;_mus.lastTick=Date.now();try{if(_flt.ctx&&_flt.ctx.state!=='running')_flt.ctx.resume();}catch(e){}_musPaint();});
   a.addEventListener('pause',function(){_musLogFlush();_mus.playing=false;_musPaint();});
   a.addEventListener('timeupdate',function(){_musTick();_musTimerCheck();_musProg();});
   a.addEventListener('error',function(){if(_mus.idx>=0)showToast('Could not load that track');});
@@ -9358,6 +9358,9 @@ function musPlay(i){
   _mus.idx=i;
   a.src=MUSIC_ALBUM.dir+tr.f;
   try{if(!_mus._fade)a.volume=1;}catch(e){}
+  _fltEnsure();
+  try{if(_flt.ctx&&_flt.ctx.state!=='running')_flt.ctx.resume();}catch(e){}
+  _fltApply();
   a.play().catch(function(){});
   _musMediaSession(tr);
   _musPaint();
@@ -9377,6 +9380,7 @@ function musClose(){
   if(_mus._fade){clearInterval(_mus._fade);_mus._fade=null;}
   _mus.timerEnd=0;_mus.timerMin=0;_mus.timerEOT=false;
   try{a.volume=1;}catch(e){}
+  try{if(_flt.ctx&&_flt.gain){_flt.gain.gain.cancelScheduledValues(_flt.ctx.currentTime);_flt.gain.gain.setValueAtTime(1,_flt.ctx.currentTime);}}catch(e){}
   _mus.idx=-1;_mus.playing=false;
   _musPaint();
   if(typeof curPage!=='undefined'&&curPage==='rest')rRest();
@@ -9390,6 +9394,83 @@ function _musMediaSession(tr){
     navigator.mediaSession.setActionHandler('nexttrack',musNext);
     navigator.mediaSession.setActionHandler('previoustrack',musPrev);
   }catch(e){}
+}
+// ── PROSODY FILTRATION (Porges-informed) ──
+// Web Audio chain: source → lowshelf cut → highshelf cut → peaking boost (prosodic
+// band) → gain (fade) → analyser → out. Dials drive it live: Activation = depth,
+// Presence = band center/width. Toggleable; falls back to plain playback if
+// Web Audio is unavailable. Gain node also gives a true fade on iOS.
+let _flt={ctx:null,src:null,ls:null,hs:null,pk:null,gain:null,an:null,dead:false};
+let _specRaf=0;
+function _fltIsOn(){return lsGet('_fltOn','1')==='1';}
+function _fltEnsure(){
+  if(_flt.ctx||_flt.dead)return;
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw 0;
+    const ctx=new AC();
+    const src=ctx.createMediaElementSource(_musEl());
+    const ls=ctx.createBiquadFilter();ls.type='lowshelf';ls.frequency.value=300;
+    const hs=ctx.createBiquadFilter();hs.type='highshelf';hs.frequency.value=4500;
+    const pk=ctx.createBiquadFilter();pk.type='peaking';
+    const gain=ctx.createGain();
+    const an=ctx.createAnalyser();an.fftSize=256;an.smoothingTimeConstant=0.82;
+    src.connect(ls);ls.connect(hs);hs.connect(pk);pk.connect(gain);gain.connect(an);an.connect(ctx.destination);
+    _flt.ctx=ctx;_flt.src=src;_flt.ls=ls;_flt.hs=hs;_flt.pk=pk;_flt.gain=gain;_flt.an=an;
+    document.addEventListener('visibilitychange',function(){if(!document.hidden&&_flt.ctx&&_flt.ctx.state!=='running')_flt.ctx.resume().catch(function(){});});
+    if(!_specRaf)_specLoop();
+    _fltApply();
+  }catch(e){_flt.dead=true;}
+}
+function _fltParams(d){
+  return {
+    lo:-(1+d.act*1.1),
+    hi:-(0.5+d.act*0.95),
+    boost:1+d.act*0.5,
+    freq:800+d.pres*80,
+    q:1.4-d.pres*0.06
+  };
+}
+function _fltApply(){
+  const line=document.getElementById('mus-flt-line');
+  if(!_flt.ctx){if(_flt.dead&&line)line.textContent='Filtering not supported on this device — playing the original mix.';return;}
+  const on=_fltIsOn();
+  const p=_fltParams(_dialsGet());
+  try{
+    _flt.ls.gain.value=on?p.lo:0;
+    _flt.hs.gain.value=on?p.hi:0;
+    _flt.pk.gain.value=on?p.boost:0;
+    _flt.pk.frequency.value=p.freq;
+    _flt.pk.Q.value=p.q;
+  }catch(e){}
+  if(line)line.textContent=on
+    ?('Prosody band '+(p.freq/1000).toFixed(1)+' kHz · emphasis +'+p.boost.toFixed(1)+' dB · lows '+p.lo.toFixed(0)+' dB · highs '+p.hi.toFixed(0)+' dB')
+    :'Original mix — no filtering';
+  const btn=document.getElementById('mus-flt-btn');
+  if(btn)btn.textContent=on?'Filtration: on':'Filtration: off';
+}
+function fltToggle(){
+  lsSet('_fltOn',_fltIsOn()?'0':'1');
+  try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}
+  _fltApply();
+  showToast(_fltIsOn()?'Filtration on — prosody band emphasized':'Filtration off — original mix');
+}
+function _specLoop(){
+  _specRaf=requestAnimationFrame(_specLoop);
+  if(!_flt.an||!_mus.playing)return;
+  const c=document.getElementById('mus-spec');if(!c)return;
+  const g=c.getContext('2d');if(!g)return;
+  const n=_flt.an.frequencyBinCount;
+  const data=new Uint8Array(n);
+  _flt.an.getByteFrequencyData(data);
+  const W=c.width,H=c.height;
+  g.clearRect(0,0,W,H);
+  const bars=48;
+  for(let i=0;i<bars;i++){
+    const v=data[Math.floor(i*n/bars)]/255;
+    const bh=Math.max(1,v*(H-2));
+    g.fillStyle=(i>=1&&i<=9)?'#ab6c52':'#b7baa7';
+    g.fillRect(i*(W/bars)+1,H-bh,(W/bars)-2,bh);
+  }
 }
 // ── sleep timer / repeat / seek ──
 const _MUS_TIMER_STEPS=[0,10,20,30,-1]; // -1 = end of current track
@@ -9407,6 +9488,16 @@ function _musTimerCheck(){
   if(!_mus.timerEnd||Date.now()<_mus.timerEnd||_mus._fade)return;
   _mus.timerEnd=0;_mus.timerMin=0;
   const a=_mus.a;if(!a)return;
+  if(_flt.ctx&&_flt.gain){
+    try{
+      const t=_flt.ctx.currentTime;
+      _flt.gain.gain.cancelScheduledValues(t);
+      _flt.gain.gain.setValueAtTime(_flt.gain.gain.value,t);
+      _flt.gain.gain.linearRampToValueAtTime(0.0001,t+14);
+    }catch(e){}
+    _mus._fade=setTimeout(function(){_mus._fade=null;musClose();},14500);
+    return;
+  }
   _mus._fade=setInterval(function(){
     let done=false;
     try{if(a.volume>0.08)a.volume=Math.max(0,a.volume-0.08);else done=true;}catch(e){done=true;}
@@ -9431,11 +9522,12 @@ function musSeek(v){const a=_mus.a;if(!a||!(a.duration>0))return;a.currentTime=(
 const _DIAL_ANCHORS={mobilized:{act:9,cap:4,pres:5},engaged:{act:6,cap:7,pres:7},ventral:{act:4,cap:8,pres:9},restful:{act:3,cap:7,pres:8},immobilized:{act:2,cap:3,pres:2}};
 function _dialsGet(){try{const v=JSON.parse(lsGet('_listenDials','null'));if(v&&v.act)return v;}catch(e){}return {act:5,cap:5,pres:5};}
 function _dialsSet(d){lsSet('_listenDials',JSON.stringify(d));try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}}
-function _dialsNudge(state){const a=_DIAL_ANCHORS[state];if(!a)return;const d=_dialsGet();const mv=function(cur,tgt){return tgt>cur?Math.ceil((cur+tgt)/2):Math.floor((cur+tgt)/2);};d.act=mv(d.act,a.act);d.cap=mv(d.cap,a.cap);d.pres=mv(d.pres,a.pres);d.ts=Date.now();_dialsSet(d);}
+function _dialsNudge(state){const a=_DIAL_ANCHORS[state];if(!a)return;const d=_dialsGet();const mv=function(cur,tgt){return tgt>cur?Math.ceil((cur+tgt)/2):Math.floor((cur+tgt)/2);};d.act=mv(d.act,a.act);d.cap=mv(d.cap,a.cap);d.pres=mv(d.pres,a.pres);d.ts=Date.now();_dialsSet(d);try{_fltApply();}catch(e){}}
 function setDial(k,v){
   const d=_dialsGet();d[k]=Math.max(1,Math.min(10,parseInt(v,10)||5));d.ts=Date.now();_dialsSet(d);
   const el=document.getElementById('dial-val-'+k);if(el)el.textContent=d[k];
   const rec=document.getElementById('mus-rec');if(rec)rec.innerHTML=_musRecInnerHTML();
+  try{_fltApply();}catch(e){}
 }
 function _musRec(){
   const d=_dialsGet();
@@ -9645,7 +9737,15 @@ function _musicCardHTML(){
     +'<div style="display:flex;gap:7px;margin-top:9px">'
     +'<button class="btn btn-s btn-sm" style="flex:1" onclick="musRepeatCycle()">'+repLbl+'</button>'
     +'<button class="btn btn-s btn-sm" style="flex:1" onclick="musTimerCycle()">'+timLbl+'</button>'
+    +'</div>'
+    +'<div style="margin-top:9px;padding-top:9px;border-top:0.5px solid var(--border)">'
+    +'<div style="display:flex;align-items:center;gap:8px">'
+    +'<button class="btn btn-s btn-sm" id="mus-flt-btn" style="flex-shrink:0" onclick="fltToggle()">'+(_fltIsOn()?'Filtration: on':'Filtration: off')+'</button>'
+    +'<canvas id="mus-spec" width="200" height="34" style="flex:1;min-width:0;height:34px;display:block"></canvas>'
+    +'</div>'
+    +'<div id="mus-flt-line" style="font-size:10.5px;color:var(--sub);margin-top:5px;line-height:1.4"></div>'
     +'</div></div>';
+  setTimeout(function(){try{_fltApply();}catch(e){}},0);
   }
   return '<div class="card" style="margin-bottom:12px">'
     +'<span class="kicker">Listening</span>'
@@ -10365,18 +10465,12 @@ function _exHeroBlock(wo){
 // mixing with each branch — ventral+sympathetic = work/play (engaged),
 // ventral+dorsal = rest/wind-down (restful).
 const PV_STATES = {
-  mobilized:   {id:'mobilized',   label:'Wired',   plain:'Fight or flight',          poly:'Sympathetic',           color:'#c4855f', zone:'dysreg', order:1},
-  engaged:     {id:'engaged',     label:'Active',     plain:'Work or play',             poly:'Ventral + sympathetic', color:'#bfa15f', zone:'safe',   order:2},
-  ventral:     {id:'ventral',     label:'Safe / Calm',    plain:'Safe & connected',         poly:'Ventral',               color:'#b7baa7', zone:'safe',   order:3},
+  mobilized:   {id:'mobilized',   label:'Mobilized',   plain:'Fight or flight',          poly:'Sympathetic',           color:'#c4855f', zone:'dysreg', order:1},
+  engaged:     {id:'engaged',     label:'Engaged',     plain:'Work or play',             poly:'Ventral + sympathetic', color:'#bfa15f', zone:'safe',   order:2},
+  ventral:     {id:'ventral',     label:'Grounded',    plain:'Safe & connected',         poly:'Ventral',               color:'#b7baa7', zone:'safe',   order:3},
   restful:     {id:'restful',     label:'Restful',     plain:'Rest & wind-down',         poly:'Ventral + dorsal',      color:'#94a89e', zone:'safe',   order:4},
-  immobilized: {id:'immobilized', label:'Shutdown', plain:'Frozen or shut down',      poly:'Dorsal',                color:'#7a9aab', zone:'dysreg', order:5},
+  immobilized: {id:'immobilized', label:'Immobilized', plain:'Frozen or shut down',      poly:'Dorsal',                color:'#7a9aab', zone:'dysreg', order:5},
 };
-const PV_DESCS={mobilized:"Your sympathetic nervous system is activated. You might feel anxious, restless, or on edge.",engaged:"A healthy activated state blending social engagement with energy. Ideal for focused work and connection.",ventral:"Your ventral vagal system is online. You feel safe, connected, and grounded.",restful:"A healthy blend of calm and rest. Your nervous system is winding down safely.",immobilized:"Your dorsal vagal system has taken over. You may feel numb, disconnected, or frozen."};
-function showNSInfo(key){var d=PV_DESCS[key],s=PV_STATES[key];if(d&&s)showToast(s.label+": "+d,6000);}
-function showAllNSInfo(){var existing=document.getElementById("_nsInfoModal");if(existing){existing.remove();return;}var overlay=document.createElement("div");overlay.id="_nsInfoModal";overlay.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px";var card=document.createElement("div");card.style.cssText="background:#f5f0e8;border-radius:16px;padding:24px;max-width:340px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)";var title=document.createElement("div");title.style.cssText="font-weight:700;font-size:15px;color:#424c57;margin-bottom:16px;font-family:var(--font-sans)";title.textContent="Nervous System States";card.appendChild(title);["mobilized","engaged","ventral","restful","immobilized"].forEach(function(k){var s=PV_STATES[k],d=PV_DESCS[k];if(s&&d){var row=document.createElement("div");row.style.cssText="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px";var dot=document.createElement("span");dot.style.cssText="width:14px;height:14px;min-width:14px;border-radius:50%;margin-top:3px;background:"+s.color;var txt=document.createElement("div");var lbl=document.createElement("div");lbl.style.cssText="font-weight:700;font-size:14px;color:#424c57;font-family:var(--font-sans)";lbl.textContent=s.label;var desc=document.createElement("div");desc.style.cssText="font-size:13px;color:#5a6570;line-height:1.4;margin-top:2px;font-family:var(--font-sans)";desc.textContent=d;txt.appendChild(lbl);txt.appendChild(desc);row.appendChild(dot);row.appendChild(txt);card.appendChild(row);}});var close=document.createElement("div");close.style.cssText="text-align:center;margin-top:8px;font-size:13px;color:#8a7e6b;cursor:pointer;font-family:var(--font-sans)";close.textContent="Tap anywhere to close";card.appendChild(close);overlay.appendChild(card);document.body.appendChild(overlay);overlay.addEventListener("click",function(){overlay.remove();});card.addEventListener("click",function(e){e.stopPropagation();});close.addEventListener("click",function(){overlay.remove();});}
-document.addEventListener('click',function(e){var el=e.target.closest('.nsi');if(el){e.stopPropagation();e.preventDefault();if(el.dataset.k==='all')showAllNSInfo();else showNSInfo(el.dataset.k);}},true);
-
-document.addEventListener("click",function(e){var el=e.target.closest("[onclick*=pvAddCheckin]");if(!el)return;var parent=el.parentElement;if(!parent)return;var sibs=parent.querySelectorAll("[onclick*=pvAddCheckin]");sibs.forEach(function(sib){var isSel=sib===el;var spans=sib.querySelectorAll("span");if(spans[0]){spans[0].style.opacity=isSel?"1":".38";spans[0].style.border=isSel?"2.5px solid #424c57":"2.5px solid transparent";}if(spans[1]){spans[1].style.fontWeight=isSel?"700":"500";spans[1].style.color=isSel?"#424c57":"#8a7e6b";}});});
 const PV_ORDER = ['mobilized','engaged','ventral','restful','immobilized'];
 
 // Each state → only quick (≤5 min) do-it-now practices, ordered by best-fit.
