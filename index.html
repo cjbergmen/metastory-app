@@ -9203,7 +9203,7 @@ function _sleepCompactHTML(){
     </div></div>`;
 }
 function _ckCompactHTML(){
-  const ss=null;
+  const ss=(function(){var a=pvLog;if(!a||!a.length)return null;var l=a[a.length-1];if(!l||!l.t)return null;var d=new Date(l.t),n=new Date();return d.toDateString()===n.toDateString()?l.s:null})();
   const n=pvLog(viewDate).length;
   let dots='';
   PV_ORDER.forEach(id=>{
