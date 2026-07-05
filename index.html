@@ -24,7 +24,7 @@
   --font-sans:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font-sans);overflow:hidden}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font-sans);overflow:hidden;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 #app{display:flex;flex-direction:column;height:100%}
 #hdr{padding:calc(var(--st) + 14px) 18px 12px;background:var(--bg);border-bottom:0.5px solid var(--border);flex-shrink:0}
 #hdr h1{font-size:24px;font-weight:400;font-family:var(--font-serif);letter-spacing:-.2px}
@@ -10093,7 +10093,7 @@ function startPrayerTimer(sec){
   if(_prayerTimerId)clearInterval(_prayerTimerId);
   _prayerTimerId=setInterval(()=>{
     left--; const el=document.getElementById('pr-timer');
-    if(left<=0){clearInterval(_prayerTimerId);_prayerTimerId=null;if(el)el.textContent='Amen';return;}
+    if(left<=0){clearInterval(_prayerTimerId);_prayerTimerId=null;const w=document.getElementById('pr-timer-wrap');if(w)w.innerHTML='<div style="text-align:center;font-family:var(--font-sans);font-size:14px;letter-spacing:.02em;color:rgba(255,255,255,.78)">The two minutes are done — stay as long as you like.</div>';return;}
     if(el)el.textContent=fmt(left);
   },1000);
 }
