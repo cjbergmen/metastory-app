@@ -9210,7 +9210,7 @@ function _ckCompactHTML(){
     const s=PV_STATES[id];const sel=ss===id;
     dots+=`<div onclick="pvAddCheckin('${id}')" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;padding:2px 0">
       <span style="width:30px;height:30px;border-radius:50%;background:${s.color};opacity:${sel?'1':'.38'};border:2.5px solid ${sel?'var(--text)':'transparent'};box-sizing:border-box"></span>
-      <span style="font-size:9px;font-weight:${sel?'700':'500'};color:${sel?'var(--text)':'var(--sub)'};text-align:center">${s.label} <i class="nsi" data-k="${id}">?</i></span></div>`;
+      <span style="font-size:9px;font-weight:${sel?'700':'500'};color:${sel?'var(--text)':'var(--sub)'};text-align:center">${s.label}</span></div>`;
   });
   const sub=(ss&&PV_STATES[ss])
     ?`<div style="font-size:11.5px;color:var(--sub);margin-top:7px">${PV_STATES[ss].plain}${n>1?` &middot; ${n} check-ins today`:''}</div>`
@@ -9218,7 +9218,7 @@ function _ckCompactHTML(){
   return `<div class="card" style="margin-bottom:10px">
     <div style="display:flex;align-items:center;justify-content:space-between">
       <span class="kicker">How is your system right now?</span>
-      <span onclick="restGo('checkin')" style="font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer">More</span>
+      <span onclick="restGo('checkin')" style="font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer">More</span> <i class="nsi" data-k="all" style="vertical-align:middle;margin-left:4px">?</i>
     </div>
     <div style="display:flex;gap:2px;margin-top:9px">${dots}</div>
     ${sub}</div>`;
@@ -10373,7 +10373,8 @@ const PV_STATES = {
 };
 const PV_DESCS={mobilized:"Your sympathetic nervous system is activated. You might feel anxious, restless, or on edge.",engaged:"A healthy activated state blending social engagement with energy. Ideal for focused work and connection.",ventral:"Your ventral vagal system is online. You feel safe, connected, and grounded.",restful:"A healthy blend of calm and rest. Your nervous system is winding down safely.",immobilized:"Your dorsal vagal system has taken over. You may feel numb, disconnected, or frozen."};
 function showNSInfo(key){var d=PV_DESCS[key],s=PV_STATES[key];if(d&&s)showToast(s.label+": "+d,6000);}
-document.addEventListener('click',function(e){var el=e.target.closest('.nsi');if(el){e.stopPropagation();e.preventDefault();showNSInfo(el.dataset.k);}},true);
+function showAllNSInfo(){var m='';['mobilized','engaged','ventral','restful','immobilized'].forEach(function(k){var s=PV_STATES[k],d=PV_DESCS[k];if(s&&d)m+=s.label+': '+d+'\n\n';});showToast(m.trim(),12000);}
+document.addEventListener('click',function(e){var el=e.target.closest('.nsi');if(el){e.stopPropagation();e.preventDefault();if(el.dataset.k==='all')showAllNSInfo();else showNSInfo(el.dataset.k);}},true);
 
 const PV_ORDER = ['mobilized','engaged','ventral','restful','immobilized'];
 
