@@ -9401,10 +9401,15 @@ function _musSwap(toB){
     _mus.useB=!!toB;
     try{to.volume=1;}catch(e){}
     if(!toB){try{if(_flt.ctx&&_flt.ctx.state!=='running')_flt.ctx.resume();}catch(e){}_fltApply();}
-    const go=function(){try{to.currentTime=pos;}catch(e){}to.play().catch(function(){_mus.useB=!toB;from.play().catch(function(){});});};
-    if(to.readyState>=1)go();
-    else{to.addEventListener('loadedmetadata',function h(){to.removeEventListener('loadedmetadata',h);go();});try{to.load();}catch(e){}}
-    from.pause();
+    const go=function(){
+      try{to.currentTime=pos+((Date.now()-t0)/1000);}catch(e){}
+      const pr=to.play();
+      if(pr&&pr.catch)pr.catch(function(){_mus.useB=!toB;from.play().catch(function(){});});
+      setTimeout(function(){try{if(_musCur()===to)from.pause();}catch(e){}},250);
+    };
+    const t0=Date.now();
+    if(to.readyState>=2)go();
+    else{to.addEventListener('canplay',function h(){to.removeEventListener('canplay',h);go();});try{to.preload='auto';to.load();}catch(e){}}
   }catch(e){}
 }
 function musPlay(i){
@@ -9427,9 +9432,18 @@ function musPlay(i){
     try{
       const ub=_musElB();
       ub.muted=true;
+      ub.preload='auto';
       ub.src=MUSIC_ALBUM.dir+tr.f;
       const upr=ub.play();
       if(upr&&upr.then)upr.then(function(){ub.pause();ub.muted=false;_mus._bUnlocked=true;}).catch(function(){ub.muted=false;});
+    }catch(e){}
+  }
+  // Keep the plain element hot with the current track so the lock-screen
+  // hand-off is instant (file comes from HTTP cache, so no double download).
+  else if(!_mus.useB){
+    try{
+      const pb=_musElB();
+      if(!pb.src||pb.src.indexOf(tr.f)<0){pb.preload='auto';pb.src=MUSIC_ALBUM.dir+tr.f;try{pb.load();}catch(e){}}
     }catch(e){}
   }
   _musMediaSession(tr);
