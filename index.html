@@ -9375,8 +9375,25 @@ function _musSwap(toB){
   if(_mus.idx<0)return;
   const from=(_mus.useB&&_mus.b)?_mus.b:_mus.a;
   if(!from)return;
-  if(!_mus.playing||from.paused)return;
   const tr=MUSIC_ALBUM.tracks[_mus.idx];if(!tr)return;
+  if(!_mus.playing||from.paused){
+    if(!toB&&_mus.useB){
+      try{
+        const to2=_musEl();const pos2=from.currentTime||0;
+        if(!to2.src||to2.src.indexOf(tr.f)<0)to2.src=MUSIC_ALBUM.dir+tr.f;
+        const s2=function(){try{to2.currentTime=pos2;}catch(e){}};
+        if(to2.readyState>=1)s2();
+        else{to2.addEventListener('loadedmetadata',function h2(){to2.removeEventListener('loadedmetadata',h2);s2();});try{to2.load();}catch(e){}}
+        _mus.useB=false;
+        if(_mus.playing){
+          try{if(_flt.ctx&&_flt.ctx.state!=='running')_flt.ctx.resume();}catch(e){}
+          _fltApply();
+          to2.play().catch(function(){});
+        }
+      }catch(e){}
+    }
+    return;
+  }
   const to=toB?_musElB():_musEl();
   try{
     const pos=from.currentTime||0;
@@ -9404,6 +9421,17 @@ function musPlay(i){
     _fltApply();
   }
   a.play().catch(function(){});
+  // Unlock the plain background element while we still have the user's tap,
+  // so the lock-screen hand-off is allowed to start playback later.
+  if(!_mus._bUnlocked){
+    try{
+      const ub=_musElB();
+      ub.muted=true;
+      ub.src=MUSIC_ALBUM.dir+tr.f;
+      const upr=ub.play();
+      if(upr&&upr.then)upr.then(function(){ub.pause();ub.muted=false;_mus._bUnlocked=true;}).catch(function(){ub.muted=false;});
+    }catch(e){}
+  }
   _musMediaSession(tr);
   _musPaint();
   if(typeof curPage!=='undefined'&&curPage==='rest')rRest();
