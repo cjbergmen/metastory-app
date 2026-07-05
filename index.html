@@ -510,8 +510,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .ex-fig .hd,.ex-fig .bell{fill:var(--blue);stroke:none}
 .ex-fig .grnd{stroke:var(--border);stroke-width:3}
 /* motion is driven per-joint by SMIL <animate> generated in _exPose; reduced-motion handled in JS */
-.nsi{display:inline-block;width:15px;height:15px;line-height:15px;text-align:center;border-radius:50%;font-style:normal;font-size:10px;opacity:.4;cursor:pointer;margin-left:3px;vertical-align:middle;border:1px solid currentColor}
-.nsi:hover{opacity:.8}
+.nsi{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-style:normal;font-size:11px;font-weight:600;opacity:.55;cursor:pointer;margin-left:5px;vertical-align:middle;border:1.5px solid currentColor;background:rgba(0,0,0,.06)}
+.nsi:hover{opacity:.9;background:rgba(0,0,0,.1)}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -3090,7 +3090,7 @@ function _pvBlockHTML(){
     const s=PV_STATES[id];const sel=_ss===id;
     _ladder += `<button class="pv-state${sel?' sel':''}" onclick="pvAddCheckin('${id}')" style="${sel?`border-color:${s.color};background:${s.color}1f`:''}">
       <span class="pv-dot" style="background:${s.color}"></span>
-      <span class="pv-state-txt"><b>${s.label} <i class="nsi" data-k="${s.id}">i</i></b><small>${s.plain} · ${s.poly}</small></span>
+      <span class="pv-state-txt"><b>${s.label} <i class="nsi" data-k="${s.id}">?</i></b><small>${s.plain} · ${s.poly}</small></span>
       ${sel?'<span class="pv-check" style="color:'+s.color+'">✓</span>':''}
     </button>`;
   });
