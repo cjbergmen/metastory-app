@@ -9330,37 +9330,79 @@ const MUSIC_ALBUM={title:'Safe Inside',artist:'Ventrality',dir:'audio/safe-insid
   {t:'Nothing Is Required',f:'nothing-is-required.mp3',hint:'Nothing to do here — just listen.'},
   {t:'Still Here',f:'still-here.mp3',hint:'A gentle close — stay a moment after it ends.'}
 ]};
-let _mus={a:null,idx:-1,playing:false,accMs:0,lastTick:0,repeat:'all',timerEnd:0,timerMin:0,timerEOT:false,_fade:null};
-function _musEl(){
-  if(_mus.a)return _mus.a;
-  const a=new Audio();
-  a.preload='none';
-  a.addEventListener('ended',function(){
+let _mus={a:null,b:null,useB:false,idx:-1,playing:false,accMs:0,lastTick:0,repeat:'all',timerEnd:0,timerMin:0,timerEOT:false,_fade:null};
+function _musWire(el){
+  el.preload='none';
+  el.addEventListener('ended',function(){
+    if(el!==_musCur())return;
     if(_mus.timerEOT){_mus.timerEOT=false;musClose();return;}
-    if(_mus.repeat==='one'&&_mus.idx>=0){a.currentTime=0;a.play().catch(function(){});return;}
+    if(_mus.repeat==='one'&&_mus.idx>=0){el.currentTime=0;el.play().catch(function(){});return;}
     if(_mus.repeat==='off'&&_mus.idx>=MUSIC_ALBUM.tracks.length-1){musClose();return;}
     musNext();
   });
-  a.addEventListener('play',function(){_mus.playing=true;_mus.lastTick=Date.now();try{if(_flt.ctx&&_flt.ctx.state!=='running')_flt.ctx.resume();}catch(e){}_musPaint();});
-  a.addEventListener('pause',function(){_musLogFlush();_mus.playing=false;_musPaint();});
-  a.addEventListener('timeupdate',function(){_musTick();_musTimerCheck();_musProg();});
-  a.addEventListener('error',function(){if(_mus.idx>=0)showToast('Could not load that track');});
+  el.addEventListener('play',function(){if(el!==_musCur())return;_mus.playing=true;_mus.lastTick=Date.now();try{if(el===_mus.a&&_flt.ctx&&_flt.ctx.state!=='running')_flt.ctx.resume();}catch(e){}_musPaint();});
+  el.addEventListener('pause',function(){if(el!==_musCur())return;_musLogFlush();_mus.playing=false;_musPaint();});
+  el.addEventListener('timeupdate',function(){if(el!==_musCur())return;_musTick();_musTimerCheck();_musProg();});
+  el.addEventListener('error',function(){if(el===_musCur()&&_mus.idx>=0)showToast('Could not load that track');});
+}
+function _musEl(){
+  if(_mus.a)return _mus.a;
+  const a=new Audio();
+  _musWire(a);
   // Save partial listening time if the app is backgrounded or closed
   document.addEventListener('visibilitychange',function(){if(document.hidden)_musLogFlush();});
   window.addEventListener('pagehide',function(){_musLogFlush();});
+  // iOS silences Web-Audio-routed output when the screen locks or the app
+  // backgrounds. Hand playback to a plain (unfiltered) element there, and
+  // hand it back to the filtered element on return.
+  document.addEventListener('visibilitychange',function(){
+    if(_mus.idx<0)return;
+    _musSwap(!!document.hidden);
+  });
   _mus.a=a;
   return a;
 }
+function _musElB(){
+  if(_mus.b)return _mus.b;
+  const b=new Audio();
+  _musWire(b);
+  _mus.b=b;
+  return b;
+}
+function _musCur(){return (_mus.useB&&_mus.b)?_mus.b:_musEl();}
+function _musSwap(toB){
+  if(!!_mus.useB===!!toB)return;
+  if(_mus.idx<0)return;
+  const from=(_mus.useB&&_mus.b)?_mus.b:_mus.a;
+  if(!from)return;
+  if(!_mus.playing||from.paused)return;
+  const tr=MUSIC_ALBUM.tracks[_mus.idx];if(!tr)return;
+  const to=toB?_musElB():_musEl();
+  try{
+    const pos=from.currentTime||0;
+    if(!to.src||to.src.indexOf(tr.f)<0)to.src=MUSIC_ALBUM.dir+tr.f;
+    _mus.useB=!!toB;
+    try{to.volume=1;}catch(e){}
+    if(!toB){try{if(_flt.ctx&&_flt.ctx.state!=='running')_flt.ctx.resume();}catch(e){}_fltApply();}
+    const go=function(){try{to.currentTime=pos;}catch(e){}to.play().catch(function(){_mus.useB=!toB;from.play().catch(function(){});});};
+    if(to.readyState>=1)go();
+    else{to.addEventListener('loadedmetadata',function h(){to.removeEventListener('loadedmetadata',h);go();});try{to.load();}catch(e){}}
+    from.pause();
+  }catch(e){}
+}
 function musPlay(i){
   const tr=MUSIC_ALBUM.tracks[i];if(!tr)return;
-  const a=_musEl();
+  if(!document.hidden)_mus.useB=false;
+  const a=_musCur();
   _musLogFlush();
   _mus.idx=i;
   a.src=MUSIC_ALBUM.dir+tr.f;
   try{if(!_mus._fade)a.volume=1;}catch(e){}
-  _fltEnsure();
-  try{if(_flt.ctx&&_flt.ctx.state!=='running')_flt.ctx.resume();}catch(e){}
-  _fltApply();
+  if(a===_mus.a){
+    _fltEnsure();
+    try{if(_flt.ctx&&_flt.ctx.state!=='running')_flt.ctx.resume();}catch(e){}
+    _fltApply();
+  }
   a.play().catch(function(){});
   _musMediaSession(tr);
   _musPaint();
@@ -9368,7 +9410,7 @@ function musPlay(i){
 }
 function musRow(i){if(_mus.idx===i){musToggle();}else{musPlay(i);}}
 function musToggle(){
-  const a=_musEl();
+  const a=_musCur();
   if(_mus.idx<0){musPlay(0);return;}
   if(a.paused)a.play().catch(function(){});else a.pause();
 }
@@ -9376,7 +9418,10 @@ function musNext(){if(_mus.idx<0){musPlay(0);return;}musPlay((_mus.idx+1)%MUSIC_
 function musPrev(){if(_mus.idx<0){musPlay(0);return;}musPlay((_mus.idx-1+MUSIC_ALBUM.tracks.length)%MUSIC_ALBUM.tracks.length);}
 function musClose(){
   const a=_musEl();
+  const b=_mus.b;
   a.pause();a.removeAttribute('src');try{a.load();}catch(e){}
+  if(b){b.pause();b.removeAttribute('src');try{b.load();}catch(e){}}
+  _mus.useB=false;
   if(_mus._fade){clearInterval(_mus._fade);_mus._fade=null;}
   _mus.timerEnd=0;_mus.timerMin=0;_mus.timerEOT=false;
   try{a.volume=1;}catch(e){}
@@ -9454,7 +9499,7 @@ function _fltApply(){
 }
 function _fltModTick(){
   if(!_flt.ctx||_flt.dead)return;
-  if(!_mus.playing||!_fltIsOn())return;
+  if(!_mus.playing||!_fltIsOn()||_mus.useB)return;
   try{
     const d=_dialsGet();
     const p=_fltParams(d);
@@ -9511,8 +9556,8 @@ function musTimerCycle(){
 function _musTimerCheck(){
   if(!_mus.timerEnd||Date.now()<_mus.timerEnd||_mus._fade)return;
   _mus.timerEnd=0;_mus.timerMin=0;
-  const a=_mus.a;if(!a)return;
-  if(_flt.ctx&&_flt.gain){
+  const a=_musCur();if(!a)return;
+  if(!_mus.useB&&_flt.ctx&&_flt.gain){
     try{
       const t=_flt.ctx.currentTime;
       _flt.gain.gain.cancelScheduledValues(t);
@@ -9535,12 +9580,12 @@ function musRepeatCycle(){
 }
 function _musFmt(s){s=Math.max(0,Math.floor(s||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
 function musSeekBar(ev){
-  const a=_mus.a;if(!a||!(a.duration>0))return;
+  const a=_musCur();if(!a||!(a.duration>0))return;
   const r=ev.currentTarget.getBoundingClientRect();
   const x=(ev.touches&&ev.touches[0]?ev.touches[0].clientX:ev.clientX)-r.left;
   a.currentTime=Math.max(0,Math.min(1,x/r.width))*a.duration;_musProg();
 }
-function musSeek(v){const a=_mus.a;if(!a||!(a.duration>0))return;a.currentTime=(v/1000)*a.duration;_musProg();}
+function musSeek(v){const a=_musCur();if(!a||!(a.duration>0))return;a.currentTime=(v/1000)*a.duration;_musProg();}
 
 // ── protocol dials: three 1-10 sliders, nudged toward each check-in's anchors ──
 const _DIAL_ANCHORS={mobilized:{act:9,cap:4,pres:5},engaged:{act:6,cap:7,pres:7},ventral:{act:4,cap:8,pres:9},restful:{act:3,cap:7,pres:8},immobilized:{act:2,cap:3,pres:2}};
@@ -9712,7 +9757,7 @@ function _musPaint(){
 }
 function _musProg(){
   const f=document.getElementById('mp-fill');if(!f)return;
-  const a=_mus.a;
+  const a=_musCur();
   f.style.width=(a&&a.duration>0)?Math.min(100,(a.currentTime/a.duration)*100)+'%':'0%';
   const sub=document.getElementById('mp-sub');
   if(sub){
@@ -9748,7 +9793,7 @@ function _musicCardHTML(){
   let np='';
   if(_mus.idx>=0){
     const ctr=MUSIC_ALBUM.tracks[_mus.idx];
-    const a=_mus.a;
+    const a=(_mus.useB&&_mus.b)?_mus.b:_mus.a;
     const repLbl=_mus.repeat==='all'?'Repeat: album':_mus.repeat==='one'?'Repeat: track':'Repeat: off';
     const timLbl=_mus.timerEOT?'Timer: track end':(_mus.timerEnd?'Timer: '+Math.max(1,Math.ceil((_mus.timerEnd-Date.now())/60000))+'m':'Timer: off');
     np='<div style="background:var(--surface2);border-radius:var(--rs);padding:10px 12px;margin-top:10px">'

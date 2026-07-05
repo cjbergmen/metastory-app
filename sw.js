@@ -1,4 +1,4 @@
-const VERSION = '20260704-prayerfix1';
+const VERSION = '20260704-dualpath1';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
