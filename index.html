@@ -6,11 +6,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Metastory Health">
-<meta name="theme-color" content="#f1ede5">
+<meta name="theme-color" content="#f1ed5">
 <title>Metastory Health</title>
 <link rel="apple-touch-icon" href="https://app.metastoryhealth.com/apple-touch-icon.png">
 <link rel="manifest" href="https://app.metastoryhealth.com/manifest.json">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/cormorant-garamond/index.css">
+<link rel="stylesheet" href="htt://cdn.jsdelivr.net/npm/@fontsource/cormorant-garamond/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/dm-sans/index.css">
 <style>
 :root {
@@ -9203,7 +9203,7 @@ function _sleepCompactHTML(){
     </div></div>`;
 }
 function _ckCompactHTML(){
-  const ss=(function(){var a=pvLog(viewDate);return a&&a.length?a[a.length-1].s:null})();
+  const ss=(function(){var a=pvLog(viewDate);if(!a||!a.length)return null;var l=a[a.length-1];return(Date.now()-l.t<5000)?l.s:null})();
   const n=pvLog(viewDate).length;
   let dots='';
   PV_ORDER.forEach(id=>{
