@@ -9418,6 +9418,7 @@ function _fltEnsure(){
     _flt.ctx=ctx;_flt.src=src;_flt.ls=ls;_flt.hs=hs;_flt.pk=pk;_flt.gain=gain;_flt.an=an;
     document.addEventListener('visibilitychange',function(){if(!document.hidden&&_flt.ctx&&_flt.ctx.state!=='running')_flt.ctx.resume().catch(function(){});});
     if(!_specRaf)_specLoop();
+    if(!_flt.mod)_flt.mod=setInterval(_fltModTick,1000);
     _fltApply();
   }catch(e){_flt.dead=true;}
 }
@@ -9436,17 +9437,40 @@ function _fltApply(){
   const on=_fltIsOn();
   const p=_fltParams(_dialsGet());
   try{
+    const t=_flt.ctx.currentTime;
+    _flt.pk.gain.cancelScheduledValues(t);
+    _flt.pk.frequency.cancelScheduledValues(t);
     _flt.ls.gain.value=on?p.lo:0;
     _flt.hs.gain.value=on?p.hi:0;
-    _flt.pk.gain.value=on?p.boost:0;
-    _flt.pk.frequency.value=p.freq;
+    _flt.pk.gain.setValueAtTime(on?p.boost:0,t);
+    _flt.pk.frequency.setValueAtTime(p.freq,t);
     _flt.pk.Q.value=p.q;
   }catch(e){}
   if(line)line.textContent=on
-    ?('Prosody band '+(p.freq/1000).toFixed(1)+' kHz · emphasis +'+p.boost.toFixed(1)+' dB · lows '+p.lo.toFixed(0)+' dB · highs '+p.hi.toFixed(0)+' dB')
+    ?('Prosody band '+(p.freq/1000).toFixed(1)+' kHz · emphasis +'+p.boost.toFixed(1)+' dB · lows '+p.lo.toFixed(0)+' dB · highs '+p.hi.toFixed(0)+' dB · shifting slowly, breath-paced')
     :'Original mix — no filtering';
   const btn=document.getElementById('mus-flt-btn');
   if(btn)btn.textContent=on?'Filtration: on':'Filtration: off';
+}
+function _fltModTick(){
+  if(!_flt.ctx||_flt.dead)return;
+  if(!_mus.playing||!_fltIsOn())return;
+  try{
+    const d=_dialsGet();
+    const p=_fltParams(d);
+    const now=Date.now()/1000;
+    const swellAmt=0.15+d.act*0.035;
+    const driftAmt=0.08+d.act*0.012;
+    const swell=1+swellAmt*Math.sin(2*Math.PI*now/11);
+    const drift=1+driftAmt*Math.sin(2*Math.PI*now/150);
+    const t=_flt.ctx.currentTime;
+    _flt.pk.gain.cancelScheduledValues(t);
+    _flt.pk.gain.setValueAtTime(_flt.pk.gain.value,t);
+    _flt.pk.gain.linearRampToValueAtTime(p.boost*swell,t+1.05);
+    _flt.pk.frequency.cancelScheduledValues(t);
+    _flt.pk.frequency.setValueAtTime(_flt.pk.frequency.value,t);
+    _flt.pk.frequency.linearRampToValueAtTime(p.freq*drift,t+1.05);
+  }catch(e){}
 }
 function fltToggle(){
   lsSet('_fltOn',_fltIsOn()?'0':'1');
