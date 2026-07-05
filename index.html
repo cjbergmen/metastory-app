@@ -510,6 +510,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .ex-fig .hd,.ex-fig .bell{fill:var(--blue);stroke:none}
 .ex-fig .grnd{stroke:var(--border);stroke-width:3}
 /* motion is driven per-joint by SMIL <animate> generated in _exPose; reduced-motion handled in JS */
+.nsi{display:inline-block;width:15px;height:15px;line-height:15px;text-align:center;border-radius:50%;font-style:normal;font-size:10px;opacity:.4;cursor:pointer;margin-left:3px;vertical-align:middle;border:1px solid currentColor}
+.nsi:hover{opacity:.8}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -3088,7 +3090,7 @@ function _pvBlockHTML(){
     const s=PV_STATES[id];const sel=_ss===id;
     _ladder += `<button class="pv-state${sel?' sel':''}" onclick="pvAddCheckin('${id}')" style="${sel?`border-color:${s.color};background:${s.color}1f`:''}">
       <span class="pv-dot" style="background:${s.color}"></span>
-      <span class="pv-state-txt"><b>${s.label}</b><small>${s.plain} · ${s.poly}</small></span>
+      <span class="pv-state-txt"><b>${s.label} <i class="nsi" data-k="${s.id}">i</i></b><small>${s.plain} · ${s.poly}</small></span>
       ${sel?'<span class="pv-check" style="color:'+s.color+'">✓</span>':''}
     </button>`;
   });
@@ -10363,12 +10365,16 @@ function _exHeroBlock(wo){
 // mixing with each branch — ventral+sympathetic = work/play (engaged),
 // ventral+dorsal = rest/wind-down (restful).
 const PV_STATES = {
-  mobilized:   {id:'mobilized',   label:'Mobilized',   plain:'Fight or flight',          poly:'Sympathetic',           color:'#c4855f', zone:'dysreg', order:1},
-  engaged:     {id:'engaged',     label:'Engaged',     plain:'Work or play',             poly:'Ventral + sympathetic', color:'#bfa15f', zone:'safe',   order:2},
-  ventral:     {id:'ventral',     label:'Grounded',    plain:'Safe & connected',         poly:'Ventral',               color:'#b7baa7', zone:'safe',   order:3},
+  mobilized:   {id:'mobilized',   label:'Wired',   plain:'Fight or flight',          poly:'Sympathetic',           color:'#c4855f', zone:'dysreg', order:1},
+  engaged:     {id:'engaged',     label:'Active',     plain:'Work or play',             poly:'Ventral + sympathetic', color:'#bfa15f', zone:'safe',   order:2},
+  ventral:     {id:'ventral',     label:'Safe / Calm',    plain:'Safe & connected',         poly:'Ventral',               color:'#b7baa7', zone:'safe',   order:3},
   restful:     {id:'restful',     label:'Restful',     plain:'Rest & wind-down',         poly:'Ventral + dorsal',      color:'#94a89e', zone:'safe',   order:4},
-  immobilized: {id:'immobilized', label:'Immobilized', plain:'Frozen or shut down',      poly:'Dorsal',                color:'#7a9aab', zone:'dysreg', order:5},
+  immobilized: {id:'immobilized', label:'Shutdown', plain:'Frozen or shut down',      poly:'Dorsal',                color:'#7a9aab', zone:'dysreg', order:5},
 };
+const PV_DESCS={mobilized:"Your sympathetic nervous system is activated. You might feel anxious, restless, or on edge.",engaged:"A healthy activated state blending social engagement with energy. Ideal for focused work and connection.",ventral:"Your ventral vagal system is online. You feel safe, connected, and grounded.",restful:"A healthy blend of calm and rest. Your nervous system is winding down safely.",immobilized:"Your dorsal vagal system has taken over. You may feel numb, disconnected, or frozen."};
+function showNSInfo(key){var d=PV_DESCS[key],s=PV_STATES[key];if(d&&s)showToast(s.label+": "+d,6000);}
+document.addEventListener('click',function(e){var el=e.target.closest('.nsi');if(el){e.stopPropagation();showNSInfo(el.dataset.k);}});
+
 const PV_ORDER = ['mobilized','engaged','ventral','restful','immobilized'];
 
 // Each state → only quick (≤5 min) do-it-now practices, ordered by best-fit.
