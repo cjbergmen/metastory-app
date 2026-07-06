@@ -510,6 +510,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .ex-fig .hd,.ex-fig .bell{fill:var(--blue);stroke:none}
 .ex-fig .grnd{stroke:var(--border);stroke-width:3}
 /* motion is driven per-joint by SMIL <animate> generated in _exPose; reduced-motion handled in JS */
+.nsi{display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;border-radius:50%;background:var(--border);color:var(--sub);font-size:11px;font-weight:700;font-style:normal;margin-left:6px;cursor:pointer;vertical-align:middle}
+  .nsi:hover{background:var(--sub);color:var(--surface)}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -3090,7 +3092,7 @@ function _pvBlockHTML(){
     const s=PV_STATES[id];const sel=_ss===id;
     _ladder += `<button class="pv-state${sel?' sel':''}" onclick="pvAddCheckin('${id}')" style="${sel?`border-color:${s.color};background:${s.color}1f`:''}">
       <span class="pv-dot" style="background:${s.color}"></span>
-      <span class="pv-state-txt"><b>${s.label}</b><small>${s.plain} · ${s.poly}</small></span>
+      <span class="pv-state-txt"><b>${s.label}<i class="nsi" data-k="${s.id}">?</i></b><small>${s.plain} · ${s.poly}</small></span>
       ${sel?'<span class="pv-check" style="color:'+s.color+'">✓</span>':''}
     </button>`;
   });
@@ -9209,7 +9211,7 @@ function _ckCompactHTML(){
     const s=PV_STATES[id];const sel=ss===id;
     dots+=`<div onclick="pvAddCheckin('${id}')" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;padding:2px 0">
       <span style="width:30px;height:30px;border-radius:50%;background:${s.color};opacity:${sel?'1':'.38'};border:2.5px solid ${sel?'var(--text)':'transparent'};box-sizing:border-box"></span>
-      <span style="font-size:9px;font-weight:${sel?'700':'500'};color:${sel?'var(--text)':'var(--sub)'};text-align:center">${s.label}</span></div>`;
+      <span style="font-size:9px;font-weight:${sel?'700':'500'};color:${sel?'var(--text)':'var(--sub)'};text-align:center">${s.label}<i class="nsi" data-k="${id}">?</i></span></div>`;
   });
   const sub=(ss&&PV_STATES[ss])
     ?`<div style="font-size:11.5px;color:var(--sub);margin-top:7px">${PV_STATES[ss].plain}${n>1?` &middot; ${n} check-ins today`:''}</div>`
@@ -9217,7 +9219,7 @@ function _ckCompactHTML(){
   return `<div class="card" style="margin-bottom:10px">
     <div style="display:flex;align-items:center;justify-content:space-between">
       <span class="kicker">How is your system right now?</span>
-      <span onclick="restGo('checkin')" style="font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer">More</span>
+      <span onclick="restGo('checkin')" style="font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer">More</span><i class="nsi" data-k="all" style="margin-left:6px">?</i>
     </div>
     <div style="display:flex;gap:2px;margin-top:9px">${dots}</div>
     ${sub}</div>`;
@@ -10575,15 +10577,40 @@ function _exHeroBlock(wo){
 // mixing with each branch — ventral+sympathetic = work/play (engaged),
 // ventral+dorsal = rest/wind-down (restful).
 const PV_STATES = {
-  mobilized:   {id:'mobilized',   label:'Mobilized',   plain:'Fight or flight',          poly:'Sympathetic',           color:'#c4855f', zone:'dysreg', order:1},
-  engaged:     {id:'engaged',     label:'Engaged',     plain:'Work or play',             poly:'Ventral + sympathetic', color:'#bfa15f', zone:'safe',   order:2},
-  ventral:     {id:'ventral',     label:'Grounded',    plain:'Safe & connected',         poly:'Ventral',               color:'#b7baa7', zone:'safe',   order:3},
+  mobilized:   {id:'mobilized',   label:'Wired',   plain:'Fight or flight',          poly:'Sympathetic',           color:'#c4855f', zone:'dysreg', order:1},
+  engaged:     {id:'engaged',     label:'Active',     plain:'Work or play',             poly:'Ventral + sympathetic', color:'#bfa15f', zone:'safe',   order:2},
+  ventral:     {id:'ventral',     label:'Safe/Calm',    plain:'Safe & connected',         poly:'Ventral',               color:'#b7baa7', zone:'safe',   order:3},
   restful:     {id:'restful',     label:'Restful',     plain:'Rest & wind-down',         poly:'Ventral + dorsal',      color:'#94a89e', zone:'safe',   order:4},
-  immobilized: {id:'immobilized', label:'Immobilized', plain:'Frozen or shut down',      poly:'Dorsal',                color:'#7a9aab', zone:'dysreg', order:5},
+  immobilized: {id:'immobilized', label:'Shut Down', plain:'Frozen or shut down',      poly:'Dorsal',                color:'#7a9aab', zone:'dysreg', order:5},
 };
 const PV_ORDER = ['mobilized','engaged','ventral','restful','immobilized'];
+  const PV_DESCS = {
+    mobilized:"Your sympathetic nervous system is activated. You might feel anxious, restless, or on edge.",
+    engaged:"A healthy activated state blending social engagement with energy. Ideal for focused work and connection.",
+    ventral:"Your ventral vagal system is online. You feel safe, connected, and grounded.",
+    restful:"A healthy blend of calm and rest. Your nervous system is winding down safely.",
+    immobilized:"Your dorsal vagal system has taken over. You may feel numb, disconnected, or frozen."
+  };
+  function _nsInfoRow(k){
+    const s=PV_STATES[k], d=PV_DESCS[k];
+    if(!s||!d) return '';
+    return `<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px"><span style="width:14px;height:14px;min-width:14px;border-radius:50%;margin-top:3px;background:${s.color}"></span><div><div style="font-weight:700;font-size:14px;color:var(--text);font-family:var(--font-sans)">${s.label}</div><div style="font-size:13px;color:var(--sub);line-height:1.4;margin-top:2px;font-family:var(--font-sans)">${d}</div></div></div>`;
+  }
+  function showNSInfo(key){
+    const existing=document.getElementById('_nsInfoModal');
+    if(existing){existing.remove();return;}
+    const rows = key==='all' ? PV_ORDER.map(_nsInfoRow).join('') : _nsInfoRow(key);
+    const title = key==='all' ? 'Nervous System States' : (PV_STATES[key]?PV_STATES[key].label:'');
+    const overlay=document.createElement('div');
+    overlay.id='_nsInfoModal';
+    overlay.className='ov open';
+    overlay.innerHTML = `<div class="modal" onclick="event.stopPropagation()"><div class="mh"></div><div class="mt2">${title}</div>${rows}<div style="text-align:center;margin-top:4px;font-size:12px;color:var(--sub)">Tap anywhere to close</div></div>`;
+    overlay.addEventListener('click',function(){overlay.remove();});
+    document.body.appendChild(overlay);
+  }
+  document.addEventListener('click',function(e){var el=e.target.closest('.nsi');if(el){e.stopPropagation();e.preventDefault();showNSInfo(el.dataset.k);}},true);
 
-// Each state → only quick (≤5 min) do-it-now practices, ordered by best-fit.
+  // Each state → only quick (≤5 min) do-it-now practices, ordered by best-fit.
 const PV_SUGGEST = {
   mobilized:   {k:'When you\'re mobilized', blurb:'Fight-or-flight energy is up. The move is to signal "the threat has passed" — lengthen the exhale and discharge the charge. A long exhale, a physiological sigh, or cold water on the face all settle the system in under a few minutes.', ids:['extended-exhale','phys-sigh','cold-face','orienting','gentle-shaking']},
   engaged:     {k:'When you\'re engaged', blurb:'This is a regulated, energized state — good for work and play. Keep it from tipping into overdrive: a 60-second reset between tasks holds the tone without draining it.', ids:['transition-reset','phys-sigh','joint-circles','gratitude']},
