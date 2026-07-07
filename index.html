@@ -2845,7 +2845,39 @@ function rToday(){
   document.getElementById('page-today').innerHTML=h;
 }
 
-// ── WORKOUT ───────────────────────────────────────────────────────────────────
+function _weekSourcePlan(){
+    let src={};
+    try{
+          const raw=lsGet('_customWorkouts','');
+          if(raw)src=JSON.parse(raw);
+    }catch(e){src={};}
+    if(!src||typeof src!=='object'||!Object.keys(src).length)src=WORKOUTS;
+    return src;
+}
+  function _shiftWeekPlan(offset){
+      const src=_weekSourcePlan();
+      const next={};
+      Object.keys(src).forEach(function(k){
+            const d=Number(k);
+            if(isNaN(d))return;
+            const nd=((d+offset)%7+7)%7;
+            next[nd]=src[k];
+      });
+      lsSet('_customWorkouts',JSON.stringify(next));
+      const m=document.getElementById('_shiftWeekModal');
+      if(m)m.remove();
+      try{showToast('Week shifted '+(offset>0?offset+' day'+(offset>1?'s':'')+' later':Math.abs(offset)+' day'+(Math.abs(offset)>1?'s':'')+' earlier'));}catch(e){}
+      try{if(typeof rWorkout==='function')rWorkout();}catch(e){}
+  }
+  function openShiftWeek(){
+      const overlay=document.createElement('div');
+      overlay.id='_shiftWeekModal';
+      overlay.className='ov open';
+      overlay.innerHTML=`<div class="modal" onclick="event.stopPropagation()"><div class="mh"></div><div class="mt2">Shift Your Week</div><p style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:14px">Can't train on the usual day? Move your whole week's plan earlier or later — every workout keeps its place in the order, it just lands on different days.</p><div style="display:flex;gap:8px;margin-bottom:14px"><button class="btn btn-s" style="flex:1" onclick="_shiftWeekPlan(-1)">◀ 1 day earlier</button><button class="btn btn-s" style="flex:1" onclick="_shiftWeekPlan(1)">1 day later ▶</button></div><div class="kicker" style="margin-bottom:8px">Or shift by any amount</div><div style="display:flex;gap:6px;flex-wrap:wrap">${[-3,-2,-1,1,2,3].map(function(n){return '<button class="wo-chip" onclick="_shiftWeekPlan('+n+')">'+(n>0?'+'+n:n)+' day'+(Math.abs(n)>1?'s':'')+'</button>';}).join('')}</div></div>`;
+      overlay.addEventListener('click',function(){overlay.remove();});
+      document.body.appendChild(overlay);
+  }
+  // ── WORKOUT ───────────────────────────────────────────────────────────────────
 function rWorkout(){
   loadPreChoice();
   const wo=getWO();
@@ -2870,7 +2902,7 @@ function rWorkout(){
       <span class="kicker">Today · Recovery</span>
       <h3>Rest day</h3>
       <p>Movement heals only when the body can afford it. Today is for walking, mobility, and contrast therapy — under-recovery is when progress quietly stalls.</p></div>
-      <div class="card"><div class="ct">${splitTitle}</div>`;
+      <div class="card"><div style="display:flex;align-items:center;justify-content:space-between"><div class="ct">${splitTitle}</div><span onclick="openShiftWeek()" style="font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer;flex-shrink:0;margin-left:8px">Shift week</span></div>`;
     activeDays.forEach(d=>{
       const w=weekWO[d];
       if(!w)return;
