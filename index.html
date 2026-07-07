@@ -3092,13 +3092,13 @@ function _pvBlockHTML(){
     const s=PV_STATES[id];const sel=_ss===id;
     _ladder += `<button class="pv-state${sel?' sel':''}" onclick="pvAddCheckin('${id}')" style="${sel?`border-color:${s.color};background:${s.color}1f`:''}">
       <span class="pv-dot" style="background:${s.color}"></span>
-      <span class="pv-state-txt"><b>${s.label}<i class="nsi" data-k="${s.id}">?</i></b><small>${s.plain} · ${s.poly}</small></span>
+      <span class="pv-state-txt"><b>${s.label}</b><small>${s.plain} · ${s.poly}</small></span>
       ${sel?'<span class="pv-check" style="color:'+s.color+'">✓</span>':''}
     </button>`;
   });
   // Build the three blocks separately, then order them by whether a check-in exists.
   // After a check-in, the suggestion pops to the very top and the check-in settles below it.
-  let _checkinCard = `<div class="card"><span class="kicker" style="color:var(--sub)">Nervous-system check-in</span>
+  let _checkinCard = `<div class="card"><div style="display:flex;align-items:center;justify-content:space-between"><span class="kicker" style="color:var(--sub)">Nervous-system check-in</span><i class="nsi" data-k="all">?</i></div>
     <h3 class="mk-q">What state is your system in right now?</h3>
     <div class="pv-ladder">${_ladder}</div>
     <p style="font-size:11.5px;color:var(--sub);margin-top:10px;line-height:1.45">Polyvagal theory: the middle three are regulated (safe) states; the top and bottom are the activated and shut-down edges. Check in as many times a day as you like — each one shapes today's practice and builds your pattern over time.</p>`;
@@ -9211,7 +9211,7 @@ function _ckCompactHTML(){
     const s=PV_STATES[id];const sel=ss===id;
     dots+=`<div onclick="pvAddCheckin('${id}')" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;padding:2px 0">
       <span style="width:30px;height:30px;border-radius:50%;background:${s.color};opacity:${sel?'1':'.38'};border:2.5px solid ${sel?'var(--text)':'transparent'};box-sizing:border-box"></span>
-      <span style="font-size:9px;font-weight:${sel?'700':'500'};color:${sel?'var(--text)':'var(--sub)'};text-align:center">${s.label}<i class="nsi" data-k="${id}">?</i></span></div>`;
+      <span style="font-size:9px;font-weight:${sel?'700':'500'};color:${sel?'var(--text)':'var(--sub)'};text-align:center">${s.label}</span></div>`;
   });
   const sub=(ss&&PV_STATES[ss])
     ?`<div style="font-size:11.5px;color:var(--sub);margin-top:7px">${PV_STATES[ss].plain}${n>1?` &middot; ${n} check-ins today`:''}</div>`
