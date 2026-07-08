@@ -1277,7 +1277,7 @@ Profile: name=${p.name||'User'}, goal=${goal}, bodyType=${p.bodyType||'mesomorph
 Make the routines specific and personal — reference their body type in meal timing and food choices (ectomorphs need more caloric density and carbs; endomorphs benefit from protein-first, lower-carb meals; mesomorphs get a balanced approach). In each note (n), where it fits naturally, include a brief why that connects the action to overall metabolic/whole-body health (one short clause, e.g. "morning light sets the sleep rhythm that powers the day"). No emoji in t or a fields.`;
     const res=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`,{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.5,maxOutputTokens:1500}})
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.5,maxOutputTokens:1500,thinkingConfig:{thinkingBudget:0}}})
     });
     const data=await res.json();
     const raw=data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
@@ -4649,7 +4649,7 @@ Respond with ONLY a valid JSON object (no markdown, no extra text):
 
     const res = await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.4, maxOutputTokens:1400}})
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.4, maxOutputTokens:1400,thinkingConfig:{thinkingBudget:0}}})
     });
     const data = await res.json();
     const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -8578,7 +8578,7 @@ Rules:
 
         const exRes=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`,{
           method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({contents:[{parts:[{text:exPrompt}]}],generationConfig:{temperature:0.7,maxOutputTokens:4000}})
+          body:JSON.stringify({contents:[{parts:[{text:exPrompt}]}],generationConfig:{temperature:0.7,maxOutputTokens:4000,thinkingConfig:{thinkingBudget:0}}})
         });
         const exData=await exRes.json();
         if(!exData.error){
@@ -8613,7 +8613,7 @@ Profile: name=${p.name||'User'}, goal=${p.goal}, bodyType=${p.bodyType||'mesomor
 Make the routines specific and personal — reference their goal, body type, diet preferences, and weight. For ectomorphs emphasize caloric density and carb timing; for endomorphs emphasize protein-first meals and limiting simple carbs; for mesomorphs use a balanced approach. In each note (n), where it fits naturally, include a brief why that connects the action to overall metabolic/whole-body health (one short clause). Avoid generic filler. No emoji in t or a fields.`;
       const res=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`,{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.5,maxOutputTokens:2000}})
+        body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.5,maxOutputTokens:2000,thinkingConfig:{thinkingBudget:0}}})
       });
       const data=await res.json();
       const raw=data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
