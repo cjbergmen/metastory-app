@@ -552,6 +552,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     <div class="page" id="page-supps"></div>
     <div class="page" id="page-detective"></div>
     <div class="page" id="page-summary"></div>
+    <div class="page" id="page-journal"></div>
   </div>
   <div id="mini-player">
     <div id="mp-prog" onclick="musSeekBar(event)"><div id="mp-fill"></div></div>
@@ -1160,6 +1161,16 @@ async function fbPullAll(){
       });
     }catch(e){}
     _daySyncOff=false;
+    // Pull reflection journal entries (merge by id)
+    try{
+      const jSnap = await fbDb.collection('users').doc(uid).collection('journal').get();
+      if(jSnap && !jSnap.empty){
+        const byId={}; _journalAll().forEach(e=>{ if(e&&e.id) byId[e.id]=e; });
+        jSnap.forEach(doc=>{ const d=doc.data(); if(d&&d.id&&!byId[d.id]) byId[d.id]=d; });
+        const merged=Object.keys(byId).map(k=>byId[k]).sort((a,b)=>(a.ts||0)-(b.ts||0));
+        _journalSaveLocal(merged);
+      }
+    }catch(e){}
     // Pull workout logs
     const woSnap = await fbDb.collection('users').doc(uid).collection('workoutLogs').get();
     woSnap.forEach(doc => {
@@ -1683,18 +1694,18 @@ const NS_ACT = [
   {id:'orienting-walk',e:'🚶',n:'Slow Orienting Walk',cat:'movement',dur:'20 min',tag:'Reset your nervous system with deliberate presence',steps:['Go outside or to a new space.','Walk at a pace slower than usual — intentionally slow.','Let your gaze wander. Look around with genuine curiosity, not a destination.','No phone, no audio.','If you notice the urge to speed up, that\'s the medicine — slow down.'],why:'Visual orienting (scanning the environment with unhurried curiosity) is a built-in nervous system safety signal. It tells the threat-detection system that no predator is present.'},
   {id:'zone2-walk',e:'🏃',n:'Zone 2 Walk or Jog',cat:'movement',dur:'20–30 min',tag:'The most validated non-drug anxiolytic',steps:['Move at a pace where you can hold a full conversation without breathlessness — brisk walk, easy jog, cycling, or swimming.','Maintain this pace for 20–30 minutes.','No headphones for the first 10 minutes — just be present with your body moving.','3–4x per week is the research target.'],why:'Zone 2 cardio is the most robustly validated non-pharmacological anxiolytic. It increases GABA, serotonin, and BDNF while lowering the cortisol baseline over time.'},
   {id:'bilateral-tapping',e:'🤲',n:'Bilateral Tapping',cat:'movement',dur:'5–10 min',tag:'Bilateral stimulation for nervous system balance',steps:['Sit comfortably with your hands resting on your thighs.','Alternately and gently tap your left then right knee — slow rhythmic pace.','You can also cross your arms over your chest and gently tap alternate shoulders.','Continue for 5–10 minutes with slow, even breath.'],why:'Left-right alternating stimulation activates bilateral brain integration — the same mechanism used in EMDR. Particularly helpful for calming hypervigilant states.'},
-  {id:'joint-circles',e:'🔄',n:'Joint Circles',cat:'movement',dur:'5 min',tag:'Release tension from key joints',steps:['Head: tilt right ear to shoulder, slowly roll chin to chest, then left ear to shoulder. 5 circles each direction.','Wrists: hands in front, palms up — make gentle circles with both wrists. 5 each direction.','Shoulders: both shoulders up toward ears, back, and release down. 5 circles.','Hips: hands on hips, make slow circles in both directions. 5 each.','Ankles: seated, lift feet and make slow circles both ways. 5 each.'],why:'Active range of motion through joints improves proprioceptive awareness and the release of opposing muscle tension — a direct way to interrupt held stress patterns in the body.'},
+  {id:'joint-circles',e:'🔄',staged:true,n:'Joint Circles',cat:'movement',dur:'5 min',tag:'Release tension from key joints',steps:['Head: tilt right ear to shoulder, slowly roll chin to chest, then left ear to shoulder. 5 circles each direction.','Wrists: hands in front, palms up — make gentle circles with both wrists. 5 each direction.','Shoulders: both shoulders up toward ears, back, and release down. 5 circles.','Hips: hands on hips, make slow circles in both directions. 5 each.','Ankles: seated, lift feet and make slow circles both ways. 5 each.'],why:'Active range of motion through joints improves proprioceptive awareness and the release of opposing muscle tension — a direct way to interrupt held stress patterns in the body.'},
   {id:'post-meal-walk',e:'🍽️',n:'Post-Meal Walk',cat:'movement',dur:'10 min',tag:'Blunt blood sugar spikes that trigger anxiety',steps:['Within 15 minutes of finishing a meal, step outside or walk around your space.','Walk at an easy, comfortable pace.','10 minutes is enough — you don\'t need to break a sweat.','Make it habitual: tie it to every main meal.'],why:'Post-meal walking reduces the blood glucose spike by 20–30%, directly reducing the cortisol-anxiety response associated with blood sugar dysregulation.'},
-  {id:'tre-tremor',e:'🦵',n:'Neurogenic Tremor (TRE)',cat:'movement',dur:'10–15 min',tag:'Let the body discharge what the mind holds',steps:['Stand with feet slightly wider than hip-width.','Bend your knees slightly and lean your weight forward onto the balls of your feet.','Hold until your legs begin to fatigue and tremor (2–3 min).','Lie down on your back with knees bent, feet flat.','Allow the tremor to spread through your body naturally — don\'t force it, don\'t stop it.','Tremor for 5–10 more minutes. Close with slow breaths.'],why:'The body naturally shakes to discharge stored survival-state tension. TRE activates this biological mechanism. Research shows it reduces trauma symptoms and chronic muscular tension.'},
+  {id:'tre-tremor',e:'🦵',staged:true,n:'Neurogenic Tremor (TRE)',cat:'movement',dur:'10–15 min',tag:'Let the body discharge what the mind holds',steps:['Stand with feet slightly wider than hip-width.','Bend your knees slightly and lean your weight forward onto the balls of your feet.','Hold until your legs begin to fatigue and tremor (2–3 min).','Lie down on your back with knees bent, feet flat.','Allow the tremor to spread through your body naturally — don\'t force it, don\'t stop it.','Tremor for 5–10 more minutes. Close with slow breaths.'],why:'The body naturally shakes to discharge stored survival-state tension. TRE activates this biological mechanism. Research shows it reduces trauma symptoms and chronic muscular tension.'},
   {id:'intuitive-movement',e:'🕺',n:'Intuitive Movement',cat:'movement',dur:'20 min',tag:'Move exactly as your body asks',steps:['Begin lying on the floor.','Notice any restriction, pull, or sensation in the body.','Allow movement to arise naturally toward ease — there is no protocol.','It may be a stretch, a roll, a rock, stillness, or something unexpected.','No goal, no correct form. Follow physical impulse for 20 minutes.'],why:'Intuitive movement bypasses the cognitive override and allows the body to complete movement sequences the threat-response initiated but never resolved.'},
   // GROUNDING
-  {id:'five-senses',e:'🖐️',n:'5-4-3-2-1 Grounding',cat:'grounding',dur:'3–5 min',tag:'Interrupt anxiety and return to the present',steps:['Name 5 things you can see — get specific with colors, shapes, light.','Name 4 things you can physically feel — weight of your feet, temperature of air, texture of your clothing.','Name 3 things you can hear — include quiet background sounds.','Name 2 things you can smell.','Name 1 thing you can taste.','Speak aloud when possible — the act of speaking activates the social engagement system.'],why:'Sensory grounding shifts attention from threat-scanning (future/past) to direct present-moment input, interrupting the anxiety thought loop at its physiological source.'},
+  {id:'five-senses',e:'🖐️',staged:true,n:'5-4-3-2-1 Grounding',cat:'grounding',dur:'3–5 min',tag:'Interrupt anxiety and return to the present',steps:['Name 5 things you can see — get specific with colors, shapes, light.','Name 4 things you can physically feel — weight of your feet, temperature of air, texture of your clothing.','Name 3 things you can hear — include quiet background sounds.','Name 2 things you can smell.','Name 1 thing you can taste.','Speak aloud when possible — the act of speaking activates the social engagement system.'],why:'Sensory grounding shifts attention from threat-scanning (future/past) to direct present-moment input, interrupting the anxiety thought loop at its physiological source.'},
   {id:'orienting',e:'👁️',n:'Orienting Practice',cat:'grounding',dur:'3–5 min',tag:'A built-in safety signal for your nervous system',steps:['Sit or stand comfortably.','Slowly turn your head and look around the room.','You are not scanning for threat — you are genuinely looking. Notice colors, shapes, light, textures.','Let your gaze rest on anything neutral or pleasant.','Return to the front, then slowly look the other way.','Continue for 3–5 minutes, allowing the breath to slow naturally.'],why:'The orienting response — visual scanning with unhurried curiosity — is one of the nervous system\'s primary safety signals. When the eyes and neck move freely, the threat-detection system down-regulates.'},
-  {id:'body-scan',e:'🧍',n:'Body Scan',cat:'grounding',dur:'10 min',tag:'Build the map of your inner landscape',steps:['Lie down comfortably. Close your eyes.','Bring attention to your feet. Notice temperature, weight, sensation — don\'t try to change anything.','Slowly move upward: calves, knees, thighs, hips, belly, chest, shoulders, arms, hands, neck, face.','At each region, ask: what is here? Not what should be here — what is actually here?','If you notice strong activation anywhere, don\'t push toward it. Find the most neutral area and rest there instead.'],why:'Body scanning trains interoception — the ability to accurately read your own internal state. Without this map, the nervous system can\'t regulate what it can\'t perceive.'},
+  {id:'body-scan',e:'🧍',staged:true,n:'Body Scan',cat:'grounding',dur:'10 min',tag:'Build the map of your inner landscape',steps:['Lie down comfortably. Close your eyes.','Bring attention to your feet. Notice temperature, weight, sensation — don\'t try to change anything.','Slowly move upward: calves, knees, thighs, hips, belly, chest, shoulders, arms, hands, neck, face.','At each region, ask: what is here? Not what should be here — what is actually here?','If you notice strong activation anywhere, don\'t push toward it. Find the most neutral area and rest there instead.'],why:'Body scanning trains interoception — the ability to accurately read your own internal state. Without this map, the nervous system can\'t regulate what it can\'t perceive.'},
   {id:'floor-time',e:'🛋️',n:'Floor Time',cat:'grounding',dur:'10 min',tag:'Let the floor hold you',steps:['Lie flat on the floor — carpet, yoga mat, or bare floor. Somewhere firm.','Feel the weight of your body meeting the ground.','Notice what softens and what resists.','You don\'t need to do anything. You don\'t need to relax. Just let the floor hold you.','Stay for 10 minutes.'],why:'Many high-activation nervous systems have never truly experienced being held by their environment. Allowing the floor to support the body\'s weight is often a physiologically novel experience that signals safety.'},
   {id:'cold-face',e:'💦',n:'Cold Water Face Immersion',cat:'grounding',dur:'30 sec',tag:'Interrupt freeze and dissociation fast',steps:['Fill a basin with cold water (or simply turn a cold faucet on).','Splash cold water on your face, or hold a cold damp cloth to your face for 30 seconds.','Keep your eyes open if possible and breathe through your nose.','The colder the better — but begin with cool water if cold feels too activating.'],why:'Cold facial immersion stimulates the diving reflex via the trigeminal nerve, producing a rapid and powerful parasympathetic response. One of the fastest ways to interrupt dissociation or a freeze state.'},
   {id:'grounding-contact',e:'🙌',n:'Grounding Through Touch',cat:'grounding',dur:'5 min',tag:'Anchor your nervous system through physical sensation',steps:['Place both hands flat on your thighs, or press your feet firmly into the floor.','Feel the weight of your hands, the warmth, the slight pressure.','Notice the boundary between your hands and legs — or your feet and the ground.','Breathe slowly with this sensation.','Variation: hold a warm mug, handle a textured object, or wrap in a heavy blanket.'],why:'Physical contact releases oxytocin and activates the proprioceptive system — the body\'s sense of where it is in space — which is a direct parasympathetic input.'},
-  {id:'pmr',e:'💪',n:'Progressive Muscle Release',cat:'grounding',dur:'10–12 min',tag:'Unwind tension you didn\'t know you were holding',steps:['Lie down comfortably.','Starting at your feet: tense the muscles firmly for 5 seconds, then release completely.','Notice the difference between tension and release.','Move upward: calves, thighs, abdomen, hands, arms, shoulders, face.','With each release, let the area sink heavier into the surface.','Finish with 3 slow breaths.'],why:'Many people carry chronic tension invisible to them. Deliberately tensing and releasing each muscle group disrupts this holding pattern and trains the nervous system to distinguish activation from rest.'},
+  {id:'pmr',e:'💪',staged:true,n:'Progressive Muscle Release',cat:'grounding',dur:'10–12 min',tag:'Unwind tension you didn\'t know you were holding',steps:['Lie down comfortably.','Starting at your feet: tense the muscles firmly for 5 seconds, then release completely.','Notice the difference between tension and release.','Move upward: calves, thighs, abdomen, hands, arms, shoulders, face.','With each release, let the area sink heavier into the surface.','Finish with 3 slow breaths.'],why:'Many people carry chronic tension invisible to them. Deliberately tensing and releasing each muscle group disrupts this holding pattern and trains the nervous system to distinguish activation from rest.'},
   // MINDFULNESS
   {id:'sensory-orient',e:'🔍',n:'Sensory Orientation',cat:'mindfulness',dur:'5 min',tag:'Anchor yourself in the present moment',steps:['Bring attention to your body first: feel your feet on the ground or seat on the chair.','Promote body awareness through all your senses: What can you see right now? What sounds — near and far?','Feel the fabric of your clothing. Notice any smells or tastes.','Alternate your awareness between inside your body and outside it.','Return to this practice whenever your mind pulls toward past or future.'],why:'Orientation shifts attention to the present moment and away from disruptive or threatening thoughts. It is one of the foundational tools in somatic and trauma therapies.'},
   {id:'nature-viz',e:'🌲',n:'Safe Place Visualization',cat:'mindfulness',dur:'5–10 min',tag:'Find safety when you can\'t access nature directly',steps:['Find a comfortable position and allow your body to feel grounded.','Take a deep breath in. As you exhale, begin visualizing yourself somewhere in nature — a place that feels genuinely safe and peaceful.','What do you see? Water, trees, mountains, sky?','What do you hear? What does the air feel like?','Know this place is just for you. No demands exist here.','Breathe slowly and stay as long as you need.'],why:'Nature-based guided imagery has demonstrated measurable anxiolytic effects comparable to actual time in nature. The nervous system responds to vivid imagined environments.'},
@@ -1794,6 +1805,25 @@ function getTodayActivity(){
 // ── STATE ─────────────────────────────────────────────────────────────────────
 function dk(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 let viewDate=dk();
+
+/* ════════════ REFLECTION JOURNAL — prayer/reflection entries ════════════
+   Stored locally in _journal (array) and mirrored per-entry to Firestore
+   collection 'journal' so entries persist and follow the user across devices. */
+function _journalAll(){try{const a=JSON.parse(lsGet('_journal','[]'));return Array.isArray(a)?a:[];}catch(e){return [];}}
+function _journalSaveLocal(arr){lsSet('_journal',JSON.stringify(arr));}
+function journalAdd(slot,mode,text){
+  text=String(text||'').trim(); if(!text) return null;
+  const ts=Date.now();
+  const e={id:'j'+ts+Math.random().toString(36).slice(2,6),ts,date:dk(),slot:slot||'',mode:(mode==='christian'?'christian':'other'),text};
+  const arr=_journalAll(); arr.push(e); _journalSaveLocal(arr);
+  try{ if(typeof fbSet==='function') fbSet('journal', e.id, Object.assign({},e,{updated:ts})); }catch(err){}
+  return e;
+}
+function journalDelete(id){
+  const arr=_journalAll().filter(e=>e.id!==id); _journalSaveLocal(arr);
+  try{ if(fbUser&&fbDb) fbDb.collection('users').doc(fbUser.uid).collection('journal').doc(id).delete().catch(()=>{}); }catch(e){}
+  try{ if(curPage==='journal') rJournal(); }catch(e){}
+}
 
 /* Merge helper: move src key data into dst key */
 function _mergeKey(prefix,srcKey,dstKey){
@@ -2681,7 +2711,7 @@ function pct(v,t){return Math.min(100,Math.round(v/t*100))}
 
 // ── NAV ───────────────────────────────────────────────────────────────────────
 let curPage='today';
-const TITLES={today:'Today',workout:'Exercise',food:'Diet',water:'Water',recovery:'Stress',assess:'Assessments',rest:'Rest',supps:'Supplements',detective:'Health Detective',summary:'My DRESS Summary'};
+const TITLES={today:'Today',workout:'Exercise',food:'Diet',water:'Water',recovery:'Stress',assess:'Assessments',rest:'Rest',supps:'Supplements',detective:'Health Detective',summary:'My DRESS Summary',journal:'Reflections'};
 function goPage(p){
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.nb').forEach(e=>e.classList.remove('active'));
@@ -2703,6 +2733,7 @@ function render(p){
   else if(p==='supps')rSupps();
   else if(p==='detective')rDetective();
   else if(p==='summary')rDressSummary();
+  else if(p==='journal')rJournal();
 }
 function refresh(){render(curPage)}
 
@@ -9125,6 +9156,7 @@ if('serviceWorker' in navigator){
       <button class="dr-i" onclick="drawerGo('detective')"><span class="ic" style="background:rgba(196,112,112,.16)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></span><div>Health Detective<small>Ask anything about your story</small></div></button>
       <button class="dr-i" onclick="drawerGo('progress')"><span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 12V7M12 12l3.5 3.5"/></svg></span><div>Progress &amp; Weekly Review<small>Scores, trends, this week's focus</small></div></button>
       <button class="dr-i" onclick="drawerDressSummary()"><span class="ic" style="background:rgba(196,112,112,.16)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M9 13h6M9 17h6M9 9h2"/></svg></span><div>My DRESS Summary<small>Your whole program, one page</small></div></button>
+      <button class="dr-i" onclick="drawerGo('journal')"><span class="ic" style="background:rgba(120,140,196,.18)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span><div>Reflections<small>Your prayers &amp; insights, summarized over time</small></div></button>
       <button class="dr-i" onclick="closeDrawer();openSettings()"><span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1l-.4-2.6H10l-.4 2.6a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.4 2.6h3.8l.4-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5a7 7 0 0 0 .1-1z"/></svg></span><div>Settings<small>Profile, health flags, sign out</small></div></button>
     </div>
     <div class="dr-foot">Education &amp; self-care — not medical diagnosis or treatment.</div>
@@ -9154,6 +9186,119 @@ function drawerGo(p){
 function drawerDressSummary(){
   closeDrawer();
   goPage('summary');
+}
+
+/* ════════════ REFLECTIONS PAGE — journal + AI period summaries ════════════ */
+let _journalPeriod='week';
+function _journalPeriodBounds(period){
+  const now=new Date();
+  let start;
+  if(period==='month'){ start=new Date(now.getFullYear(),now.getMonth(),1); }
+  else if(period==='year'){ start=new Date(now.getFullYear(),0,1); }
+  else { start=new Date(now.getFullYear(),now.getMonth(),now.getDate()); start.setDate(start.getDate()-start.getDay()); }
+  return {start:start.getTime(), end:now.getTime()+1000};
+}
+function _journalPeriodLabel(period){
+  const now=new Date();
+  if(period==='month') return now.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+  if(period==='year') return String(now.getFullYear());
+  const s=new Date(_journalPeriodBounds('week').start);
+  return 'Week of '+s.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+}
+function _journalPeriodKey(period){
+  const now=new Date();
+  if(period==='month') return now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  if(period==='year') return String(now.getFullYear());
+  return 'w'+new Date(_journalPeriodBounds('week').start).toISOString().slice(0,10);
+}
+function _journalSetPeriod(p){_journalPeriod=p;rJournal();}
+function _journalConfirmDelete(id){ if(confirm('Delete this entry? This cannot be undone.')) journalDelete(id); }
+function rJournal(){
+  const mode=_restMode();
+  const christian = mode==='christian';
+  const period=_journalPeriod||'week';
+  const b=_journalPeriodBounds(period);
+  const all=_journalAll();
+  const inPeriod=all.filter(e=>e.ts>=b.start&&e.ts<b.end).sort((x,y)=>y.ts-x.ts);
+  const pageTitle = christian?'Prayer Journal':'Reflections';
+  const summaryTitle = christian?'How God is working':'Insights emerging';
+  let h='';
+  h+=`<div class="card" style="background:linear-gradient(160deg,#5b6aa8,#3a3f70);color:#fff;border:none">
+    <div style="font-family:var(--font-serif);font-size:25px;font-weight:500;margin-bottom:5px">${pageTitle}</div>
+    <div style="font-size:13px;color:rgba(255,255,255,.85);line-height:1.55">${christian?'A record of your prayers and what God is stirring — gathered from your prayer times, and read back to you over time.':'A record of your reflections and insights — gathered from your rest times, and read back to you over time.'}</div>
+  </div>`;
+  const seg=(p,label)=>`<button onclick="_journalSetPeriod('${p}')" style="flex:1;padding:9px 4px;border:none;border-radius:9px;background:${period===p?'var(--text)':'transparent'};color:${period===p?'#fff':'var(--sub)'};font-family:var(--font-sans);font-size:13px;font-weight:700;cursor:pointer">${label}</button>`;
+  h+=`<div style="display:flex;gap:4px;background:var(--surface2);border-radius:12px;padding:4px;margin-bottom:12px">${seg('week','This Week')}${seg('month','This Month')}${seg('year','This Year')}</div>`;
+  if(all.length===0){
+    h+=`<div class="card" style="text-align:center;padding:30px 18px"><div style="font-size:34px;margin-bottom:10px">🕊️</div><div style="font-family:var(--font-serif);font-size:19px;margin-bottom:6px">No entries yet</div><div style="font-size:13px;color:var(--sub);line-height:1.55">At the end of each prayer time in <b>Rest</b>, you'll be invited to write down a prayer, a thought, or something you want to remember. They'll gather here.</div><button class="btn btn-g btn-f" style="margin-top:14px" onclick="goPage('rest')">Go to Rest</button></div>`;
+    document.getElementById('page-journal').innerHTML=h; return;
+  }
+  const cacheKey='_jsum_'+mode+'_'+period+'_'+_journalPeriodKey(period);
+  let cached=null; try{cached=JSON.parse(lsGet(cacheKey,'null'));}catch(e){}
+  h+=`<div class="card" id="jsum-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px"><span class="kicker" style="color:var(--sub)">${summaryTitle} · ${_journalPeriodLabel(period)}</span></div><div id="jsum-inner">`;
+  if(inPeriod.length===0){
+    h+=`<div style="font-size:13px;color:var(--sub);line-height:1.55">No entries in this period yet. Try a wider range above, or add one during your next prayer time.</div>`;
+  } else if(cached&&cached.text){
+    h+=`<div style="font-size:14.5px;line-height:1.68;white-space:pre-line;color:var(--text)">${_esc(cached.text)}</div>
+      <div style="font-size:11px;color:var(--sub);margin-top:13px">Reflection on ${cached.count||inPeriod.length} ${(cached.count||inPeriod.length)===1?'entry':'entries'} · <span onclick="journalSummarize()" style="color:var(--green);font-weight:700;cursor:pointer">Refresh</span></div>`;
+  } else {
+    h+=`<div style="font-size:13px;color:var(--sub);line-height:1.55;margin-bottom:12px">Let the app read back over your ${inPeriod.length} ${inPeriod.length===1?'entry':'entries'} from ${_journalPeriodLabel(period).toLowerCase()} and offer a gentle reflection on ${christian?'how God is at work in your life':'the themes and insights emerging'}.</div>
+      <button class="btn btn-g btn-f" id="jsum-btn" onclick="journalSummarize()">${christian?'Reflect on how God is working':'Reflect on my insights'}</button>`;
+  }
+  h+=`</div></div>`;
+  h+=`<div class="ct" style="padding:10px 3px 8px">Entries${inPeriod.length?' · '+inPeriod.length:''}</div>`;
+  const slotLabel={morning:'Morning',midday:'Midday',evening:'Evening'};
+  if(inPeriod.length===0){
+    h+=`<div class="card" style="font-size:13px;color:var(--sub);line-height:1.55">Nothing recorded in this period.</div>`;
+  }
+  inPeriod.forEach(e=>{
+    const d=new Date(e.ts);
+    const dstr=d.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+    const tstr=d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+    const tag=(e.slot&&slotLabel[e.slot])?slotLabel[e.slot]+' · ':'';
+    h+=`<div class="card" style="padding:13px 15px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--green)">${tag}${dstr}</span>
+        <span style="font-size:11px;color:var(--sub)">${tstr}<span onclick="_journalConfirmDelete('${e.id}')" title="Delete" style="cursor:pointer;margin-left:9px;font-weight:700">✕</span></span>
+      </div>
+      <div style="font-family:var(--font-serif);font-size:16px;line-height:1.55;white-space:pre-line">${_esc(e.text)}</div>
+    </div>`;
+  });
+  document.getElementById('page-journal').innerHTML=h;
+}
+async function journalSummarize(){
+  const mode=_restMode();
+  const christian = mode==='christian';
+  const period=_journalPeriod||'week';
+  const b=_journalPeriodBounds(period);
+  const entries=_journalAll().filter(e=>e.ts>=b.start&&e.ts<b.end).sort((x,y)=>x.ts-y.ts);
+  if(!entries.length){ try{showToast('No entries in this period yet');}catch(e){} return; }
+  const inner=document.getElementById('jsum-inner');
+  if(inner) inner.innerHTML='<div style="font-size:13.5px;color:var(--sub);line-height:1.6;padding:4px 0">Reading back over your '+entries.length+' '+(entries.length===1?'entry':'entries')+'…</div>';
+  const dated=entries.map(e=>{const d=new Date(e.ts);const ds=d.toLocaleDateString(undefined,{month:'short',day:'numeric'});const sl=e.slot?e.slot+' ':'';return '['+ds+' '+sl+'] '+e.text;}).join('\n');
+  const periodWord = period==='week'?'this week':period==='month'?'this month':'this year';
+  let prompt;
+  if(christian){
+    prompt='You are a gentle, humble Christian spiritual companion. Below are dated journal entries a person wrote during their daily prayer times '+periodWord+'. Read back over them and write a warm, encouraging reflection (2-3 short paragraphs) on how God appears to be at work in their life: recurring themes, burdens they keep bringing, prayers that seem to be moving, quiet growth, and gratitude.\nRules: Ground everything ONLY in what they actually wrote — do not invent events, people, or specifics. Be humble and tentative ("it seems," "you may notice") rather than declaring with certainty what God is doing. Do not moralize, instruct, or give commands. Do not quote scripture unless they did. Warm and personal, addressed to "you". End with one short sentence of encouragement. Keep it under 200 words.\n\nEntries:\n'+dated;
+  } else {
+    prompt='You are a warm, thoughtful reflective companion. Below are dated journal entries a person wrote during their daily moments of stillness '+periodWord+'. Read back over them and write a warm reflection (2-3 short paragraphs) on the insights, patterns, and themes emerging in their life: what keeps surfacing, what seems to be shifting, quiet growth, and what appears to matter most.\nRules: Ground everything ONLY in what they actually wrote — do not invent events, people, or specifics. Be tentative and non-prescriptive ("you may notice," "there seems to be"). Do not moralize or give commands. No religious framing. Warm and personal, addressed to "you". End with one short encouraging sentence. Keep it under 200 words.\n\nEntries:\n'+dated;
+  }
+  try{
+    const res=await fetch(GEMINI_WORKER_URL+'/gemini-2.5-flash',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.7,maxOutputTokens:700}})
+    });
+    const data=await res.json();
+    let txt=(((((data||{}).candidates||[])[0]||{}).content||{}).parts||[])[0];
+    txt=(txt&&txt.text)?txt.text.trim():'';
+    if(!txt) throw new Error('empty');
+    txt=txt.replace(/^```[a-z]*\s*/i,'').replace(/\s*```$/,'').trim();
+    lsSet('_jsum_'+mode+'_'+period+'_'+_journalPeriodKey(period), JSON.stringify({text:txt,at:Date.now(),count:entries.length}));
+    rJournal();
+  }catch(err){
+    const inr=document.getElementById('jsum-inner');
+    if(inr) inr.innerHTML='<div style="font-size:13px;color:var(--sub);line-height:1.55">Couldn\'t create a reflection just now — check your connection and try again.</div><button class="btn btn-g btn-f" style="margin-top:10px" onclick="journalSummarize()">Try again</button>';
+  }
 }
 
 /* ════════════ REST TAB ════════════ */
@@ -9975,8 +10120,33 @@ const _PRAY_TEXT={
   r_intention:'Set an intention.\n\nWho do you want to be today? What matters most? Hold it quietly for a moment.',
   r_lookback:'Look back over the day.\n\nWhere were you most alive? Where did you fall short of who you want to be? Notice it gently — then let it go.',
   r_centering:'A breath to return to, as long as you like:\n\nBreathing in — I am here.\nBreathing out — I let go.',
-  r_closing:'Carry this stillness with you into whatever comes next.'
+  r_closing:'Carry this stillness with you into whatever comes next.',
+  // ── Assurance of pardon (morning) — BCP absolution ──
+  assurance:'The almighty and merciful Lord grant you pardon and remission of all your sins, time for amendment of life, and the grace and comfort of his Holy Spirit. Amen.\n\nThere is therefore now no condemnation for those who are in Christ Jesus. (Romans 8:1)',
+  // ── Midday — sustaining & petition ──
+  mid_open:'O God, make speed to save us.\nO Lord, make haste to help us.\n\nGlory to the Father, and to the Son, and to the Holy Spirit; as it was in the beginning, is now, and will be for ever. Amen.',
+  mid_petition:'The day is only half spent, and already I have felt its weight. Sustain me through what remains.\n\nSteady my hands for the work before me. Give me patience with those I will meet, and honesty in all I say. Where I have grown scattered, gather me. Where I am tempted to hurry past what matters, slow me.\n\nAnd establish the work of my hands — let it count for something good.\n\n(Psalm 90:17)',
+  mid_thanks:'Almighty God, Father of all mercies, I give you humble thanks for all your goodness and loving-kindness to me. I bless you for my creation, preservation, and all the blessings of this life; but above all for your immeasurable love in the redemption of the world by our Lord Jesus Christ.\n\nGive me such a sense of all your mercies, that my heart may be unfeignedly thankful. Amen.',
+  mid_send:'Go now into the rest of the day in the strength the Lord provides. He who began a good work in you will carry it on to completion.\n\nYou do not go alone.',
+  // ── Evening — light, examen, rest ──
+  eve_open:'Hail, gladdening Light, of his pure glory poured,\nwho is the immortal Father, heavenly, blest,\nholiest of holies, Jesus Christ our Lord.\n\nNow, as we come to the setting of the sun,\nand our eyes behold the evening light,\nwe sing your praise, O God: Father, Son, and Holy Spirit.',
+  eve_examen1:'Look back over the hours now behind you.\n\nWhere did you meet grace today — a kindness, a small mercy, a moment you felt truly alive or truly held? Do not rush past it. Name it, and give thanks. Every good and perfect gift came from above.',
+  eve_examen2:'Look once more, gently.\n\nWhere did you fall short — of love, of patience, of trust? Where did you turn from the person you mean to be? Bring it honestly to God, who is tender with the truly sorry. Confess it, receive his mercy, and set it down.\n\nYou need not carry it into the night.',
+  eve_benediction:'Lord, now let your servant depart in peace, according to your word; for my eyes have seen your salvation, which you have prepared before the face of all peoples: a light to lighten the nations, and the glory of your people Israel. (Luke 2:29–32)\n\nGuide us waking, O Lord, and guard us sleeping; that awake we may watch with Christ, and asleep we may rest in peace.'
 };
+// ── Rotating collect pools (public-domain, Book of Common Prayer & tradition) ──
+const REST_COLLECTS_MIDDAY=[
+  {t:"Direct us, O Lord, in all our doings with your most gracious favor, and further us with your continual help; that in all our works begun, continued, and ended in you, we may glorify your holy Name, and finally, by your mercy, obtain everlasting life; through Jesus Christ our Lord. Amen.",s:"Book of Common Prayer"},
+  {t:"Almighty God, whose most dear Son went not up to joy but first he suffered pain, and entered not into glory before he was crucified: Mercifully grant that we, walking in the way of the cross, may find it none other than the way of life and peace; through Jesus Christ our Lord. Amen.",s:"Book of Common Prayer"},
+  {t:"Grant, O Lord, that as we go about the work of this day, we may not be anxious for tomorrow, but may cast all our care on you, who care for us; and let your peace, which surpasses understanding, guard our hearts and minds; through Jesus Christ our Lord. Amen.",s:"after 1 Peter 5:7"},
+  {t:"O God, the King eternal, whose light divides the day from the night: Drive far from us all wrong desires, incline our hearts to keep your law, and guide our feet into the way of peace; through Jesus Christ our Lord. Amen.",s:"Book of Common Prayer"}
+];
+const REST_COLLECTS_EVENING=[
+  {t:"Lighten our darkness, we beseech you, O Lord; and by your great mercy defend us from all perils and dangers of this night; for the love of your only Son, our Savior Jesus Christ. Amen.",s:"Book of Common Prayer"},
+  {t:"Be present, O merciful God, and protect us through the hours of this night, so that we who are wearied by the changes and chances of this life may rest in your eternal changelessness; through Jesus Christ our Lord. Amen.",s:"Compline · Book of Common Prayer"},
+  {t:"Keep watch, dear Lord, with those who work, or watch, or weep this night, and give your angels charge over those who sleep. Tend the sick, give rest to the weary, bless the dying, soothe the suffering, and shield the joyous; and all for your love's sake. Amen.",s:"after Augustine of Hippo"},
+  {t:"O Lord, support us all the day long, until the shadows lengthen and the evening comes, and the busy world is hushed, and the fever of life is over, and our work is done. Then in your mercy grant us a safe lodging, and a holy rest, and peace at the last. Amen.",s:"John Henry Newman"}
+];
 // ── Approved content pools (Batch 1) — rotate by day-of-year, offset per time slot ──
 // Opening prayers: church fathers / historic saints (named only when certain).
 const REST_OPENINGS=[
@@ -10067,7 +10237,25 @@ function _prayPage(kind,opts){
   if(kind==='complete'){
     return wrap(H(opts.title||'Amen')+body(opts.text||'')+attrib(opts.attrib));
   }
+  if(kind==='journal'){
+    const overline=`<div style="font-family:var(--font-sans);font-size:11px;text-transform:uppercase;letter-spacing:.11em;color:rgba(255,255,255,.8);margin-bottom:16px">Journal · optional</div>`;
+    const heading=`<div style="${SERIF};font-size:30px;font-weight:500;line-height:1.14;letter-spacing:-.2px;margin-bottom:10px;text-shadow:0 1px 12px rgba(0,0,0,.3)">${opts.title||'Carry it with you'}</div>`;
+    const sub=opts.sub?`<div style="font-family:var(--font-sans);font-size:15px;line-height:1.6;color:rgba(255,255,255,.88);margin-bottom:18px;text-shadow:0 1px 10px rgba(0,0,0,.25)">${opts.sub}</div>`:'';
+    const ta=`<textarea id="pr-journal-input" placeholder="${opts.ph||'Write a few words…'}" oninput="_prayerJournalDirty=true" style="width:100%;min-height:150px;box-sizing:border-box;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.34);border-radius:14px;padding:15px 16px;color:#fff;font-family:var(--font-serif);font-size:19px;line-height:1.5;resize:vertical;outline:none;-webkit-appearance:none"></textarea>`;
+    const note=`<div style="font-family:var(--font-sans);font-size:12.5px;color:rgba(255,255,255,.62);margin-top:11px;line-height:1.5">Saved privately to your account. Leave blank to skip — you'll see these gathered in Reflections, with weekly, monthly, and yearly summaries.</div>`;
+    return wrap(overline+heading+sub+ta+note);
+  }
   return wrap(H(opts.title)+body(opts.text||'')+attrib(opts.attrib));
+}
+function _journalPromptOpts(mode,slot){
+  if(mode==='christian'){
+    return {title:'Before the Amen',
+      sub:'Is there a prayer, a burden, a thanksgiving, or something God is showing you that you want to hold onto?',
+      ph:'A prayer, a thanksgiving, something God is stirring…'};
+  }
+  return {title:'Before you go',
+    sub:'Anything you noticed, felt, or want to remember from these few minutes?',
+    ph:'A thought, an insight, something to remember…'};
 }
 function _buildPrayerPages(mode,slot){
   const date=new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
@@ -10081,23 +10269,32 @@ function _buildPrayerPages(mode,slot){
   add('title',{title,date});
   if(mode==='christian'){
     if(slot==='morning'){
+      // Morning — adoration, confession & pardon, the Lord's Prayer, the Word, blessing
       add('std',{title:'Opening Prayer',text:opening.t,attrib:_attrFrom(opening)});
       add('pause',{title:'Be still',text:'Take the next two minutes and quiet your heart before the Lord. Ask him what he is saying to you today.'},true);
       add('std',{title:'Confession',text:_PRAY_TEXT.confession});
+      add('std',{title:'Assurance of Pardon',text:_PRAY_TEXT.assurance});
       addLords();
-      add('scripture',{title:'Scripture',text:verse.t,attrib:verse.ref+' · WEB'});
+      add('scripture',{title:'The Word',text:verse.t,attrib:verse.ref+' · WEB'});
       add('complete',{title:'Blessing',text:_PRAY_TEXT.blessing,slot});
     } else if(slot==='midday'){
-      add('std',{title:'Opening Prayer',text:opening.t,attrib:_attrFrom(opening)});
-      addLords();
-      add('scripture',{title:'Scripture',text:verse.t,attrib:verse.ref+' · WEB'});
-      add('complete',{title:'Blessing',text:_PRAY_TEXT.blessing,slot});
+      // Midday — sustaining & petition (no confession, no Lord's Prayer)
+      const collect=_restPick(REST_COLLECTS_MIDDAY,off);
+      add('std',{title:'Adoration',text:_PRAY_TEXT.mid_open});
+      add('std',{title:'Petition',text:_PRAY_TEXT.mid_petition});
+      add('std',{title:'Thanksgiving',text:_PRAY_TEXT.mid_thanks});
+      add('scripture',{title:'The Word',text:verse.t,attrib:verse.ref+' · WEB'});
+      add('std',{title:'A Collect',text:collect.t,attrib:collect.s});
+      add('complete',{title:'Go in strength',text:_PRAY_TEXT.mid_send,slot});
     } else {
-      add('std',{title:'Opening Prayer',text:opening.t,attrib:_attrFrom(opening)});
-      add('std',{title:'Confession',text:_PRAY_TEXT.confession});
-      addLords();
-      add('scripture',{title:'Scripture',text:verse.t,attrib:verse.ref+' · WEB'});
-      add('complete',{title:'Peace at the last',text:_PRAY_TEXT.blessing,slot});
+      // Evening — light, examen (recounting & reflection), the Word, collect, rest
+      const collect=_restPick(REST_COLLECTS_EVENING,off);
+      add('std',{title:'O Gracious Light',text:_PRAY_TEXT.eve_open});
+      add('std',{title:'Recount the Day',text:_PRAY_TEXT.eve_examen1});
+      add('std',{title:'Examine the Day',text:_PRAY_TEXT.eve_examen2});
+      add('scripture',{title:'The Word',text:verse.t,attrib:verse.ref+' · WEB'});
+      add('std',{title:'A Collect',text:collect.t,attrib:collect.s});
+      add('complete',{title:'Peace at the last',text:_PRAY_TEXT.eve_benediction,slot});
     }
   } else {
     if(slot==='morning'){
@@ -10120,17 +10317,30 @@ function _buildPrayerPages(mode,slot){
       add('complete',{title:'Rest now',text:_PRAY_TEXT.r_closing,slot});
     }
   }
+  // Private journaling page, inserted just before the closing page of every flow
+  if(P.length>1){
+    P.splice(P.length-1,0,{h:_prayPage('journal',_journalPromptOpts(mode,slot)),ring:false});
+  }
   return P;
 }
 let _prayerTimerId=null, _prayerSlot='', _prayerMode='', _prayerStep=0, _prayerPages=[];
+let _prayerJournalDirty=false, _prayerJournalSaved=false;
+function _prayerSaveJournal(){
+  if(_prayerJournalSaved) return;
+  const ta=document.getElementById('pr-journal-input'); if(!ta) return;
+  const text=(ta.value||'').trim(); if(!text) return;
+  journalAdd(_prayerSlot,_prayerMode,text);
+  _prayerJournalSaved=true;
+  try{showToast('Saved to your Reflections');}catch(e){}
+}
 function openPrayer(slot){
-  _prayerSlot=slot; _prayerMode=_restMode(); _prayerStep=0;
+  _prayerSlot=slot; _prayerMode=_restMode(); _prayerStep=0; _prayerJournalDirty=false; _prayerJournalSaved=false;
   _prayerPages=_buildPrayerPages(_prayerMode,slot);
   const panels=_prayerPages.map((p,i)=>`<div class="pr-panel" style="position:absolute;inset:0;opacity:${i===0?1:0};transition:opacity .55s ease;pointer-events:${i===0?'auto':'none'}">${p.h}</div>`).join('');
   const ov=document.createElement('div');
   ov.id='prayer-overlay';
   ov.style.cssText='position:fixed;inset:0;z-index:9999;background:'+_prayerBg(slot);
-  ov.innerHTML=`<style>@keyframes prBreathe{0%,100%{transform:scale(.84)}50%{transform:scale(1.12)}}</style>
+  ov.innerHTML=`<style>@keyframes prBreathe{0%,100%{transform:scale(.84)}50%{transform:scale(1.12)}}#pr-journal-input::placeholder{color:rgba(255,255,255,.55)}#pr-journal-input:focus{border-color:rgba(255,255,255,.7)}</style>
     <div id="prayer-dark" style="position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .55s"></div>
     <div id="pr-ring" style="position:absolute;top:44px;left:50%;transform:translateX(-50%);width:116px;height:116px;pointer-events:none;z-index:4;transition:opacity .2s ease"><div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.5);animation:prBreathe 11s ease-in-out infinite"></div><div style="position:absolute;inset:15px;border-radius:50%;border:1px solid rgba(255,255,255,.28);animation:prBreathe 11s ease-in-out infinite"></div></div>
     <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:rgba(255,255,255,.16);z-index:5"><div id="pr-progress" style="position:absolute;left:0;top:0;width:100%;height:0;background:rgba(255,255,255,.85);transition:height .55s ease"></div></div>
@@ -10176,6 +10386,7 @@ let _prTouchX=0,_prTouchY=0;
 function _prTouchStart(e){const t=e.touches&&e.touches[0];if(t){_prTouchX=t.clientX;_prTouchY=t.clientY;}}
 function _prTouchEnd(e){if(document.getElementById('pr-menu'))return;const t=e.changedTouches&&e.changedTouches[0];if(!t)return;const dx=t.clientX-_prTouchX,dy=t.clientY-_prTouchY;if(dy>100&&dy>Math.abs(dx)*1.5){closePrayer();return;}if(Math.abs(dx)>48&&Math.abs(dx)>Math.abs(dy)*1.3){if(dx<0)prayerNext();else prayerPrev();}}
 function closePrayer(){
+  try{_prayerSaveJournal();}catch(e){}
   if(_prayerTimerId){clearInterval(_prayerTimerId);_prayerTimerId=null;}
   const ov=document.getElementById('prayer-overlay'); if(ov)ov.remove();
   document.body.style.overflow='';
@@ -10247,7 +10458,7 @@ function _practiceMarkDone(id){const d=_practiceDoneToday();if(!d.includes(id)){
 function _practicePage(kind,opts){
   opts=opts||{};
   const SERIF='font-family:var(--font-serif)';
-  const wrap=inner=>`<div class="pc-page" style="flex:0 0 100%;width:100%;height:100%;overflow-y:auto;box-sizing:border-box;padding:182px 28px 96px;color:#fff;font-family:var(--font-sans);-webkit-overflow-scrolling:touch">${inner}</div>`;
+  const wrap=(inner,pt)=>`<div class="pc-page" style="flex:0 0 100%;width:100%;height:100%;overflow-y:auto;box-sizing:border-box;padding:${pt||182}px 28px 150px;color:#fff;font-family:var(--font-sans);-webkit-overflow-scrolling:touch">${inner}</div>`;
   const H=t=>`<div style="${SERIF};font-size:38px;font-weight:500;line-height:1.08;letter-spacing:-.3px;margin-bottom:20px;text-shadow:0 1px 14px rgba(0,0,0,.22)">${t}</div>`;
   const body=t=>`<div style="${SERIF};font-size:23px;font-weight:400;line-height:1.55;white-space:pre-line;text-shadow:0 1px 12px rgba(0,0,0,.22)">${t}</div>`;
   if(kind==='title'){
@@ -10262,6 +10473,13 @@ function _practicePage(kind,opts){
     const overline=`<div style="font-family:var(--font-sans);font-size:11px;text-transform:uppercase;letter-spacing:.11em;color:rgba(255,255,255,.8);margin-bottom:18px">Step ${opts.idx} of ${opts.total}</div>`;
     return wrap(overline+body(opts.text||''));
   }
+  if(kind==='steps'){
+    const list=(opts.steps||[]).map((s,i)=>`<div style="display:flex;gap:14px;margin-bottom:17px">
+      <div style="flex:none;width:27px;height:27px;border-radius:50%;border:1.5px solid rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;font-family:var(--font-sans);font-size:13px;font-weight:600;color:#fff;margin-top:3px">${i+1}</div>
+      <div style="${SERIF};font-size:20px;font-weight:400;line-height:1.5;flex:1;text-shadow:0 1px 12px rgba(0,0,0,.22)">${s}</div></div>`).join('');
+    const overline=`<div style="font-family:var(--font-sans);font-size:11px;text-transform:uppercase;letter-spacing:.11em;color:rgba(255,255,255,.8);margin-bottom:22px">How to</div>`;
+    return wrap(overline+list,150);
+  }
   if(kind==='why'){
     return wrap(`<div style="font-family:var(--font-sans);font-size:11px;text-transform:uppercase;letter-spacing:.11em;color:rgba(255,255,255,.8);margin-bottom:16px">Why it works</div>`+body(opts.text||''));
   }
@@ -10275,8 +10493,12 @@ function _buildPracticePages(act){
   const P=[];
   const add=h=>P.push(h);
   add(_practicePage('title',{over:'Practice',title:act.n,sub:'⏱ '+(act.dur||''),tag:act.tag||''}));
-  (act.steps||[]).forEach((s,i)=>add(_practicePage('step',{idx:i+1,total:(act.steps||[]).length,text:s})));
   if(act.why) add(_practicePage('why',{text:act.why}));
+  if(act.staged){
+    (act.steps||[]).forEach((s,i)=>add(_practicePage('step',{idx:i+1,total:(act.steps||[]).length,text:s})));
+  }else{
+    add(_practicePage('steps',{steps:act.steps||[]}));
+  }
   add(_practicePage('complete',{title:'Well done',text:'Notice how your body feels now compared to when you began. Even a small shift counts — that’s your nervous system responding.'}));
   return P;
 }
@@ -10294,15 +10516,27 @@ function openPractice(id){
     <div id="pc-dark" style="position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .55s"></div>
     <div id="pc-ring" style="position:absolute;top:44px;left:50%;transform:translateX(-50%);width:116px;height:116px;pointer-events:none;z-index:4;transition:opacity .2s ease"><div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.5);animation:pcBreathe 11s ease-in-out infinite"></div><div style="position:absolute;inset:15px;border-radius:50%;border:1px solid rgba(255,255,255,.28);animation:pcBreathe 11s ease-in-out infinite"></div></div>
     <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:rgba(255,255,255,.16);z-index:5"><div id="pc-progress" style="position:absolute;left:0;top:0;width:100%;height:0;background:rgba(255,255,255,.85);transition:height .55s ease"></div></div>
-    <div id="ov-mus" style="position:absolute;top:14px;right:14px;z-index:7;display:none;align-items:center;gap:8px;background:rgba(0,0,0,.30);border:1px solid rgba(255,255,255,.28);border-radius:22px;padding:5px 12px 5px 5px;max-width:58%">
-      <button id="ov-mus-play" onclick="musToggle()" aria-label="Play or pause music" style="flex:none;width:28px;height:28px;border-radius:50%;border:none;background:rgba(255,255,255,.92);color:#222;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0"></button>
-      <span id="ov-mus-title" style="font-family:var(--font-sans);font-size:11.5px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
-    </div>
+    <button id="pc-timer" onclick="pcTimerToggle()" aria-label="Practice timer" style="position:absolute;top:14px;right:14px;z-index:7;display:none;align-items:center;gap:9px;background:rgba(0,0,0,.30);border:1px solid rgba(255,255,255,.32);border-radius:22px;padding:7px 15px 7px 12px;color:#fff;font-family:var(--font-sans);cursor:pointer">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>
+      <span id="pc-timer-time" style="font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.02em">0:00</span>
+      <span id="pc-timer-lbl" style="font-size:11px;font-weight:600;letter-spacing:.03em;opacity:.85">Start</span>
+    </button>
     <div id="practice-stage" style="position:absolute;inset:0">${panels}</div>
-    <div style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;padding:16px 22px 30px;z-index:6">
-      <button onclick="closePractice()" aria-label="Close practice" style="background:none;border:none;color:#fff;cursor:pointer;flex:none;display:flex;align-items:center;padding:4px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
-      <div id="pc-dots" style="flex:1;display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap"></div>
-      <button id="pc-finish" onclick="completePractice()" aria-label="Complete" style="flex:none;width:30px;height:30px;border-radius:50%;border:none;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;cursor:pointer;visibility:hidden"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#222" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+    <div style="position:absolute;left:0;right:0;bottom:0;z-index:6">
+      <div id="ov-mus" style="display:none;align-items:center;gap:4px;background:rgba(28,32,28,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#fff;padding:9px 12px 9px 8px">
+        <button class="mp-b" id="ov-mus-play" onclick="musToggle()" aria-label="Play or pause music"></button>
+        <div style="flex:1;min-width:0">
+          <div id="ov-mus-title" style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--font-sans)"></div>
+          <div style="font-size:10.5px;color:rgba(255,255,255,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">Ventrality · Safe Inside</div>
+        </div>
+        <button class="mp-b" onclick="musNext()" aria-label="Next track"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 4l10 8-10 8V4zM17 4h2v16h-2z"/></svg></button>
+        <button class="mp-b" onclick="musClose()" aria-label="Stop listening" style="color:rgba(255,255,255,.7)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;padding:16px 22px 30px">
+        <button onclick="closePractice()" aria-label="Close practice" style="background:none;border:none;color:#fff;cursor:pointer;flex:none;display:flex;align-items:center;padding:4px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <div id="pc-dots" style="flex:1;display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap"></div>
+        <button id="pc-finish" onclick="completePractice()" aria-label="Complete" style="flex:none;width:30px;height:30px;border-radius:50%;border:none;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;cursor:pointer;visibility:hidden"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#222" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+      </div>
     </div>`;
   document.body.appendChild(ov);
   document.body.style.overflow='hidden';
@@ -10310,9 +10544,75 @@ function openPractice(id){
   ov.addEventListener('touchstart',_pcTouchStart,{passive:true});
   ov.addEventListener('touchend',_pcTouchEnd,{passive:true});
   _renderPracticeStep();
+  _pcTimerInit(act);
   try{_musPaint();}catch(e){}
 }
 function _pcRingFade(e){const ring=document.getElementById('pc-ring');if(!ring)return;const st=(e.target&&e.target.scrollTop)||0;ring.style.opacity=Math.max(0,1-st/100).toFixed(2);}
+
+/* ── Practice timer — manual-start countdown for fixed-duration practices.
+   Lives separate from the audio player (top-right pill). ── */
+let _pcTimer={secs:0,left:0,running:false,id:null,end:0};
+function _practiceDurSecs(dur){
+  if(!dur) return null;
+  const s=String(dur);
+  if(s.indexOf('·')>=0) return null;              // conditional (training/rest day)
+  if(/\d\s*[–—-]\s*\d/.test(s)) return null;       // a numeric range, not a fixed time
+  let m=s.match(/(\d+(?:\.\d+)?)\s*min/i);
+  if(m) return Math.round(parseFloat(m[1])*60);
+  m=s.match(/(\d+(?:\.\d+)?)\s*sec/i);
+  if(m) return Math.round(parseFloat(m[1]));
+  return null;
+}
+function _pcTimerFmt(s){s=Math.max(0,Math.round(s));const m=Math.floor(s/60),ss=s%60;return m+':'+String(ss).padStart(2,'0');}
+function _pcTimerInit(act){
+  if(_pcTimer.id){clearInterval(_pcTimer.id);}
+  const secs=_practiceDurSecs(act&&act.dur);
+  _pcTimer={secs:secs||0,left:secs||0,running:false,id:null,end:0};
+  const el=document.getElementById('pc-timer');
+  if(el) el.style.display=secs?'inline-flex':'none';
+  _pcTimerPaint();
+}
+function _pcTimerPaint(){
+  const t=document.getElementById('pc-timer-time');if(t)t.textContent=_pcTimerFmt(_pcTimer.left);
+  const l=document.getElementById('pc-timer-lbl');
+  if(l)l.textContent=_pcTimer.running?'Pause':(_pcTimer.left<_pcTimer.secs?'Resume':'Start');
+}
+function pcTimerToggle(){
+  if(!_pcTimer.secs)return;
+  if(_pcTimer.running){clearInterval(_pcTimer.id);_pcTimer.id=null;_pcTimer.running=false;_pcTimerPaint();return;}
+  if(_pcTimer.left<=0)_pcTimer.left=_pcTimer.secs;
+  _pcTimer.end=Date.now()+_pcTimer.left*1000;
+  _pcTimer.running=true;
+  _pcTimer.id=setInterval(_pcTimerTick,200);
+  _pcTimerPaint();
+}
+function _pcTimerTick(){
+  _pcTimer.left=Math.max(0,(_pcTimer.end-Date.now())/1000);
+  if(_pcTimer.left<=0.05){clearInterval(_pcTimer.id);_pcTimer.id=null;_pcTimer.running=false;_pcTimer.left=0;_pcTimerDone();}
+  _pcTimerPaint();
+}
+function _pcTimerDone(){
+  try{_pcChime();}catch(e){}
+  try{showToast('Time complete — '+Math.round(_pcTimer.secs/60)+' min done');}catch(e){}
+  const el=document.getElementById('pc-timer');
+  if(el){const ob=el.style.background,oc=el.style.color;el.style.background='rgba(255,255,255,.92)';el.style.color='#333';setTimeout(()=>{if(el){el.style.background=ob;el.style.color=oc;}},1500);}
+  _pcTimer.left=_pcTimer.secs;              // ready to run again
+  setTimeout(_pcTimerPaint,1550);
+}
+function _pcChime(){
+  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+  const ctx=new AC();
+  [880,1174.7].forEach((f,i)=>{
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.type='sine';o.frequency.value=f;o.connect(g);g.connect(ctx.destination);
+    const t0=ctx.currentTime+i*0.3;
+    g.gain.setValueAtTime(0,t0);
+    g.gain.linearRampToValueAtTime(0.16,t0+0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+0.6);
+    o.start(t0);o.stop(t0+0.65);
+  });
+  setTimeout(()=>{try{ctx.close();}catch(e){}},1600);
+}
 function _renderPracticeStep(){
   const ov=document.getElementById('practice-overlay');if(!ov)return;
   const n=_pcPages.length;
@@ -10331,7 +10631,7 @@ function practicePrev(){if(_pcStep>0){_pcStep--;_renderPracticeStep();}}
 let _pcTouchX=0,_pcTouchY=0;
 function _pcTouchStart(e){const t=e.touches&&e.touches[0];if(t){_pcTouchX=t.clientX;_pcTouchY=t.clientY;}}
 function _pcTouchEnd(e){const t=e.changedTouches&&e.changedTouches[0];if(!t)return;const dx=t.clientX-_pcTouchX,dy=t.clientY-_pcTouchY;if(dy>100&&dy>Math.abs(dx)*1.5){closePractice();return;}if(Math.abs(dx)>48&&Math.abs(dx)>Math.abs(dy)*1.3){if(dx<0)practiceNext();else practicePrev();}}
-function closePractice(){const ov=document.getElementById('practice-overlay');if(ov)ov.remove();document.body.style.overflow='';}
+function closePractice(){if(_pcTimer.id){clearInterval(_pcTimer.id);_pcTimer.id=null;_pcTimer.running=false;}const ov=document.getElementById('practice-overlay');if(ov)ov.remove();document.body.style.overflow='';}
 function completePractice(){_practiceMarkDone(_pcId);closePractice();showToast('Practice complete');_repaintRegulation();}
 
 /* ════════════ SUPPS TAB ════════════ */
