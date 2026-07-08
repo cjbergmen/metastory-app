@@ -3160,7 +3160,7 @@ function rWorkout(){
 }
 
 // ── FOOD ──────────────────────────────────────────────────────────────────────
-function rFood(){var _w=document.getElementById('food-lib-wrap');if(_w&&_w.offsetParent!==null&&_w.getAttribute('data-fulllib')==='1'){try{_w.innerHTML=rFoodLibHTML();}catch(e){}return;}return _rFoodOrig();}
+function rFood(){var _w=document.getElementById('food-lib-wrap');if(_w&&_w.offsetParent!==null&&_w.getAttribute('data-fulllib')==='1'){try{_w.innerHTML=rFoodLibHTML();}catch(e){}try{_libSwipeInit();}catch(e){}return;}return _rFoodOrig();}
 function _rFoodOrig(){
   // Redirect to the new Diet page renderer — rFood() is kept as an alias
   // so that all existing call sites (saveFood, delFood, closeFood, etc.)
@@ -4773,7 +4773,7 @@ function setFoodModalTab(tab){
 }
 let _libArchived=false;
 const _ARCH_SVG='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v3H3zM5 10v9h14v-9M9 13h6"/></svg>';
-function rFoodModalLib(){var w=document.getElementById('food-lib-wrap');if(w){w.setAttribute('data-fulllib','1');try{w.innerHTML=rFoodLibHTML();}catch(e){}}return;}
+function rFoodModalLib(){var w=document.getElementById('food-lib-wrap');if(w){w.setAttribute('data-fulllib','1');try{w.innerHTML=rFoodLibHTML();}catch(e){}try{_libSwipeInit();}catch(e){}}return;}
 function _fmlOrigDead(){
   const q=(document.getElementById('fml-q').value||'').toLowerCase().trim();
   const all=getLib();
@@ -5187,7 +5187,10 @@ function rFoodLibHTML(){
     {k:'calories',l:'Calories'},
   ];
   let filtered=lib.filter(item=>{
-    const mc=_libCat==='all'||item.cat===_libCat;
+    // Archived items live only under the Archived tab — never in All or other tabs.
+    const mc=_libCat==='archived'?item.cat==='archived'
+            :_libCat==='all'?item.cat!=='archived'
+            :(item.cat===_libCat&&item.cat!=='archived');
     const ms=!_libSearch||item.n.toLowerCase().includes(_libSearch.toLowerCase());
     return mc&&ms;
   });
@@ -5230,14 +5233,19 @@ function rFoodLibHTML(){
     filtered.forEach(item=>{
       const isOpen=item.id===_libExpandedId;
       const safeName=item.n.replace(/'/g,"\\'");
+      const _archived=item.cat==='archived';
       h+=`<div class="lib-item">
-        <div class="lib-item-hdr" onclick="libToggleItem('${item.id}')">
-          <div class="lib-item-em">${item.e}</div>
-          <div class="lib-item-info">
-            <div class="lib-item-name">${item.n}</div>
-            <div class="lib-item-macros">P ${item.p}g · C ${item.c}g · F ${item.f}g · ${item.k} kcal</div>
+        <div style="position:relative">
+          ${_archived?'':`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-end;gap:6px;padding-right:22px;background:var(--green);color:#fff;font-size:12.5px;font-weight:700;pointer-events:none">${_ARCH_SVG}Archive</div>`}
+          <div class="lib-item-hdr${_archived?'':' lib-swrow-fg'}" data-sid="${item.id}" style="position:relative;background:var(--surface)" onclick="libToggleItem('${item.id}')">
+            <div class="lib-item-em">${item.e}</div>
+            <div class="lib-item-info">
+              <div class="lib-item-name">${item.n}</div>
+              <div class="lib-item-macros">P ${item.p}g · C ${item.c}g · F ${item.f}g · ${item.k} kcal</div>
+            </div>
+            ${_archived?`<button onclick="event.stopPropagation();libRestore('${item.id}')" style="background:var(--green);color:#fff;border:none;border-radius:12px;font-size:11px;font-weight:700;padding:6px 11px;cursor:pointer;white-space:nowrap;flex:none">Restore</button>`:''}
+            <span class="lib-chevron${isOpen?' open':''}">▾</span>
           </div>
-          <span class="lib-chevron${isOpen?' open':''}">▾</span>
         </div>`;
       if(isOpen){
         const ing=item.ing&&item.ing.length?item.ing:[{n:item.n,p:item.p,c:item.c,f:item.f,k:item.k}];
@@ -5486,6 +5494,32 @@ function libSaveAsNew(id){
   setTimeout(()=>libUpdateTotals(newItem.id),0);
 }
 
+// Swipe-left (or the row's archive gesture) moves a food to the Archived tab.
+function libArchive(id){
+  const lib=getLib();const it=lib.find(x=>x.id===id);if(!it||it.cat==='archived')return;
+  it.acat=it.cat||'custom'; it.cat='archived'; it.updated=Date.now();
+  putLib(lib);try{fbSyncSettings();}catch(e){}
+  if(_libExpandedId===id)_libExpandedId=null;
+  rFood();
+  if(typeof showToast==='function')showToast('Archived — find it in the Archived tab');
+}
+function libRestore(id){
+  const lib=getLib();const it=lib.find(x=>x.id===id);if(!it)return;
+  it.cat=it.acat||'custom'; delete it.acat; it.updated=Date.now();
+  putLib(lib);try{fbSyncSettings();}catch(e){}
+  rFood();
+  if(typeof showToast==='function')showToast('Restored to your library');
+}
+// Bind once to the library container; uses delegation so it survives re-renders.
+function _libSwipeInit(){
+  const wrap=document.getElementById('food-lib-wrap');
+  if(!wrap||wrap._libSwBound)return;
+  wrap._libSwBound=true;
+  let fg=null,x0=0,dx=0,moved=false;
+  wrap.addEventListener('touchstart',e=>{ fg=e.target.closest('.lib-swrow-fg'); if(fg){x0=e.touches[0].clientX;dx=0;moved=false;fg.style.transition='';} },{passive:true});
+  wrap.addEventListener('touchmove',e=>{ if(!fg)return; dx=e.touches[0].clientX-x0; if(dx<0){moved=true;fg.style.transform='translateX('+Math.max(dx,-116)+'px)';} },{passive:true});
+  wrap.addEventListener('touchend',()=>{ if(!fg)return; const el=fg,sid=el.dataset.sid; fg=null; el.style.transition='transform .2s ease'; if(dx<-64){ el.style.transform='translateX(-100%)'; setTimeout(()=>libArchive(sid),160);} else { el.style.transform='translateX(0)'; } });
+}
 function libDelete(id){
   if(!confirm('Remove this item from your library?'))return;
   const lib=getLib().filter(x=>x.id!==id);
@@ -8956,7 +8990,7 @@ async function logMealBuilder(){
   }
   try{syncToSheets(log);}catch(e){}
   try{fbSyncFoodLog(today,log);}catch(e){}
-  saveToLib({n:name,e:'🥗',cat:'custom',p:Math.round(t.p*10)/10,c:Math.round(t.c*10)/10,f:Math.round(t.f*10)/10,k:Math.round(t.k),source:'builder'});
+  saveToLib({n:name,e:'🥗',cat:guessFoodCat(name,new Date().getHours()),p:Math.round(t.p*10)/10,c:Math.round(t.c*10)/10,f:Math.round(t.f*10)/10,k:Math.round(t.k),source:'builder'});
   viewDate=today;
   closeFood();rFood();
   if(curPage==='today')rToday();
