@@ -7519,7 +7519,7 @@ const WIZ_STEPS=[
    fields:[
     {k:'wake',label:'Wake up',def:'07:00',head:'Weekdays'},
     {k:'breakfast',label:'Breakfast',def:'07:30'},
-    {k:'workout',label:'Workout',def:''},
+    {k:'workout',label:'Workout (usual time)',def:''},
     {k:'lunch',label:'Lunch',def:'12:30'},
     {k:'dinner',label:'Dinner',def:'18:30'},
     {k:'bed',label:'Bedtime',def:'22:00'},
@@ -7527,13 +7527,7 @@ const WIZ_STEPS=[
     {k:'bedWeekend',label:'Bedtime',def:''}
    ]},
   // 8: Days per week
-  {type:'tiles',key:'days',title:'How many days per week?',sub:'Pick what you can realistically commit to.',icon:'📅',
-   tiles:[
-    {val:3,em:'3',label:'Days',sub:'Great for beginners'},
-    {val:4,em:'4',label:'Days',sub:'Solid balance'},
-    {val:5,em:'5',label:'Days',sub:'High frequency'},
-    {val:6,em:'6',label:'Days',sub:'Max volume'},
-  ]},
+  {type:'daypicker',key:'dayList',title:'Which days will you train?',sub:'Tap the days you want to work out — the rest become your recovery days. You can move these anytime later.',icon:'📅'},
   // 7: Diet
   {type:'tiles',key:'diet',title:'Any diet preference?',sub:'This shapes your macro targets.',icon:'🥗',
    tiles:[
@@ -7729,6 +7723,25 @@ function renderWizStep(s){
         </div>`).join('')}
       </div>`;
   }
+  if(s.type==='daypicker'){
+    // Seed the selection: saved profile → current custom schedule → sensible default.
+    if(!Array.isArray(_wiz.profile.dayList)){
+      let init=[];
+      try{const cw=JSON.parse(lsGet('_customWorkouts','{}')||'{}');init=Object.keys(cw).map(Number).filter(n=>!isNaN(n)&&n>=0&&n<=6);}catch(e){}
+      if(!init.length)init=[1,2,4,5];
+      _wiz.profile.dayList=init.sort((a,b)=>a-b);
+      _wiz.profile.days=init.length;
+    }
+    const sel=_wiz.profile.dayList;
+    const DNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const n=sel.length, rest=7-n;
+    return `<div class="wiz-title">${s.title}</div>
+      <div class="wiz-sub">${s.sub}</div>
+      <div style="display:flex;gap:6px;justify-content:space-between;margin:6px 0 16px">
+        ${DNAMES.map((nm,d)=>{const on=sel.includes(d);return `<div onclick="wizToggleDay(${d})" style="flex:1;text-align:center;padding:13px 0;border-radius:12px;cursor:pointer;font-size:13px;font-weight:700;border:2px solid ${on?'var(--green)':'var(--border)'};background:${on?'var(--green)':'var(--surface2)'};color:${on?'#fff':'var(--sub)'};transition:all .15s;user-select:none">${nm}</div>`;}).join('')}
+      </div>
+      <div style="text-align:center;font-size:13px;color:var(--sub)">${n?`<b style="color:var(--text)">${n}</b> training day${n>1?'s':''} · <b style="color:var(--text)">${rest}</b> rest day${rest!==1?'s':''} each week`:'Tap at least one day to continue'}</div>`;
+  }
   if(s.type==='times'){
     if(!_wiz.profile.times)_wiz.profile.times={};
     s.fields.forEach(f=>{ if(_wiz.profile.times[f.k]===undefined && f.def) _wiz.profile.times[f.k]=f.def; });
@@ -7870,6 +7883,8 @@ function wizUpdateNext(){
     ok=!!_wiz.profile[s.key];
   }else if(s.type==='tiles'){
     ok=_wiz.profile[s.key]!==undefined&&_wiz.profile[s.key]!==null;
+  }else if(s.type==='daypicker'){
+    ok=Array.isArray(_wiz.profile.dayList)&&_wiz.profile.dayList.length>0;
   }else if(s.type==='multi'){
     ok=(_wiz.profile[s.key]||[]).length>0;
   }
@@ -7881,6 +7896,15 @@ function wizSel(key,val){
   renderWiz();
 }
 
+function wizToggleDay(d){
+  if(!Array.isArray(_wiz.profile.dayList))_wiz.profile.dayList=[];
+  const arr=_wiz.profile.dayList;
+  const i=arr.indexOf(d);
+  if(i>=0)arr.splice(i,1);else arr.push(d);
+  arr.sort((a,b)=>a-b);
+  _wiz.profile.days=arr.length; // keep count in sync for volume math
+  renderWiz();
+}
 function wizToggle(key,val){
   if(!Array.isArray(_wiz.profile[key]))_wiz.profile[key]=(key==='equipment'&&_wiz.profile[key])?_equipPrefs({equipment:_wiz.profile[key]}).list:[];
   const arr=_wiz.profile[key];
@@ -8122,8 +8146,13 @@ function buildPersonalizedPlan(p){
   }
 
   // ── Assign session types to day-of-week slots ─────────────────────────────
-  const daySlots={2:[1,4],3:[1,3,5],4:[1,2,4,5],5:[1,2,3,4,5],6:[1,2,3,4,5,6]}
-    [Math.min(6,Math.max(2,days))]||[1,2,4,5];
+  // Honor the user's explicitly chosen training days when present; otherwise
+  // fall back to sensible defaults based on how many days they train.
+  const _picked=(Array.isArray(p.dayList)&&p.dayList.length)
+    ? p.dayList.slice().map(Number).filter(n=>!isNaN(n)&&n>=0&&n<=6).sort((a,b)=>a-b)
+    : null;
+  const daySlots=_picked||({2:[1,4],3:[1,3,5],4:[1,2,4,5],5:[1,2,3,4,5],6:[1,2,3,4,5,6]}
+    [Math.min(6,Math.max(2,days))]||[1,2,4,5]);
   const typeOrder=_buildTypeOrder(nS,nH,nZ,nY,nM,days);
 
   // ── Pick strength sessions from the curated library ───────────────────────
@@ -11595,7 +11624,12 @@ function _buildRoutineFromTimes(tm,tr){
   add(tm.wake,'Drink 16 oz of water','Before coffee — rehydrate first');
   add(_addMin(tm.wake,15),'10 minutes of outdoor sunlight','Within an hour of waking, no sunglasses');
   add(tm.breakfast,'Breakfast — anchor with 30g+ protein','Steady morning energy starts here');
-  if(tr && tm.workout){ add(_addMin(tm.workout,-15),'Warm up — 5–10 min mobility','Prime the joints before lifting'); add(tm.workout,'Workout',''); }
+  if(tr && tm.workout){
+    add(_addMin(tm.workout,-90),'Pre-workout fuel — carbs + a little protein','~90 min before training for steady energy and to protect muscle');
+    add(_addMin(tm.workout,-15),'Warm up — 5–10 min mobility','Prime the joints before lifting');
+    add(tm.workout,'Workout','');
+    add(_addMin(tm.workout,30),'Post-workout protein — 30g+','Within ~45 min of finishing to kickstart recovery');
+  }
   add(tm.lunch,'Lunch — protein-forward','Notice how you feel 90 minutes after');
   add(_addMin(tm.lunch,180),'Short walk + water','Beat the afternoon dip without more caffeine');
   add(tm.dinner,'Dinner — last full meal','Give digestion time before bed');

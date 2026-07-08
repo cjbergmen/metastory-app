@@ -1,4 +1,4 @@
-const VERSION = '20260708-macros-weekend1';
+const VERSION = '20260708-daypicker1';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
