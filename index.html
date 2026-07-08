@@ -2736,6 +2736,14 @@ function render(p){
   else if(p==='journal')rJournal();
 }
 function refresh(){render(curPage)}
+  // Re-render the current tab whenever the app becomes visible again, so time-of-day
+  // content (Rest tab prayer suggestion, greetings, etc) never goes stale after the
+  // app sits backgrounded overnight.
+  document.addEventListener('visibilitychange',function(){
+      if(!document.hidden){
+            try{refresh();}catch(e){}
+      }
+  });
 
 // ── DATE NAV ──────────────────────────────────────────────────────────────────
 const _D=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
