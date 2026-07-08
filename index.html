@@ -67,6 +67,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .ps-ctrl{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--surface2);border:1.5px solid var(--border);border-radius:12px;padding:10px 4px;cursor:pointer;font-size:11px;font-weight:700;color:var(--text)}
 .ps-ctrl.act{border-color:var(--green);color:var(--green);background:rgba(171,108,82,.12)}
 .ps-ctrl svg{width:18px;height:18px}
+#ps-play svg{width:28px;height:28px;display:block}
 .card{background:var(--surface);border-radius:var(--r);padding:14px;margin-bottom:11px;border:0.5px solid var(--border);box-shadow:var(--card-shadow)}
 .ct{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.08em;color:var(--sub);margin-bottom:9px;font-family:var(--font-sans)}
 .disp{font-family:var(--font-serif);font-weight:400}
@@ -9705,7 +9706,8 @@ function musRow(i){if(_mus.idx===i){musToggle();}else{musPlay(i);}}
 function musToggle(){
   const a=_musCur();
   if(_mus.idx<0){musPlay(0);return;}
-  if(a.paused)a.play().catch(function(){});else a.pause();
+  if(a.paused){a.play().catch(function(){});_mus.playing=true;}else{a.pause();_mus.playing=false;}
+  try{_musPaint();}catch(e){}
 }
 function musNext(){if(_mus.idx<0){musPlay(0);return;}musPlay(_musPickNext());}
 function musPrev(){if(_mus.idx<0){musPlay(0);return;}musPlay((_mus.idx-1+MUSIC_ALBUM.tracks.length)%MUSIC_ALBUM.tracks.length);}
@@ -10092,6 +10094,24 @@ function _ensurePlayerSheet(){
   d.id='player-sheet';
   d.innerHTML='<div id="ps-backdrop" onclick="playerSheetClose()"></div><div id="ps-panel"><div id="ps-grip" onclick="playerSheetClose()"></div><div id="ps-body"></div></div>';
   document.body.appendChild(d);
+  // Swipe the panel down to collapse
+  const panel=d.querySelector('#ps-panel');
+  let _sy=0,_dy=0,_drag=false;
+  panel.addEventListener('touchstart',function(e){
+    if(e.target.closest&&e.target.closest('#ps-seek'))return; // don't hijack the seek slider
+    _sy=e.touches[0].clientY;_dy=0;_drag=true;panel.style.transition='none';
+  },{passive:true});
+  panel.addEventListener('touchmove',function(e){
+    if(!_drag)return;
+    _dy=e.touches[0].clientY-_sy;
+    if(_dy>0)panel.style.transform='translateY('+_dy+'px)';
+  },{passive:true});
+  const _end=function(){
+    if(!_drag)return;_drag=false;panel.style.transition='';panel.style.transform='';
+    if(_dy>70)playerSheetClose();
+  };
+  panel.addEventListener('touchend',_end,{passive:true});
+  panel.addEventListener('touchcancel',_end,{passive:true});
 }
 function _playerSheetRender(){
   const p=document.getElementById('ps-body'); if(!p)return;
@@ -10109,7 +10129,7 @@ function _playerSheetRender(){
     +'</div>'
     +'<div style="display:flex;align-items:center;justify-content:center;gap:30px;margin:10px 0 18px">'
     +'<button class="mp-b2" onclick="musPrev()" aria-label="Previous track">'+_PS_ICONS.prev+'</button>'
-    +'<button id="ps-play" onclick="musToggle()" aria-label="Play or pause" style="width:58px;height:58px;border-radius:50%;border:none;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer">'+(_mus.playing?_PS_ICONS.pause:_PS_ICONS.play)+'</button>'
+    +'<button id="ps-play" onclick="musToggle()" aria-label="Play or pause" style="width:58px;height:58px;border-radius:50%;border:none;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer">'+(((a&&!a.paused)||(!a&&_mus.playing))?_PS_ICONS.pause:_PS_ICONS.play)+'</button>'
     +'<button class="mp-b2" onclick="musNext()" aria-label="Next track">'+_PS_ICONS.next+'</button>'
     +'</div>'
     +'<div style="display:flex;gap:8px">'
