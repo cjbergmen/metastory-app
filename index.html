@@ -9336,7 +9336,7 @@ async function journalSummarize(){
   try{
     const res=await fetch(GEMINI_WORKER_URL+'/gemini-2.5-flash',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.7,maxOutputTokens:700}})
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.7,maxOutputTokens:1024,thinkingConfig:{thinkingBudget:0}}})
     });
     const data=await res.json();
     let txt=(((((data||{}).candidates||[])[0]||{}).content||{}).parts||[])[0];
