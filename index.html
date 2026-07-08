@@ -55,6 +55,18 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 #mp-meta{flex:1;min-width:0;cursor:pointer}
 #mp-title{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--font-sans)}
 #mp-sub{font-size:10.5px;color:rgba(255,255,255,.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+#player-sheet{position:fixed;inset:0;z-index:10050;display:none}
+#player-sheet.on{display:block}
+#ps-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.45);opacity:0;transition:opacity .28s}
+#player-sheet.on #ps-backdrop{opacity:1}
+#ps-panel{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:20px 20px 0 0;padding:8px 20px calc(var(--sb) + 22px);box-shadow:0 -6px 26px rgba(0,0,0,.24);transform:translateY(101%);transition:transform .3s cubic-bezier(.22,.61,.36,1)}
+#player-sheet.on #ps-panel{transform:translateY(0)}
+#ps-grip{width:38px;height:4px;border-radius:3px;background:var(--border);margin:2px auto 12px;cursor:pointer}
+.mp-b2{background:none;border:none;color:var(--text);cursor:pointer;padding:6px;display:flex;align-items:center;justify-content:center}
+.mp-b2 svg{width:26px;height:26px}
+.ps-ctrl{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--surface2);border:1.5px solid var(--border);border-radius:12px;padding:10px 4px;cursor:pointer;font-size:11px;font-weight:700;color:var(--text)}
+.ps-ctrl.act{border-color:var(--green);color:var(--green);background:rgba(171,108,82,.12)}
+.ps-ctrl svg{width:18px;height:18px}
 .card{background:var(--surface);border-radius:var(--r);padding:14px;margin-bottom:11px;border:0.5px solid var(--border);box-shadow:var(--card-shadow)}
 .ct{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.08em;color:var(--sub);margin-bottom:9px;font-family:var(--font-sans)}
 .disp{font-family:var(--font-serif);font-weight:400}
@@ -559,7 +571,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     <button class="mp-b" id="mp-play" onclick="musToggle()" aria-label="Play or pause">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
     </button>
-    <div id="mp-meta" onclick="goPage('rest')">
+    <div id="mp-meta" onclick="playerSheetToggle()">
       <div id="mp-title"></div>
       <div id="mp-sub">Ventrality · Safe Inside</div>
     </div>
@@ -9558,7 +9570,18 @@ const MUSIC_ALBUM={title:'Safe Inside',artist:'Ventrality',dir:'audio/safe-insid
   {t:'Nothing Is Required',f:'nothing-is-required.mp3',hint:'Nothing to do here — just listen.'},
   {t:'Still Here',f:'still-here.mp3',hint:'A gentle close — stay a moment after it ends.'}
 ]};
-let _mus={a:null,b:null,useB:false,idx:-1,playing:false,accMs:0,lastTick:0,repeat:'all',timerEnd:0,timerMin:0,timerEOT:false,_fade:null};
+let _mus={a:null,b:null,useB:false,idx:-1,playing:false,accMs:0,lastTick:0,repeat:'all',shuffle:false,timerEnd:0,timerMin:0,timerEOT:false,_fade:null};
+function _musPickNext(){
+  const n=MUSIC_ALBUM.tracks.length;
+  if(_mus.shuffle&&n>1){let r;do{r=Math.floor(Math.random()*n);}while(r===_mus.idx);return r;}
+  return (_mus.idx+1)%n;
+}
+function musShuffleToggle(){
+  _mus.shuffle=!_mus.shuffle;
+  try{showToast(_mus.shuffle?'Shuffle on':'Shuffle off');}catch(e){}
+  try{_playerSheetSync();}catch(e){}
+  if(typeof curPage!=='undefined'&&curPage==='rest')rRest();
+}
 function _musWire(el){
   el.preload='none';
   el.addEventListener('ended',function(){
@@ -9684,7 +9707,7 @@ function musToggle(){
   if(_mus.idx<0){musPlay(0);return;}
   if(a.paused)a.play().catch(function(){});else a.pause();
 }
-function musNext(){if(_mus.idx<0){musPlay(0);return;}musPlay((_mus.idx+1)%MUSIC_ALBUM.tracks.length);}
+function musNext(){if(_mus.idx<0){musPlay(0);return;}musPlay(_musPickNext());}
 function musPrev(){if(_mus.idx<0){musPlay(0);return;}musPlay((_mus.idx-1+MUSIC_ALBUM.tracks.length)%MUSIC_ALBUM.tracks.length);}
 function musClose(){
   const a=_musEl();
@@ -9697,6 +9720,7 @@ function musClose(){
   try{a.volume=1;}catch(e){}
   try{if(_flt.ctx&&_flt.gain){_flt.gain.gain.cancelScheduledValues(_flt.ctx.currentTime);_flt.gain.gain.setValueAtTime(1,_flt.ctx.currentTime);}}catch(e){}
   _mus.idx=-1;_mus.playing=false;
+  try{playerSheetClose();}catch(e){}
   _musPaint();
   if(typeof curPage!=='undefined'&&curPage==='rest')rRest();
 }
@@ -9792,6 +9816,8 @@ function fltToggle(){
   try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}
   _fltApply();
   showToast(_fltIsOn()?'Filtration on — prosody band emphasized':'Filtration off — original mix');
+  try{_playerSheetSync();}catch(e){}
+  if(typeof curPage!=='undefined'&&curPage==='rest')rRest();
 }
 function _specLoop(){
   _specRaf=requestAnimationFrame(_specLoop);
@@ -9846,6 +9872,7 @@ function _musTimerCheck(){
 function musRepeatCycle(){
   _mus.repeat=_mus.repeat==='all'?'one':_mus.repeat==='one'?'off':'all';
   showToast(_mus.repeat==='all'?'Repeating the album':_mus.repeat==='one'?'Repeating this track':'Album plays through once');
+  try{_playerSheetSync();}catch(e){}
   if(typeof curPage!=='undefined'&&curPage==='rest')rRest();
 }
 function _musFmt(s){s=Math.max(0,Math.floor(s||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
@@ -10024,6 +10051,9 @@ function _musPaint(){
       if(pb)pb.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">'+(_mus.playing?'<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>':'<path d="M7 4l13 8-13 8V4z"/>')+'</svg>';
     }
   }
+  const psp=document.getElementById('ps-play');
+  if(psp)psp.innerHTML=_mus.playing?_PS_ICONS.pause:_PS_ICONS.play;
+  const pst=document.getElementById('ps-title');if(pst&&tr)pst.textContent=tr.t;
 }
 function _musProg(){
   const f=document.getElementById('mp-fill');if(!f)return;
@@ -10041,7 +10071,64 @@ function _musProg(){
   if(sl&&a&&a.duration>0)sl.value=Math.round(a.currentTime/a.duration*1000);
   const te=document.getElementById('mus-time-el');if(te&&a)te.textContent=_musFmt(a.currentTime);
   const td=document.getElementById('mus-time-dur');if(td&&a&&a.duration>0)td.textContent=_musFmt(a.duration);
+  const psl=document.getElementById('ps-seek');
+  if(psl&&a&&a.duration>0&&document.activeElement!==psl)psl.value=Math.round(a.currentTime/a.duration*1000);
+  const pte=document.getElementById('ps-time-el');if(pte&&a)pte.textContent=_musFmt(a.currentTime);
+  const ptd=document.getElementById('ps-time-dur');if(ptd&&a&&a.duration>0)ptd.textContent=_musFmt(a.duration);
 }
+// ── Expandable player bottom-sheet (works on any page + over overlays) ──
+const _PS_ICONS={
+  play:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8V4z"/></svg>',
+  pause:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>',
+  prev:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h2v16H6zM20 4L10 12l10 8V4z"/></svg>',
+  next:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 4l10 8-10 8V4zM16 4h2v16h-2z"/></svg>',
+  repeat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
+  shuffle:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M21 3l-8 8"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M3 4l6 6"/><path d="M9 15l-6 6"/></svg>',
+  filter:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>'
+};
+function _ensurePlayerSheet(){
+  if(document.getElementById('player-sheet'))return;
+  const d=document.createElement('div');
+  d.id='player-sheet';
+  d.innerHTML='<div id="ps-backdrop" onclick="playerSheetClose()"></div><div id="ps-panel"><div id="ps-grip" onclick="playerSheetClose()"></div><div id="ps-body"></div></div>';
+  document.body.appendChild(d);
+}
+function _playerSheetRender(){
+  const p=document.getElementById('ps-body'); if(!p)return;
+  const tr=(_mus.idx>=0)?MUSIC_ALBUM.tracks[_mus.idx]:null;
+  const a=_musCur();
+  const repLbl=_mus.repeat==='one'?'Repeat one':_mus.repeat==='off'?'Repeat off':'Repeat all';
+  const pos=(a&&a.duration>0)?Math.round(a.currentTime/a.duration*1000):0;
+  p.innerHTML=
+    '<div style="text-align:center;margin-bottom:2px"><div id="ps-title" style="font-family:var(--font-serif);font-size:21px;font-weight:600;line-height:1.15">'+(tr?tr.t:'Safe Inside')+'</div>'
+    +'<div style="font-size:11.5px;color:var(--sub);margin-top:3px">Ventrality · Safe Inside</div></div>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin:14px 0 2px">'
+    +'<span id="ps-time-el" style="font-size:10.5px;color:var(--sub);min-width:32px">'+_musFmt(a?a.currentTime:0)+'</span>'
+    +'<input type="range" id="ps-seek" min="0" max="1000" value="'+pos+'" oninput="musSeek(this.value)" style="flex:1">'
+    +'<span id="ps-time-dur" style="font-size:10.5px;color:var(--sub);min-width:32px;text-align:right">'+_musFmt((a&&a.duration>0)?a.duration:0)+'</span>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;justify-content:center;gap:30px;margin:10px 0 18px">'
+    +'<button class="mp-b2" onclick="musPrev()" aria-label="Previous track">'+_PS_ICONS.prev+'</button>'
+    +'<button id="ps-play" onclick="musToggle()" aria-label="Play or pause" style="width:58px;height:58px;border-radius:50%;border:none;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer">'+(_mus.playing?_PS_ICONS.pause:_PS_ICONS.play)+'</button>'
+    +'<button class="mp-b2" onclick="musNext()" aria-label="Next track">'+_PS_ICONS.next+'</button>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button class="ps-ctrl'+(_mus.repeat!=='off'?' act':'')+'" onclick="musRepeatCycle()">'+_PS_ICONS.repeat+'<span>'+repLbl+'</span></button>'
+    +'<button class="ps-ctrl'+(_mus.shuffle?' act':'')+'" onclick="musShuffleToggle()">'+_PS_ICONS.shuffle+'<span>Shuffle</span></button>'
+    +'<button class="ps-ctrl'+(_fltIsOn()?' act':'')+'" onclick="fltToggle()">'+_PS_ICONS.filter+'<span>Filter '+(_fltIsOn()?'on':'off')+'</span></button>'
+    +'</div>';
+}
+function playerSheetToggle(){
+  const el=document.getElementById('player-sheet');
+  if(el&&el.classList.contains('on')){playerSheetClose();return;}
+  if(_mus.idx<0){try{musPlay(0);}catch(e){}}
+  _ensurePlayerSheet();
+  _playerSheetRender();
+  const s=document.getElementById('player-sheet');
+  requestAnimationFrame(function(){s.classList.add('on');});
+}
+function playerSheetClose(){const el=document.getElementById('player-sheet');if(el)el.classList.remove('on');}
+function _playerSheetSync(){const el=document.getElementById('player-sheet');if(el&&el.classList.contains('on'))_playerSheetRender();}
 function _musicCardHTML(){
   let rows='';
   MUSIC_ALBUM.tracks.forEach(function(tr,i){
@@ -10394,15 +10481,18 @@ function openPrayer(slot){
     <div id="prayer-dark" style="position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .55s"></div>
     <div id="pr-ring" style="position:absolute;top:44px;left:50%;transform:translateX(-50%);width:116px;height:116px;pointer-events:none;z-index:4;transition:opacity .2s ease"><div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.5);animation:prBreathe 11s ease-in-out infinite"></div><div style="position:absolute;inset:15px;border-radius:50%;border:1px solid rgba(255,255,255,.28);animation:prBreathe 11s ease-in-out infinite"></div></div>
     <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:rgba(255,255,255,.16);z-index:5"><div id="pr-progress" style="position:absolute;left:0;top:0;width:100%;height:0;background:rgba(255,255,255,.85);transition:height .55s ease"></div></div>
-    <div id="ov-mus" style="position:absolute;top:14px;right:14px;z-index:7;display:none;align-items:center;gap:8px;background:rgba(0,0,0,.30);border:1px solid rgba(255,255,255,.28);border-radius:22px;padding:5px 12px 5px 5px;max-width:58%">
-      <button id="ov-mus-play" onclick="musToggle()" aria-label="Play or pause music" style="flex:none;width:28px;height:28px;border-radius:50%;border:none;background:rgba(255,255,255,.92);color:#222;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0"></button>
-      <span id="ov-mus-title" style="font-family:var(--font-sans);font-size:11.5px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
-    </div>
     <div id="prayer-stage" style="position:absolute;inset:0">${panels}</div>
-    <div style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;padding:16px 22px 30px;z-index:6">
-      <button onclick="prayerMenu()" aria-label="Prayer times menu" style="background:none;border:none;color:#fff;cursor:pointer;flex:none;display:flex;align-items:center;padding:4px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-      <div id="pr-dots" style="flex:1;display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap"></div>
-      <button id="pr-finish" onclick="completePrayer(_prayerSlot)" aria-label="Complete" style="flex:none;width:30px;height:30px;border-radius:50%;border:none;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;cursor:pointer;visibility:hidden"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#222" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+    <div style="position:absolute;left:0;right:0;bottom:0;z-index:6">
+      <div id="ov-mus" onclick="playerSheetToggle()" style="display:none;align-items:center;gap:10px;margin:0 16px 8px;background:rgba(0,0,0,.34);border:1px solid rgba(255,255,255,.28);border-radius:22px;padding:6px 12px 6px 6px;cursor:pointer">
+        <button id="ov-mus-play" onclick="event.stopPropagation();musToggle()" aria-label="Play or pause music" style="flex:none;width:30px;height:30px;border-radius:50%;border:none;background:rgba(255,255,255,.92);color:#222;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0"></button>
+        <span id="ov-mus-title" style="flex:1;min-width:0;font-family:var(--font-sans);font-size:12px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
+        <span aria-hidden="true" style="flex:none;color:rgba(255,255,255,.7);display:flex"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;padding:0 22px 30px">
+        <button onclick="prayerMenu()" aria-label="Prayer times menu" style="background:none;border:none;color:#fff;cursor:pointer;flex:none;display:flex;align-items:center;padding:4px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        <div id="pr-dots" style="flex:1;display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap"></div>
+        <button id="pr-finish" onclick="completePrayer(_prayerSlot)" aria-label="Complete" style="flex:none;width:30px;height:30px;border-radius:50%;border:none;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;cursor:pointer;visibility:hidden"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#222" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+      </div>
     </div>`;
   document.body.appendChild(ov);
   document.body.style.overflow='hidden';
@@ -10575,7 +10665,7 @@ function openPractice(id){
     <div style="position:absolute;left:0;right:0;bottom:0;z-index:6">
       <div id="ov-mus" style="display:none;align-items:center;gap:4px;background:rgba(28,32,28,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#fff;padding:9px 12px 9px 8px">
         <button class="mp-b" id="ov-mus-play" onclick="musToggle()" aria-label="Play or pause music"></button>
-        <div style="flex:1;min-width:0">
+        <div style="flex:1;min-width:0;cursor:pointer" onclick="playerSheetToggle()">
           <div id="ov-mus-title" style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--font-sans)"></div>
           <div style="font-size:10.5px;color:rgba(255,255,255,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">Ventrality · Safe Inside</div>
         </div>
