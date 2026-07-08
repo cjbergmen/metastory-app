@@ -2736,14 +2736,6 @@ function render(p){
   else if(p==='journal')rJournal();
 }
 function refresh(){render(curPage)}
-  // Re-render the current tab whenever the app becomes visible again, so time-of-day
-  // content (Rest tab prayer suggestion, greetings, etc) never goes stale after the
-  // app sits backgrounded overnight.
-  document.addEventListener('visibilitychange',function(){
-      if(!document.hidden){
-            try{refresh();}catch(e){}
-      }
-  });
 
 // ── DATE NAV ──────────────────────────────────────────────────────────────────
 const _D=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -2903,6 +2895,7 @@ function _weekSourcePlan(){
             next[nd]=src[k];
       });
       lsSet('_customWorkouts',JSON.stringify(next));
+      try{fbSyncSettings();}catch(e){}
       const m=document.getElementById('_shiftWeekModal');
       if(m)m.remove();
       try{showToast('Week shifted '+(offset>0?offset+' day'+(offset>1?'s':'')+' later':Math.abs(offset)+' day'+(Math.abs(offset)>1?'s':'')+' earlier'));}catch(e){}
@@ -2913,6 +2906,54 @@ function _weekSourcePlan(){
       overlay.id='_shiftWeekModal';
       overlay.className='ov open';
       overlay.innerHTML=`<div class="modal" onclick="event.stopPropagation()"><div class="mh"></div><div class="mt2">Shift Your Week</div><p style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:14px">Can't train on the usual day? Move your whole week's plan earlier or later — every workout keeps its place in the order, it just lands on different days.</p><div style="display:flex;gap:8px;margin-bottom:14px"><button class="btn btn-s" style="flex:1" onclick="_shiftWeekPlan(-1)">◀ 1 day earlier</button><button class="btn btn-s" style="flex:1" onclick="_shiftWeekPlan(1)">1 day later ▶</button></div><div class="kicker" style="margin-bottom:8px">Or shift by any amount</div><div style="display:flex;gap:6px;flex-wrap:wrap">${[-3,-2,-1,1,2,3].map(function(n){return '<button class="wo-chip" onclick="_shiftWeekPlan('+n+')">'+(n>0?'+'+n:n)+' day'+(Math.abs(n)>1?'s':'')+'</button>';}).join('')}</div></div>`;
+      overlay.addEventListener('click',function(){overlay.remove();});
+      document.body.appendChild(overlay);
+  }
+  // Move ONE day's workout to another day (target occupied → the two days swap)
+  function _moveDayPlan(from,to){
+      from=Number(from); to=Number(to);
+      const m=document.getElementById('_moveDayModal');
+      if(isNaN(from)||isNaN(to)){ if(m)m.remove(); return; }
+      if(from===to){ if(m)m.remove(); try{showToast('Pick a different day');}catch(e){} return; }
+      const src=_weekSourcePlan();
+      // Materialize the full active week so the move persists and no day falls back to defaults
+      const next={};
+      Object.keys(src).forEach(function(k){
+            const d=Number(k);
+            if(!isNaN(d)&&src[k])next[d]=JSON.parse(JSON.stringify(src[k]));
+      });
+      const moving=next[from];
+      if(!moving){ if(m)m.remove(); try{showToast('No workout on that day');}catch(e){} return; }
+      let swapped=false;
+      if(next[to]){
+            const tmp=next[to];
+            next[to]=moving;
+            next[from]=tmp;
+            swapped=true;
+      } else {
+            next[to]=moving;
+            delete next[from];
+      }
+      lsSet('_customWorkouts',JSON.stringify(next));
+      try{fbSyncSettings();}catch(e){}
+      if(m)m.remove();
+      const dn=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      try{showToast(swapped?(dn[from]+' ↔ '+dn[to]+' swapped'):((moving.name||'Workout')+' moved to '+dn[to]));}catch(e){}
+      try{if(typeof rWorkout==='function')rWorkout();}catch(e){}
+  }
+  function openMoveDay(){
+      const src=_weekSourcePlan();
+      const dn=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const active=Object.keys(src).map(Number).filter(function(d){return !isNaN(d)&&src[d];}).sort(function(a,b){return a-b;});
+      if(!active.length){ try{showToast('No workouts to move');}catch(e){} return; }
+      let today=0; try{today=vdDate().getDay();}catch(e){}
+      const defFrom=active.indexOf(today)>=0?today:active[0];
+      const fromOpts=active.map(function(d){return '<option value="'+d+'"'+(d===defFrom?' selected':'')+'>'+dn[d]+' — '+((src[d].name||'Workout'))+'</option>';}).join('');
+      const toOpts=dn.map(function(nm,d){const occ=src[d]?(' — has '+(src[d].name||'workout')):' — rest day';return '<option value="'+d+'"'+(d===defFrom?' disabled':'')+'>'+nm+occ+'</option>';}).join('');
+      const overlay=document.createElement('div');
+      overlay.id='_moveDayModal';
+      overlay.className='ov open';
+      overlay.innerHTML='<div class="modal" onclick="event.stopPropagation()"><div class="mh"></div><div class="mt2">Move a Workout</div><p style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:16px">Move one day\'s session to a different day. If the day you pick already has a workout, the two days trade places.</p><div class="kicker" style="margin-bottom:6px">Move this workout</div><select id="_moveFrom" class="fi">'+fromOpts+'</select><div class="kicker" style="margin:14px 0 6px">To this day</div><select id="_moveTo" class="fi">'+toOpts+'</select><button class="btn btn-o" style="width:100%;margin-top:18px" onclick="_moveDayPlan(document.getElementById(\'_moveFrom\').value,document.getElementById(\'_moveTo\').value)">Move workout</button></div>';
       overlay.addEventListener('click',function(){overlay.remove();});
       document.body.appendChild(overlay);
   }
@@ -2941,7 +2982,7 @@ function rWorkout(){
       <span class="kicker">Today · Recovery</span>
       <h3>Rest day</h3>
       <p>Movement heals only when the body can afford it. Today is for walking, mobility, and contrast therapy — under-recovery is when progress quietly stalls.</p></div>
-      <div class="card"><div style="display:flex;align-items:center;justify-content:space-between"><div class="ct">${splitTitle}</div><span onclick="openShiftWeek()" style="font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer;flex-shrink:0;margin-left:8px">Shift week</span></div>`;
+      <div class="card"><div style="display:flex;align-items:center;justify-content:space-between"><div class="ct">${splitTitle}</div><span style="flex-shrink:0;margin-left:8px;white-space:nowrap"><span onclick="openMoveDay()" style="font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer">Move a day</span><span style="color:var(--sub);opacity:.4;margin:0 7px">·</span><span onclick="openShiftWeek()" style="font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer">Shift week</span></span></div>`;
     activeDays.forEach(d=>{
       const w=weekWO[d];
       if(!w)return;
@@ -2981,6 +3022,7 @@ function rWorkout(){
     </div>`;
   }
   h+=_exHeroBlock(wo);
+  h+=`<div style="display:flex;justify-content:flex-end;align-items:center;gap:0;margin:-4px 3px 8px;white-space:nowrap"><span onclick="openMoveDay()" style="font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer">Move a day</span><span style="color:var(--sub);opacity:.4;margin:0 7px">·</span><span onclick="openShiftWeek()" style="font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer">Shift week</span></div>`;
   if(wo.info){
     const inf=wo.info;
     h+=`<div class="wo-info-wrap" id="wic-today" onclick="flipWOCard('wic-today',event)">
