@@ -3683,7 +3683,7 @@ function _dayFacts(d){
   const key=_dkOf(d);
   const isT=_trainDaySet().includes(d.getDay());
   const tgt=_tgtFor(isT);
-  const f={planned:isT?1:0,woAny:0,logged:0,protHit:0,calOk:0,waterTracked:0,waterMet:0,
+  const f={planned:isT?1:0,woAny:0,logged:0,protHit:0,calOk:0,waterTracked:0,waterMet:0,waterFrac:0,
     ctxGood:0,ctxTot:0,moodReg:0,moodTot:0,pairs:0,improved:0,suppTaken:0,suppSched:0,suppDay:0,ckAny:0,
     restDone:0,restPlanned:0,restAny:0,lisDay:0,lisHit:0,lisMin:0};
   // Workout done = "Mark Complete" flag OR any logged sets (lenient, matches week heatmap)
@@ -3707,7 +3707,7 @@ function _dayFacts(d){
     });
   }
   const w=parseFloat(lsGet('wa_'+key,'0'))||0;
-  if(w>0){f.waterTracked=1;if(w>=(tgt.w||90)*0.8)f.waterMet=1;}
+  if(w>0){f.waterTracked=1;const _wg=(tgt.w||90);f.waterFrac=Math.min(w/_wg,1);if(w>=_wg*0.8)f.waterMet=1;}
   const supps=getSupps();
   if(supps.length){
     let sl=[];try{sl=JSON.parse(lsGet('_supplog_'+key,'[]'))||[];}catch(e){}
@@ -3745,7 +3745,7 @@ const _PROG_SCORERS={
   food:t=>{if(!t.logged)return null;
     const consistency=t.logged/t.n, protein=t.protHit/t.logged, energy=t.calOk/t.logged;
     return Math.round((consistency*0.4+protein*0.4+energy*0.2)*100);},
-  water:t=>t.waterTracked?Math.round(t.waterMet/t.waterTracked*100):null,
+  water:t=>t.waterTracked?Math.round(t.waterFrac/t.waterTracked*100):null,
   ctx:t=>t.ctxTot?Math.round(t.ctxGood/t.ctxTot*100):null,
   mood:t=>{if(!t.moodTot)return null;
     const reg=t.moodReg/t.moodTot;
@@ -3810,7 +3810,7 @@ function computeProgress(days){
   const defs=[
     {id:'workout',label:'Workouts',what:'Workout days vs your planned schedule (logged sets count)'},
     {id:'food',label:'Nutrition',what:'Days logged (40%) + protein goal (40%) + calories in range (20%)'},
-    {id:'water',label:'Hydration',what:'Tracked days where you hit 80%+ of your water goal'},
+    {id:'water',label:'Hydration',what:'How close your logged water got to your daily goal, averaged across logged days'},
     {id:'mood',label:'Mood signal',what:'Meals ending calm, content or energized — plus meals that lifted your mood'},
     {id:'ctx',label:'Mindful eating',what:'Check-ins where you ate relaxed, with people, or unhurried'},
     {id:'supps',label:'Supplements',what:'Scheduled doses you took'},
@@ -3825,7 +3825,7 @@ function computeProgress(days){
     let detail='';
     if(c.id==='workout')detail=cd.score===null?'No activity yet':t.woAny+' workout days vs '+t.planned+' planned in the last '+cd.win+' days';
     else if(c.id==='food')detail=t.logged?t.logged+'/'+cd.win+' days logged · protein goal '+t.protHit+' days · calories in range '+t.calOk+' days':'No meals logged yet';
-    else if(c.id==='water')detail=t.waterTracked?t.waterMet+' of '+t.waterTracked+' tracked days':'No water tracked yet';
+    else if(c.id==='water')detail=t.waterTracked?Math.round(t.waterFrac/t.waterTracked*100)+'% of goal avg · full goal '+t.waterMet+' of '+t.waterTracked+' logged days':'No water tracked yet';
     else if(c.id==='mood')detail=t.moodTot?t.moodReg+'/'+t.moodTot+' meals ended regulated'+(t.improved?' · '+t.improved+' lifted your mood':''):'No mood check-ins yet';
     else if(c.id==='ctx')detail=t.ctxTot?t.ctxGood+' of '+t.ctxTot+' check-ins':'No check-ins yet';
     else if(c.id==='supps')detail=t.suppSched?t.suppTaken+' of '+t.suppSched+' doses':'No supplements set up';
