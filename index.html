@@ -2024,8 +2024,8 @@ function getWeekData(){
     const water=parseFloat(lsGet('wa_'+key,'0'));
     const p=log.reduce((s,e)=>s+(+e.p||0),0);
     const k=log.reduce((s,e)=>s+(+e.k||0),0);
-    const isTr=[1,2,4,5].includes(d.getDay());
-    const _tgt=getTgt();
+    const isTr=_trainDaySet().includes(d.getDay());
+    const _tgt=_tgtFor(isTr);
     result.push({key,label:['Su','Mo','Tu','We','Th','Fr','Sa'][d.getDay()],
       p:Math.round(p),k:Math.round(k),water,
       tgtP:_tgt.p,tgtK:_tgt.k,
@@ -2453,7 +2453,10 @@ function buildExCard(e,idx,num,col,wdone){
 }
 
 function vdDate(){return new Date(viewDate+'T12:00:00')}
-function isTrain(){return[1,2,4,5].includes(vdDate().getDay())}
+// Training day = a day the user actually has a workout scheduled.
+// Follows the user's custom workout days (_trainDaySet), so nutrition
+// targets move with the schedule when workouts are shifted/moved.
+function isTrain(){return _trainDaySet().includes(vdDate().getDay())}
 function flipWOCard(id,e){e.stopPropagation();const el=document.getElementById(id);if(el)el.classList.toggle('flipped');}
 function selectPre(choice){_preChoice=choice;lsSet('_preChoice_'+viewDate,choice||'');rWorkout();}
 function loadPreChoice(){_preChoice=lsGet('_preChoice_'+viewDate,'')||null;}
@@ -2618,7 +2621,11 @@ function saveWorkoutWeek(){
   const d=vdDate().getDay();
   let cw={};
   try{const raw=lsGet('_customWorkouts','');if(raw)cw=JSON.parse(raw);}catch(e){}
-  [1,2,4,5].forEach(day=>{
+  // Iterate the user's actual training days when they have a custom schedule,
+  // so saving the week never re-adds days they've moved away from.
+  const _existing=Object.keys(cw).map(Number).filter(n=>!isNaN(n)&&n>=0&&n<=6);
+  const _days=_existing.length?_existing:[1,2,4,5];
+  _days.forEach(day=>{
     const base=cw[day]||WORKOUTS[day];
     if(!base)return;
     if(day===d){
@@ -2673,11 +2680,11 @@ function getWO(){
   if(custom){
     try{
       const cw=JSON.parse(custom);
-      if(cw&&typeof cw==='object'){
-        const day=cw[d];
-        if(day){
-          return day;
-        }
+      // Once a user has a custom schedule, it's the complete week: a day with
+      // no entry is a rest day. This keeps the workout, the training-day badge,
+      // and the macro targets all in sync when days are shifted or moved.
+      if(cw&&typeof cw==='object'&&Object.keys(cw).length){
+        return cw[d]||null;
       }
     }catch(e){}
   }
@@ -7508,14 +7515,16 @@ const WIZ_STEPS=[
     {val:'variable',em:'🔄',label:'Variable',sub:'Changes nightly'},
   ]},
   // 7c: Daily rhythm — times drive the routine + reminders
-  {type:'times',key:'times',title:'What does your day usually look like?',sub:'Your times shape when reminders appear and build your starting routine. Set what you can — skip the rest.',
+  {type:'times',key:'times',title:'What does your day usually look like?',sub:'Your times shape when reminders appear and build your starting routine. Set your typical weekday, then add your weekend wake/sleep below if they’re different — leave those blank if they’re the same.',
    fields:[
-    {k:'wake',label:'Wake up',def:'07:00'},
+    {k:'wake',label:'Wake up',def:'07:00',head:'Weekdays'},
     {k:'breakfast',label:'Breakfast',def:'07:30'},
     {k:'workout',label:'Workout',def:''},
     {k:'lunch',label:'Lunch',def:'12:30'},
     {k:'dinner',label:'Dinner',def:'18:30'},
-    {k:'bed',label:'Bedtime',def:'22:00'}
+    {k:'bed',label:'Bedtime',def:'22:00'},
+    {k:'wakeWeekend',label:'Wake up',def:'',head:'Weekends (only if different)'},
+    {k:'bedWeekend',label:'Bedtime',def:''}
    ]},
   // 8: Days per week
   {type:'tiles',key:'days',title:'How many days per week?',sub:'Pick what you can realistically commit to.',icon:'📅',
@@ -7727,7 +7736,7 @@ function renderWizStep(s){
     return `<div class="wiz-title">${s.title}</div>
       <div class="wiz-sub">${s.sub}</div>
       <div style="display:flex;flex-direction:column;gap:10px">
-        ${s.fields.map(f=>`<div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1.5px solid var(--border);border-radius:14px;padding:12px 14px">
+        ${s.fields.map(f=>`${f.head?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--sub);margin:10px 2px 0">${f.head}</div>`:''}<div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1.5px solid var(--border);border-radius:14px;padding:12px 14px">
           <span style="font-size:15px;font-weight:600;color:var(--text)">${f.label}</span>
           <input type="time" value="${tv[f.k]||''}" oninput="wizSaveTime('${f.k}',this.value)" style="background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:8px 11px;font-size:16px;color:var(--text);font-family:var(--font-sans);outline:none">
         </div>`).join('')}
@@ -11532,7 +11541,12 @@ function rDressSummary(){
   h+=readCard('Exercise','var(--green)','<path d="M3 12h4l3-7 4 14 3-7h4"/>',reads.exercise,'workout');
   h+=readCard('Stress','var(--purple)','<path d="M5 14c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 9c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 19c2-1.5 4-1.5 6 0s4 1.5 6 0"/>',reads.stress,'recovery');
   h+=readCard('Supplements','var(--green)','<rect x="4" y="9" width="16" height="7" rx="3.5" transform="rotate(-35 12 12.5)"/><path d="M9.5 9.5l5 5.5"/>',reads.supps,'supps');
-  const sleepWin=(tm.bed&&tm.wake)?`${_fmtClock(new Date(0,0,0,+tm.bed.split(':')[0],+tm.bed.split(':')[1]))}–${_fmtClock(new Date(0,0,0,+tm.wake.split(':')[0],+tm.wake.split(':')[1]))}`:'10pm–6am';
+  const _win=(bed,wake)=>`${_fmtClock(new Date(0,0,0,+bed.split(':')[0],+bed.split(':')[1]))}–${_fmtClock(new Date(0,0,0,+wake.split(':')[0],+wake.split(':')[1]))}`;
+  const _wkWin=(tm.bed&&tm.wake)?_win(tm.bed,tm.wake):'10pm–6am';
+  // Weekend times are optional; only show a separate window if they differ.
+  const _weBed=tm.bedWeekend||tm.bed, _weWake=tm.wakeWeekend||tm.wake;
+  const _hasWe=(tm.bedWeekend||tm.wakeWeekend)&&(_weBed!==tm.bed||_weWake!==tm.wake)&&_weBed&&_weWake;
+  const sleepWin=_hasWe?`Weekdays ${_wkWin} · Weekends ${_win(_weBed,_weWake)}`:_wkWin;
   const numRow=(k,v)=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--border);font-size:13px"><span style="color:var(--sub)">${k}</span><span style="font-weight:700">${v}</span></div>`;
   h+=`<div class="card"><span class="kicker" style="color:var(--sub)">Your numbers</span><div style="margin-top:4px">
     ${numRow('Protein target',(t.p||'—')+'g/day')}
