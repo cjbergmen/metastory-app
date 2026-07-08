@@ -10125,7 +10125,8 @@ function playerSheetToggle(){
   _ensurePlayerSheet();
   _playerSheetRender();
   const s=document.getElementById('player-sheet');
-  requestAnimationFrame(function(){s.classList.add('on');});
+  void s.offsetHeight; // force reflow so the slide-up transition runs reliably (rAF is throttled in background tabs)
+  s.classList.add('on');
 }
 function playerSheetClose(){const el=document.getElementById('player-sheet');if(el)el.classList.remove('on');}
 function _playerSheetSync(){const el=document.getElementById('player-sheet');if(el&&el.classList.contains('on'))_playerSheetRender();}
