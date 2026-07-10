@@ -5767,6 +5767,17 @@ function _logFoodByWeight(id){ try{
 function _logWeightPrompt(id){return _logFoodPrompt2(id);}
 function _logFoodPrompt2(id){ try{
   var it=getLib().find(function(x){return x.id===id;}); if(!it) return;
+  _flog={id:id,item:it,mode:(it.perGram?'wt':'serv')};
+  var ov0=document.getElementById('wlog-ov'); if(ov0) ov0.remove();
+  ov0=document.createElement('div'); ov0.id='wlog-ov';
+  ov0.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center';
+  ov0.onclick=function(e){ if(e.target===ov0) ov0.remove(); };
+  document.body.appendChild(ov0);
+  _flogRender();
+  return;
+}catch(e){console.error('logFood sheet',e);} }
+function _logFoodPrompt2_DEAD(id){ try{
+  var it=getLib().find(function(x){return x.id===id;}); if(!it) return;
   var ov=document.getElementById('wlog-ov'); if(ov) ov.remove();
   ov=document.createElement('div'); ov.id='wlog-ov';
   ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center';
@@ -5777,6 +5788,116 @@ function _logFoodPrompt2(id){ try{
   var inp=document.getElementById('wlog-g'); inp.oninput=function(){ _wlogPreview(it); }; inp.onkeydown=function(e){ if(e.key==='Enter') _logFoodByWeight(id); };
   setTimeout(function(){ inp.focus(); },50);
 }catch(e){} }
+// ── Unified food-log sheet: log by servings (×N), weight, or pieces ──────────
+// Amounts scale against the item's reference serving (macros p/c/f/k are "per
+// serving"; servG = grams per serving, servU = pieces per serving). perGram
+// items keep their per-100g convention. State lives in _flog.
+var _flog=null;
+function _flogNum(v){ v=Math.round(v*100)/100; return String(v); }
+function _flogSetMode(m){ if(_flog){ _flog.mode=m; _flogRender(); } }
+function _flogStep(d){ var i=document.getElementById('flog-amt'); if(!i) return; var v=parseFloat(i.value)||0; v=Math.round((v+d)*100)/100; if(v<0)v=0; if(v===0&&d>0)v=1; i.value=v; _flogPreview(); }
+function _flogCalc(){
+  if(!_flog) return null;
+  var it=_flog.item, i=document.getElementById('flog-amt');
+  var v=i?parseFloat(i.value):NaN; if(!v||v<=0) return null;
+  var fac;
+  if(_flog.mode==='serv') fac=v;
+  else if(_flog.mode==='wt') fac=v/(it.perGram?100:(it.servG||100));
+  else if(_flog.mode==='pc'){ if(!(it.servU>0)) return null; fac=it.perGram?((v*((it.servG||0)/it.servU))/100):(v/it.servU); }
+  else return null;
+  if(!isFinite(fac)) return null;
+  return {p:Math.round(it.p*fac*10)/10, c:Math.round(it.c*fac*10)/10, f:Math.round(it.f*fac*10)/10, k:Math.round(it.k*fac), v:v};
+}
+function _flogPreview(){
+  var el=document.getElementById('flog-prev'); if(!el) return;
+  var r=_flogCalc();
+  if(!r){ el.innerHTML='<span style="color:var(--sub,#999)">Enter an amount</span>'; return; }
+  el.innerHTML='<b>'+r.k+' kcal</b> · <span style="color:var(--green,#7a8060)">P '+r.p+'g</span> · <span style="color:var(--orange,#c98a3a)">C '+r.c+'g</span> · <span style="color:var(--blue,#424c57)">F '+r.f+'g</span>';
+}
+function _flogCommit(){
+  if(!_flog) return;
+  var it=_flog.item, r=_flogCalc();
+  if(!r){ var i=document.getElementById('flog-amt'); if(i){ i.style.borderColor='var(--red,#c00)'; i.focus(); } return; }
+  var name=it.n;
+  if(_flog.mode==='serv'){ if(r.v>1) name=_flogNum(r.v)+'× '+it.n; }
+  else if(_flog.mode==='wt') name=it.n+' · '+_flogNum(r.v)+'g';
+  else if(_flog.mode==='pc') name=it.n+' · '+_flogNum(r.v)+' '+(it.unitName||'pc');
+  var entry={name:name, emoji:it.e||'🍽️', p:r.p, c:r.c, f:r.f, k:r.k, qty:r.v, logMode:_flog.mode,
+    ts:Date.now(), t:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})};
+  if(it.cat&&it.cat!=='archived') entry.cat=it.cat;
+  var log=getLog(); log.push(entry); putLog(log);
+  var ov=document.getElementById('wlog-ov'); if(ov) ov.remove();
+  try{ if(typeof closeFood==='function') closeFood(); }catch(e){}
+  try{ rFood(); }catch(e){}
+  try{ if(curPage==='today') rToday(); }catch(e){}
+  if(window.showToast) showToast(name+' logged');
+  setTimeout(function(){ try{ if(window.openMealCheckin) openMealCheckin(); }catch(e){} },300);
+}
+function _flogToggleRef(){ var b=document.getElementById('flog-refbox'); if(b) b.style.display=(b.style.display==='none'?'block':'none'); }
+function _flogSaveRef(){
+  if(!_flog) return;
+  var lib=getLib(), it=lib.find(function(x){return x.id===_flog.id;}); if(!it) return;
+  var g=parseFloat((document.getElementById('flog-ref-g')||{}).value);
+  var u=parseFloat((document.getElementById('flog-ref-u')||{}).value);
+  var nm=(document.getElementById('flog-ref-name')||{}).value||'';
+  if(g>0) it.servG=Math.round(g*100)/100; else delete it.servG;
+  if(u>0) it.servU=Math.round(u*100)/100; else delete it.servU;
+  nm=nm.trim().replace(/[<>]/g,''); if(nm) it.unitName=nm; else delete it.unitName;
+  putLib(lib); try{ if(typeof fbSyncSettings==='function') fbSyncSettings(); }catch(e){}
+  _flog.item=it;
+  if(window.showToast) showToast('Serving size saved');
+  _flogRender();
+}
+function _flogRender(){
+  var ov=document.getElementById('wlog-ov'); if(!ov||!_flog) return;
+  var it=_flog.item, em=it.e||'🍽️';
+  var hasU=(it.servU>0)&&(!it.perGram||it.servG>0);
+  var modes=[]; if(!it.perGram) modes.push(['serv','Servings']); modes.push(['wt','Weight']); if(hasU) modes.push(['pc','Pieces']);
+  if(!modes.some(function(m){return m[0]===_flog.mode;})) _flog.mode=modes[0][0];
+  var sub=it.perGram?('Per 100g · P '+it.p+' · C '+it.c+' · F '+it.f+' · '+it.k+' kcal')
+                    :('Per serving · P '+it.p+' · C '+it.c+' · F '+it.f+' · '+it.k+' kcal');
+  var refparts=[]; if(it.servG) refparts.push(it.servG+'g'); if(it.servU) refparts.push(it.servU+' '+(it.unitName||'pc'));
+  var refline=refparts.length?('<div style="font-size:11px;color:var(--sub,#999);margin-top:3px">1 serving = '+refparts.join(' = ')+'</div>'):'';
+  var seg=modes.map(function(m){ var on=m[0]===_flog.mode;
+    return '<button onclick="_flogSetMode(\''+m[0]+'\')" style="flex:1;padding:9px 4px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;background:'+(on?'var(--blue,#424c57)':'transparent')+';color:'+(on?'#fff':'var(--sub,#888)')+'">'+m[1]+'</button>'; }).join('');
+  var amtVal, suffix, ph, isStep=false;
+  if(_flog.mode==='serv'){ amtVal='1'; suffix='serving'; ph=''; isStep=true; }
+  else if(_flog.mode==='wt'){ amtVal=(it.servG||''); suffix='g'; ph='grams'; }
+  else { amtVal=(it.servU||''); suffix=(it.unitName||'pc'); ph=(it.unitName||'pieces'); }
+  var inputBlock;
+  if(isStep){
+    inputBlock='<div style="display:flex;align-items:center;gap:10px;justify-content:center">'
+      +'<button onclick="_flogStep(-1)" style="width:46px;height:46px;border-radius:10px;border:1px solid var(--border,#ccc);background:transparent;font-size:24px;font-weight:700;color:var(--text,#333);cursor:pointer;line-height:1">−</button>'
+      +'<input id="flog-amt" type="number" inputmode="decimal" value="'+amtVal+'" oninput="_flogPreview()" onkeydown="if(event.key===\'Enter\')_flogCommit()" style="width:92px;font-size:24px;text-align:center;padding:10px;border:1px solid var(--border,#ccc);border-radius:10px;font-family:inherit;box-sizing:border-box">'
+      +'<button onclick="_flogStep(1)" style="width:46px;height:46px;border-radius:10px;border:1px solid var(--border,#ccc);background:transparent;font-size:24px;font-weight:700;color:var(--text,#333);cursor:pointer;line-height:1">+</button>'
+      +'</div>';
+  }else{
+    inputBlock='<div style="display:flex;align-items:center;gap:9px">'
+      +'<input id="flog-amt" type="number" inputmode="decimal" placeholder="'+ph+'" value="'+amtVal+'" oninput="_flogPreview()" onkeydown="if(event.key===\'Enter\')_flogCommit()" style="flex:1;font-size:20px;padding:11px;border:1px solid var(--border,#ccc);border-radius:10px;font-family:inherit;box-sizing:border-box">'
+      +'<span style="font-size:14px;color:var(--sub,#888);font-weight:600;min-width:34px">'+suffix+'</span></div>';
+  }
+  var note='';
+  if(_flog.mode==='wt'&&!it.perGram&&!it.servG) note='<div style="font-size:11px;color:var(--sub,#999);margin-top:7px;line-height:1.45">Scaled as if the saved macros are per 100g. Set a serving size below for exact weight scaling.</div>';
+  var refbox='<div style="margin-top:16px"><button onclick="_flogToggleRef()" style="background:none;border:none;color:var(--sub,#888);font-size:12px;font-weight:600;cursor:pointer;padding:0">⚙️ Set serving size</button>'
+    +'<div id="flog-refbox" style="display:none;margin-top:9px;padding:13px;background:var(--surface2,#f4f4f0);border-radius:10px">'
+    +'<div style="font-size:11px;color:var(--sub,#888);margin-bottom:9px;line-height:1.5">Tell the app what one saved serving equals — then you can log this item by weight or by piece. Leave a field blank if it doesn\'t apply.</div>'
+    +'<div style="display:flex;gap:9px;margin-bottom:9px">'
+    +'<div style="flex:1"><label style="font-size:10px;color:var(--sub,#888);font-weight:600;display:block;margin-bottom:3px">Grams / serving</label><input id="flog-ref-g" type="number" inputmode="decimal" value="'+(it.servG||'')+'" placeholder="e.g. 28" style="width:100%;font-size:15px;padding:8px;border:1px solid var(--border,#ccc);border-radius:8px;box-sizing:border-box"></div>'
+    +'<div style="flex:1"><label style="font-size:10px;color:var(--sub,#888);font-weight:600;display:block;margin-bottom:3px">Pieces / serving</label><input id="flog-ref-u" type="number" inputmode="decimal" value="'+(it.servU||'')+'" placeholder="e.g. 12" style="width:100%;font-size:15px;padding:8px;border:1px solid var(--border,#ccc);border-radius:8px;box-sizing:border-box"></div></div>'
+    +'<div style="margin-bottom:10px"><label style="font-size:10px;color:var(--sub,#888);font-weight:600;display:block;margin-bottom:3px">Piece name (optional)</label><input id="flog-ref-name" value="'+((it.unitName||'').replace(/"/g,'&quot;'))+'" placeholder="e.g. chip" style="width:100%;font-size:15px;padding:8px;border:1px solid var(--border,#ccc);border-radius:8px;box-sizing:border-box"></div>'
+    +'<button onclick="_flogSaveRef()" style="width:100%;padding:10px;border:none;border-radius:8px;background:var(--blue,#424c57);color:#fff;font-size:13px;font-weight:700;cursor:pointer">Save serving size</button></div></div>';
+  ov.innerHTML='<div style="background:var(--surface,#fff);width:100%;max-width:480px;border-radius:18px 18px 0 0;padding:18px 18px 26px;font-family:inherit;max-height:90vh;overflow-y:auto">'
+    +'<div style="font-size:16px;font-weight:700;color:var(--text,#222)">'+em+' '+(it.n||'').replace(/</g,'&lt;')+'</div>'
+    +'<div style="font-size:12px;color:var(--sub,#888);margin-top:3px">'+sub+'</div>'+refline
+    +'<div style="display:flex;gap:4px;background:var(--surface2,#f0f0ec);border-radius:10px;padding:4px;margin:15px 0 15px">'+seg+'</div>'
+    +inputBlock+note
+    +'<div id="flog-prev" style="font-size:14px;color:var(--text,#222);text-align:center;margin:15px 0 4px;min-height:18px"></div>'
+    +'<button onclick="_flogCommit()" style="width:100%;padding:14px;border-radius:10px;border:none;background:var(--green,#b7baa7);color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px">Log it</button>'
+    +refbox
+    +'<button onclick="document.getElementById(\'wlog-ov\').remove()" style="width:100%;padding:11px;margin-top:10px;border-radius:10px;border:1px solid var(--border,#ccc);background:transparent;color:var(--sub,#777);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>'
+    +'</div>';
+  setTimeout(function(){ var i=document.getElementById('flog-amt'); if(i){ i.focus(); if(_flog.mode==='serv'){ try{i.select();}catch(e){} } } _flogPreview(); },60);
+}
 function _logWeightPromptDead(id){ try{
   var it=getLib().find(function(x){return x.id===id;}); if(!it) return;
   var ov=document.getElementById('wlog-ov'); if(ov) ov.remove();
