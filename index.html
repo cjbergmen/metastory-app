@@ -3519,7 +3519,8 @@ function stressOpenInsights(){_assessPage='insights';goPage('assess');}
    blood sugar, workouts, mindful-eating context, mood, polyvagal check-ins,
    wind-down, rest/prayer, bowel, journal) and turns them into a real-time
    read of where stress load is landing across six holistic domains. Fully
-   computed & deterministic — no AI, always available. */
+   computed & deterministic — no AI, always available. Tap any domain for the
+   full breakdown of how its level was scored. */
 const STRESS_LM={
   none: {lbl:'No signal',col:'#b9b3a6',v:0},
   light:{lbl:'Light',    col:'#8fa07e',v:1},
@@ -3561,7 +3562,9 @@ function _pvDysShare(pv){
   let dys=0;pv.arr.forEach(x=>{if(PV_STATES[x.id]&&PV_STATES[x.id].zone==='dysreg')dys+=x.n;});
   return dys/pv.total;
 }
-/* Build the six domain readings from real data. */
+function _fx(label,val){return {label:label,val:val};}
+/* Build the six domain readings from real data. Each carries `detail`
+   {how, factors[]} so tapping the card can explain exactly how it scored. */
 function _stressDomains(dat){
   const {N,t,windDays,bowelEntries,bowelIrr,bsCount,bsHigh,journalDays,pv,profile}=dat;
   const D=[];
@@ -3581,7 +3584,13 @@ function _stressDomains(dat){
     else if(waterMiss>=0.3){drive='Water goal hit '+t.waterMet+'/'+t.waterTracked+' tracked days';phrase='low hydration';lever={label:'One extra glass before noon',why:'Even mild dehydration amplifies everything your body is processing. One earlier glass closes the gap.',page:'water',go:'Log water →'};}
     else if(has){drive='Meals '+t.logged+'/'+N+' days · protein '+t.protHit+'/'+(t.logged||0);phrase='nutrition';lever={label:'Keep the plate steady',why:'Nutrition is holding. Keep protein first and meals regular to protect it.',page:'food',go:'Open Diet →'};}
     else {drive='No meals logged yet';phrase='nutrition';lever={label:'Log today’s first meal',why:'Even one meal begins the nutritional picture — timing, protein, and how you felt after.',page:'food',go:'Log a meal →'};}
-    D.push({id:'nutritional',name:'Nutritional',level:_stressLevel(frac,has),frac,drive,phrase,lever});
+    const detail={how:'Nutritional load weighs four things over the last 7 days: skipped meals and blood-sugar highs count most (both signal glucose stress), then low-protein days and low hydration. More gaps push the level up.',
+      factors:[_fx('Meals logged',(t.logged||0)+' of '+N+' days'),
+        _fx('Protein goal met',t.logged?t.protHit+' of '+t.logged+' logged days':'—'),
+        _fx('Skipped-meal days',skipDays?skipDays+' day'+(skipDays===1?'':'s'):'none'),
+        _fx('Water goal met',t.waterTracked?t.waterMet+' of '+t.waterTracked+' tracked days':'not tracked'),
+        _fx('Blood-sugar highs',bsCount?bsHigh+' of '+bsCount+' readings ≥110':'no readings')]};
+    D.push({id:'nutritional',name:'Nutritional',level:_stressLevel(frac,has),frac,drive,phrase,lever,detail});
   })();
   // ── Physical (recovery capacity) ──
   (function(){
@@ -3599,7 +3608,13 @@ function _stressDomains(dat){
     else if(bowelPen>0.08){drive='Bowel irregular ('+bowelIrr+'/'+bowelEntries+' entries)';phrase='digestive irregularity';lever={label:'Slow, unhurried meals',why:'Irregular bowels often track with stress and rushed eating. Eating slowly activates rest-and-digest.',page:'rest',go:'Open Rest →'};}
     else if(has){drive='Rest & wind-down on track';phrase='recovery';lever={label:'Protect your wind-down',why:'Your recovery habits are holding — this is the routine that keeps load down. Guard it before adding anything.',page:'rest',go:'Open Rest →'};}
     else {drive='No rest data yet';phrase='recovery';lever={label:'Try one wind-down',why:'A short evening wind-down is the simplest way to start lowering physical load.',page:'rest',go:'Open Rest →'};}
-    D.push({id:'physical',name:'Physical',level:_stressLevel(frac,has),frac,drive,phrase,lever});
+    const detail={how:'Physical load is your recovery capacity. Recovery habits (wind-down, prayer/rest sessions, calming audio) lower it; short or poor sleep and irregular digestion raise it. Neglect only counts once you’ve started using a habit.',
+      factors:[_fx('Wind-down nights',windDays+' of '+N),
+        _fx('Rest / prayer days',(t.restDone||0)+' of '+N),
+        _fx('Calming-audio days',(t.lisDay||0)+' of '+N),
+        _fx('Sleep (profile)',profile.sleep?profile.sleep:'not set'),
+        _fx('Bowel regularity',bowelEntries?bowelIrr+' of '+bowelEntries+' entries irregular':'no entries')]};
+    D.push({id:'physical',name:'Physical',level:_stressLevel(frac,has),frac,drive,phrase,lever,detail});
   })();
   // ── Exercise ──
   (function(){
@@ -3610,7 +3625,10 @@ function _stressDomains(dat){
     if(t.planned>0&&missed>=0.34){drive=t.woAny+' of '+t.planned+' planned workouts done';phrase='missed movement ('+t.woAny+'/'+t.planned+' workouts)';lever={label:'Swap in a 15-min steady walk',why:'Movement is slipping. A short steady walk keeps the routine alive and lowers stress hormones without adding fatigue.',page:'workout',go:'Open Exercise →'};}
     else if(has){drive=t.woAny+' of '+(t.planned||t.woAny)+' planned workouts done';phrase='movement';lever={label:'Stay on schedule',why:'Training is on track — keep the rhythm; consistency matters more than any single session.',page:'workout',go:'Open Exercise →'};}
     else {drive='No workouts logged yet';phrase='movement';lever={label:'Log a session',why:'Movement is one of the strongest stress buffers — even one logged session starts the picture.',page:'workout',go:'Open Exercise →'};}
-    D.push({id:'exercise',name:'Exercise',level:_stressLevel(frac,has),frac,drive,phrase,lever});
+    const detail={how:'Exercise load rises with missed planned sessions over the last 7 days. A rest week or a plan with no training days scheduled reads as light, not elevated.',
+      factors:[_fx('Workouts done',(t.woAny||0)+' of '+(t.planned||0)+' planned'),
+        _fx('Planned training days',(t.planned||0)+' this week')]};
+    D.push({id:'exercise',name:'Exercise',level:_stressLevel(frac,has),frac,drive,phrase,lever,detail});
   })();
   // ── Mental (cognitive load / pace) ──
   (function(){
@@ -3621,7 +3639,10 @@ function _stressDomains(dat){
     if(rush>=0.34&&t.ctxTot){drive='Unhurried at '+t.ctxGood+'/'+t.ctxTot+' meals';phrase='a rushed pace';lever={label:'One unhurried, off-screen meal',why:'Most meals have been rushed or on-screen. A single slow, screen-free meal gives the mind a real pause.',page:'rest',go:'Open Rest →'};}
     else if(has){drive='Calm, unhurried at most meals';phrase='mental pace';lever={label:'Keep single-tasking meals',why:'You’ve been eating unhurried — a small but real way you’re lowering mental load. Keep it.',page:'rest',go:'Open Rest →'};}
     else {drive='No check-ins yet';phrase='mental pace';lever=null;}
-    D.push({id:'mental',name:'Mental',level:_stressLevel(frac,has),frac,drive,phrase,lever});
+    const detail={how:'Mental load is a read on cognitive pace. When you log how a meal was eaten, rushed or on-screen meals raise the level; unhurried, single-tasked meals lower it. It needs a few meal check-ins to read.',
+      factors:[_fx('Unhurried meals',t.ctxTot?t.ctxGood+' of '+t.ctxTot+' check-ins':'no check-ins yet'),
+        _fx('Meal context logged',(t.ctxTot||0)+' check-ins')]};
+    D.push({id:'mental',name:'Mental',level:_stressLevel(frac,has),frac,drive,phrase,lever,detail});
   })();
   // ── Emotional (mood + nervous-system state) ──
   (function(){
@@ -3635,7 +3656,13 @@ function _stressDomains(dat){
     else if(moodMiss>=0.4&&t.moodTot){drive=t.moodReg+'/'+t.moodTot+' meals ended regulated';phrase='mood dipping';lever={label:'One slow breath before eating',why:'Mood has been dipping around meals. A single slow breath before eating shifts you toward regulated.',page:'rest',go:'Open Rest →'};}
     else if(has){drive=(dom?'Mostly '+dom.label+' · ':'')+'mood regulated';phrase='emotional tone';lever={label:'Bank the calm — 30s of savoring',why:'You’ve been landing regulated. A short savoring practice deepens the state so it’s easier to return to later.',page:'rest',go:'Open Rest →'};}
     else {drive='No check-ins yet';phrase='emotional tone';lever={label:'Take a nervous-system check-in',why:'Ten seconds. It anchors the emotional read and starts tracking which states you spend time in.',page:'rest',go:'Check in →'};}
-    D.push({id:'emotional',name:'Emotional',level:_stressLevel(frac,has),frac,drive,phrase,lever});
+    const statesStr=pv.total?pv.arr.map(x=>PV_STATES[x.id].label+' '+x.n).join(' · '):'no check-ins yet';
+    const detail={how:'Emotional load blends your nervous-system check-ins with mood. Time in dysregulated states (Wired, Shut Down) and meals that end unregulated raise the level; calm, connected states lower it.',
+      factors:[_fx('Check-ins (7 days)',pv.total?pv.total+' logged':'none'),
+        _fx('State mix',statesStr),
+        _fx('Dysregulated share',pv.total?Math.round(dys*100)+'% (Wired / Shut Down)':'—'),
+        _fx('Meals ended regulated',t.moodTot?t.moodReg+' of '+t.moodTot:'no mood check-ins')]};
+    D.push({id:'emotional',name:'Emotional',level:_stressLevel(frac,has),frac,drive,phrase,lever,detail});
   })();
   // ── Relational (inferred, read-only for now) ──
   (function(){
@@ -3643,7 +3670,10 @@ function _stressDomains(dat){
     let drive,lever,level;
     if(has){level='light';drive=journalDays+' reflection '+(journalDays===1?'day':'days')+' logged';lever={label:'A short repair or gratitude note',why:'Relationships are a quiet load lever. A brief reflection on one connection helps you tend it on purpose.',page:'journal',go:'Open Reflections →'};}
     else {level='none';drive='No relational signal yet';lever={label:'Add a reflection',why:'Jot a line about a relationship that’s energizing or draining — it starts this domain’s picture.',page:'journal',go:'Open Reflections →'};}
-    D.push({id:'relational',name:'Relational',level,frac:0,drive,phrase:'relationships',lever});
+    const detail={how:'Relational is read-only for now — inferred from whether you’ve been reflecting, since the app doesn’t yet have a dedicated relational check-in. A light-touch daily input for this domain is a planned addition.',
+      factors:[_fx('Reflection days (7 days)',journalDays+' of '+N),
+        _fx('Dedicated relational input','planned — not built yet')]};
+    D.push({id:'relational',name:'Relational',level,frac:0,drive,phrase:'relationships',lever,detail});
   })();
   // fixed display order
   const order=['physical','nutritional','exercise','mental','emotional','relational'];
@@ -3657,7 +3687,6 @@ function _joinPhrases(arr){
 }
 /* Plain-language load reading for the dark hero. */
 function _stressReading(D,pv){
-  const rank={high:3,mod:2,light:1,none:0};
   const highs=D.filter(d=>d.level==='high');
   const mods=D.filter(d=>d.level==='mod');
   const hasAny=D.some(d=>d.level!=='none');
@@ -3726,12 +3755,33 @@ function stressSnoozeNudge(type){
   try{showToast('We’ll bring it back if the pattern holds');}catch(e){}
 }
 function stressLeverGo(page){try{goPage(page);}catch(e){}}
+/* Tap a domain card → modal explaining exactly how that level was scored. */
+function stressDomainInfo(id){
+  const ex=document.getElementById('stress-dom-modal');
+  if(ex){const was=ex.dataset.k;ex.remove();if(was===id)return;}
+  var dat,D;try{dat=_stressData();D=_stressDomains(dat);}catch(e){return;}
+  const d=D.find(x=>x.id===id);if(!d)return;
+  const m=STRESS_LM[d.level];
+  const factors=((d.detail&&d.detail.factors)||[]).map(f=>'<div style="display:flex;justify-content:space-between;gap:14px;font-size:12.5px;padding:7px 0;border-top:1px solid var(--border)"><span style="color:var(--sub)">'+f.label+'</span><span style="font-weight:600;text-align:right">'+f.val+'</span></div>').join('');
+  const ov=document.createElement('div');ov.id='stress-dom-modal';ov.className='ov open';ov.dataset.k=id;
+  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()"><div class="mh"></div>'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><span style="width:30px;height:30px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:9px;background:var(--surface2)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'+STRESS_ICONS[id]+'</svg></span><div style="font-size:17px;font-weight:700">'+d.name+' load</div><span style="margin-left:auto;font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;background:'+m.col+'22;color:'+m.col+'">'+m.lbl+'</span></div>'
+    +'<div style="background:var(--surface2);border-radius:6px;height:7px;overflow:hidden;margin:2px 0 12px"><div style="height:100%;border-radius:6px;width:'+Math.max(6,Math.round(m.v/3*100))+'%;background:'+m.col+'"></div></div>'
+    +'<div style="font-size:13px;color:var(--sub);line-height:1.55;margin-bottom:14px">'+((d.detail&&d.detail.how)||'')+'</div>'
+    +'<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--sub)">What’s feeding this — last 7 days</div>'
+    +factors
+    +(d.lever?'<div style="background:var(--surface2);border-radius:var(--rs);padding:12px;margin-top:14px"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--sub);margin-bottom:4px">Recommended lever</div><div style="font-size:14px;font-weight:700;margin-bottom:3px">'+d.lever.label+'</div><div style="font-size:12.5px;color:var(--sub);line-height:1.45">'+d.lever.why+'</div>'+(d.lever.page?'<button class="btn btn-g btn-sm btn-f" style="margin-top:10px" onclick="var o=document.getElementById(\'stress-dom-modal\');if(o)o.remove();stressLeverGo(\''+d.lever.page+'\')">'+d.lever.go+'</button>':'')+'</div>':'')
+    +'<div style="font-size:11px;color:var(--sub);line-height:1.55;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)"><b style="color:var(--text)">How levels work:</b> Light = mostly on track · Moderate = a gap building · Elevated = worth attention now · No signal = not enough data yet. All computed from your last 7 days — no assessment required.</div>'
+    +'<div style="text-align:center;margin-top:12px;font-size:12px;color:var(--sub)">Tap anywhere to close</div></div>';
+  ov.addEventListener('click',function(){ov.remove();});
+  document.body.appendChild(ov);
+}
 /* ── row + section renderers ── */
 function _stressRowHTML(d,first){
   const m=STRESS_LM[d.level];const pct=Math.max(6,Math.round(m.v/3*100));
-  return '<div style="display:flex;align-items:flex-start;gap:11px;padding:12px 0;'+(first?'':'border-top:1px solid var(--border)')+'">'
+  return '<div onclick="stressDomainInfo(\''+d.id+'\')" style="display:flex;align-items:flex-start;gap:11px;padding:12px 0;cursor:pointer;'+(first?'':'border-top:1px solid var(--border)')+'">'
     +'<span style="width:26px;height:26px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:8px;background:var(--surface2)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'+STRESS_ICONS[d.id]+'</svg></span>'
-    +'<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:13.5px;font-weight:700">'+d.name+'</span><span style="margin-left:auto;font-size:10px;font-weight:700;padding:2px 7px;border-radius:7px;background:'+m.col+'22;color:'+m.col+'">'+m.lbl+'</span></div>'
+    +'<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:13.5px;font-weight:700">'+d.name+'</span><span style="margin-left:auto;font-size:10px;font-weight:700;padding:2px 7px;border-radius:7px;background:'+m.col+'22;color:'+m.col+'">'+m.lbl+'</span><span style="color:var(--sub);font-size:15px;line-height:1;margin-left:2px">›</span></div>'
     +'<div style="background:var(--surface2);border-radius:6px;height:7px;overflow:hidden;margin-top:6px"><div style="height:100%;border-radius:6px;width:'+pct+'%;background:'+m.col+'"></div></div>'
     +'<div style="font-size:12px;color:var(--sub);line-height:1.45;margin-top:6px">'+d.drive+(d.lever?' · <span style="color:var(--green);font-weight:700">'+d.lever.label+'</span>':'')+'</div></div></div>';
 }
@@ -3747,7 +3797,7 @@ function rRecovery(){
       +'<div style="display:flex;align-items:center;gap:8px;margin-top:13px;padding-top:12px;border-top:1px solid rgba(255,255,255,.14);font-size:12.5px;color:#b9bec4;line-height:1.4"><span style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:'+reading.col+'"></span><span>'+(reading.lean?'<b style="color:#fff">Nervous system: leaning '+reading.lean+'.</b> ':'')+reading.note+'</span></div></div>';
   }
   if(D){
-    h+='<div class="ct" style="padding:6px 3px 8px">Where load is landing</div>';
+    h+='<div class="ct" style="padding:6px 3px 4px">Where load is landing <span style="text-transform:none;letter-spacing:0;font-weight:400">· tap a card for the breakdown</span></div>';
     h+='<div class="card" style="padding:2px 14px">'+D.map((d,i)=>_stressRowHTML(d,i===0)).join('')+'</div>';
   }
   if(levers&&levers.length){
@@ -3773,7 +3823,6 @@ function rRecovery(){
   try{h+='<details style="margin-top:4px"><summary style="font-size:12px;color:var(--sub);cursor:pointer;padding:4px 3px">Progress &amp; adherence detail</summary><div style="margin-top:8px">'+rProgressCard()+'</div></details>';}catch(e){}
   document.getElementById('page-recovery').innerHTML=h;
 }
-
 function _repaintRegulation(){try{if(curPage==='rest')rRest();else if(curPage==='recovery')rRecovery();}catch(e){}}
 function setNSCat(cat){
   _nsCat = cat;
