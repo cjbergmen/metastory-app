@@ -3772,9 +3772,10 @@ function stressDomainInfo(id){
     +factors
     +(d.lever?'<div style="background:var(--surface2);border-radius:var(--rs);padding:12px;margin-top:14px"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--sub);margin-bottom:4px">Recommended lever</div><div style="font-size:14px;font-weight:700;margin-bottom:3px">'+d.lever.label+'</div><div style="font-size:12.5px;color:var(--sub);line-height:1.45">'+d.lever.why+'</div>'+(d.lever.page?'<button class="btn btn-g btn-sm btn-f" style="margin-top:10px" onclick="var o=document.getElementById(\'stress-dom-modal\');if(o)o.remove();stressLeverGo(\''+d.lever.page+'\')">'+d.lever.go+'</button>':'')+'</div>':'')
     +'<div style="font-size:11px;color:var(--sub);line-height:1.55;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)"><b style="color:var(--text)">How levels work:</b> Light = mostly on track · Moderate = a gap building · Elevated = worth attention now · No signal = not enough data yet. All computed from your last 7 days — no assessment required.</div>'
-    +'<div style="text-align:center;margin-top:12px;font-size:12px;color:var(--sub)">Tap anywhere to close</div></div>';
+    +'<div style="text-align:center;margin-top:12px;font-size:12px;color:var(--sub)">Swipe down or tap outside to close</div></div>';
   ov.addEventListener('click',function(){ov.remove();});
   document.body.appendChild(ov);
+  try{addSwipeToDismiss('stress-dom-modal',function(){var o=document.getElementById('stress-dom-modal');if(o)o.remove();});}catch(e){}
 }
 /* ── row + section renderers ── */
 function _stressRowHTML(d,first){
