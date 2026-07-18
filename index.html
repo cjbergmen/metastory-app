@@ -810,6 +810,42 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   <button class="swap-ai-btn" id="swap-ai-btn" onclick="askAIForSwaps()">Ask AI for more options</button>
 </div>
 
+<!-- Edit Exercise Sheet -->
+<div class="swap-overlay" id="exedit-overlay" onclick="closeExEdit()"></div>
+<div class="swap-sheet" id="exedit-sheet">
+  <div class="swap-handle"></div>
+  <div class="swap-header">
+    <div class="swap-title" id="exedit-title">Edit Exercise</div>
+    <button class="swap-close" onclick="closeExEdit()">✕</button>
+  </div>
+  <div class="swap-divider"></div>
+  <div style="padding:4px 18px 18px;overflow-y:auto">
+    <div style="margin-bottom:16px">
+      <label class="fl">Sets &amp; reps</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="exedit-sets" class="re-time" style="width:56px" type="number" inputmode="numeric" min="1" max="10" placeholder="Sets">
+        <span style="color:var(--sub);font-weight:700">×</span>
+        <input id="exedit-reps" class="re-time" style="width:110px;flex:1" type="text" inputmode="text" placeholder="e.g. 8–12">
+      </div>
+      <div style="font-size:11px;color:var(--sub);margin-top:5px">Reps can be a range (8–12), a number (10), or a note (30 sec).</div>
+    </div>
+    <div style="margin-bottom:16px">
+      <label class="fl">Rest timer</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px" id="exedit-rest-chips"></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="exedit-rest" class="re-time" style="width:90px" type="number" inputmode="numeric" min="0" step="5" placeholder="Sec">
+        <span style="font-size:12px;color:var(--sub);font-weight:600">seconds</span>
+      </div>
+    </div>
+    <div style="margin-bottom:20px">
+      <label class="fl">Default weight</label>
+      <select id="exedit-weight" class="wo-wt-sel" style="margin:0"></select>
+      <div style="font-size:11px;color:var(--sub);margin-top:5px">Pre-fills the weight picker when you start logging (your last logged weight still wins once you have history).</div>
+    </div>
+    <button class="wo-add-btn" style="width:100%" onclick="saveExEdit()">Apply changes</button>
+  </div>
+</div>
+
 <!-- Sign-In Screen -->
 <div id="signin-screen">
   <div class="signin-logo"><img src="https://images.squarespace-cdn.com/content/v1/62992a3b01e7a436522ae26b/b4f781c6-f8f1-417d-a178-d54c2bcf572c/Meta+Story+Logo.png?format=300w" style="width:120px;height:auto;object-fit:contain" alt="Metastory Health"></div>
@@ -2366,6 +2402,7 @@ function buildExCard(e,idx,num,col,wdone){
   if(st.selW===null){
     if(BW_EX.includes(name)){st.selW=0;}
     else if(lastSets&&lastSets.length){st.selW=lastSets[lastSets.length-1].w;}
+    else if(e.dw!==undefined&&e.dw!==null&&e.dw!==''){st.selW=(e.dw==='bw'?0:parseFloat(e.dw));}
   }
 
   // ── How-to back side ──────────────────────────────────────
@@ -2408,7 +2445,8 @@ function buildExCard(e,idx,num,col,wdone){
       <div class="wo-ex-name" style="flex:1">${num}. ${name}</div>
       <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
         ${_woPendingSwaps[idx]?`<span style="font-size:10px;background:var(--orange)22;color:var(--orange);padding:2px 6px;border-radius:8px;font-weight:700">modified</span>`:''}
-        <button onclick="openSwapModal(${idx},event)" style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;color:var(--sub);font-size:11px;font-weight:600;padding:4px 9px;cursor:pointer;white-space:nowrap">↔</button>
+        <button onclick="openExEdit(${idx},event)" title="Edit reps, rest & weight" style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;color:var(--sub);font-size:11px;font-weight:600;padding:4px 9px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+        <button onclick="openSwapModal(${idx},event)" title="Swap exercise" style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;color:var(--sub);font-size:11px;font-weight:600;padding:4px 9px;cursor:pointer;white-space:nowrap">↔</button>
         ${how?`<button onclick="flipExCard(${idx},event)" style="display:flex;align-items:center;gap:4px;background:var(--surface2);border:1px solid var(--border);border-radius:14px;color:var(--text);font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer;white-space:nowrap" title="How to do it"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.5"/></svg>How</button>`:''}
       </div>
     </div>
@@ -2584,11 +2622,11 @@ function _applySwapOrig(idx, ci){
       if(timerDiv&&timerDiv.parentElement){
         const newBar=document.createElement('div');
         newBar.className='swap-save-bar';
-        newBar.innerHTML=`<div class="swap-save-label">↔ ${pc} swap${pc!==1?'s':''} pending</div><button class="swap-save-day" onclick="saveWorkoutToday()">Save Today</button><button class="swap-save-week" onclick="saveWorkoutWeek()">Save Week</button>`;
+        newBar.innerHTML=`<div class="swap-save-label">↔ ${pc} change${pc!==1?'s':''} pending</div><button class="swap-save-day" onclick="saveWorkoutToday()">Save Today</button><button class="swap-save-week" onclick="saveWorkoutWeek()">Save Week</button>`;
         timerDiv.parentElement.insertBefore(newBar,timerDiv.parentElement.firstChild);
       }
     } else if(bar){
-      bar.querySelector('.swap-save-label').textContent=`↔ ${pc} swap${pc!==1?'s':''} pending`;
+      bar.querySelector('.swap-save-label').textContent=`↔ ${pc} change${pc!==1?'s':''} pending`;
     }
   },180);
 }
@@ -2639,6 +2677,90 @@ function saveWorkoutWeek(){
   _woPendingSwaps={};
   showToast('Full week saved! ✅');
   rWorkout();
+}
+// ── EDIT EXERCISE (reps / rest timer / default weight) ────────────────────────
+var _exEditIdx=null;
+function _curEx(idx){
+  if(_woPendingSwaps[idx])return _woPendingSwaps[idx];
+  var wo=getWO();if(!wo)return null;
+  var nm=_woExList[idx];
+  return [].concat(wo.ex||[],wo.pm||[]).find(function(x){return x.n===nm;})||null;
+}
+function openExEdit(idx,ev){
+  if(ev)ev.stopPropagation();
+  var e=_curEx(idx);
+  if(!e){try{showToast('Could not load exercise');}catch(_){}return;}
+  _exEditIdx=idx;
+  document.getElementById('exedit-title').textContent='Edit: '+e.n;
+  // Split the tag into "sets × reps" when possible; otherwise treat the whole
+  // tag as the reps/scheme text (covers Rest-Pause / drop-set style tags).
+  var tag=(e.tag||'').trim();
+  var parts=tag.split(/\s*[×x]\s*/);
+  var setsV='',repsV=tag;
+  if(parts.length>=2){setsV=parts[0].trim();repsV=parts.slice(1).join(' × ').trim();}
+  document.getElementById('exedit-sets').value=setsV;
+  document.getElementById('exedit-reps').value=repsV;
+  document.getElementById('exedit-rest').value=_parseRestSec(e.rest);
+  var chips=[30,45,60,90,120,180];
+  document.getElementById('exedit-rest-chips').innerHTML=chips.map(function(s){
+    var lbl=(s%60===0)?((s/60)+' min'):(s+'s');
+    return '<button type="button" class="qp" onclick="document.getElementById(\'exedit-rest\').value='+s+'">'+lbl+'</button>';
+  }).join('');
+  var cur='';
+  if(e.dw!==undefined&&e.dw!==null&&e.dw!=='')cur=String(e.dw);
+  else if(_woState[e.n]&&_woState[e.n].selW!=null)cur=(_woState[e.n].selW===0?'bw':String(_woState[e.n].selW));
+  var opts='<option value="">— No default —</option>';
+  opts+='<option value="bw"'+((cur==='bw'||cur==='0')?' selected':'')+'>Bodyweight (BW)</option>';
+  DB_WEIGHTS.forEach(function(w){opts+='<option value="'+w+'"'+(cur===String(w)?' selected':'')+'>'+w+' lbs</option>';});
+  document.getElementById('exedit-weight').innerHTML=opts;
+  document.getElementById('exedit-overlay').classList.add('open');
+  document.getElementById('exedit-sheet').classList.add('open');
+}
+function closeExEdit(){
+  var ov=document.getElementById('exedit-overlay'),sh=document.getElementById('exedit-sheet');
+  if(ov)ov.classList.remove('open');
+  if(sh)sh.classList.remove('open');
+  _exEditIdx=null;
+}
+function saveExEdit(){
+  var idx=_exEditIdx;if(idx==null)return;
+  var base=_curEx(idx);if(!base){closeExEdit();return;}
+  var ne=JSON.parse(JSON.stringify(base));
+  var sets=(document.getElementById('exedit-sets').value||'').trim();
+  var reps=(document.getElementById('exedit-reps').value||'').trim();
+  if(sets&&reps)ne.tag=sets+' × '+reps;
+  else if(reps)ne.tag=reps;
+  var sec=parseInt(document.getElementById('exedit-rest').value,10);
+  if(!isNaN(sec)&&sec>=0)ne.rest=(sec%60===0&&sec>=60)?((sec/60)+' min'):(sec+' sec');
+  var wv=document.getElementById('exedit-weight').value;
+  if(wv==='')delete ne.dw;else ne.dw=wv;
+  if(wv!==''){if(!_woState[ne.n])_woState[ne.n]={selW:null,rep:''};_woState[ne.n].selW=(wv==='bw'?0:parseFloat(wv));}
+  _woPendingSwaps[idx]=ne;
+  _woExList[idx]=ne.n;
+  closeExEdit();
+  var wo=getWO();
+  var allEx=wo?[].concat(wo.ex||[],wo.pm||[]):[];
+  var origIdx=allEx.findIndex(function(x){return x.n===ne.n;});
+  var num=origIdx>=0?origIdx+1:idx+1;
+  var card=document.getElementById('wo-ex-'+idx);
+  if(card)card.outerHTML=buildExCard(ne,idx,num,wo?wo.col:'',isWODone());
+  _updatePendingBar();
+  try{showToast('Updated — tap Save to keep it');}catch(_){}
+}
+function _updatePendingBar(){
+  var pc=Object.keys(_woPendingSwaps).length;
+  var bar=document.querySelector('.swap-save-bar');
+  if(pc>0&&!bar){
+    var timerDiv=document.querySelector('#page-workout .btn.btn-o');
+    if(timerDiv&&timerDiv.parentElement){
+      var nb=document.createElement('div');
+      nb.className='swap-save-bar';
+      nb.innerHTML='<div class="swap-save-label">✎ '+pc+' change'+(pc!==1?'s':'')+' pending</div><button class="swap-save-day" onclick="saveWorkoutToday()">Save Today</button><button class="swap-save-week" onclick="saveWorkoutWeek()">Save Week</button>';
+      timerDiv.parentElement.insertBefore(nb,timerDiv.parentElement.firstChild);
+    }
+  } else if(bar){
+    bar.querySelector('.swap-save-label').textContent='✎ '+pc+' change'+(pc!==1?'s':'')+' pending';
+  }
 }
 function askAIForSwaps(){
   const key=getGeminiKey();
@@ -3151,7 +3273,7 @@ function rWorkout(){
   const pendingCount=Object.keys(_woPendingSwaps).length;
   if(pendingCount>0){
     h+=`<div class="swap-save-bar">
-      <div class="swap-save-label">↔ ${pendingCount} swap${pendingCount!==1?'s':''} pending</div>
+      <div class="swap-save-label">↔ ${pendingCount} change${pendingCount!==1?'s':''} pending</div>
       <button class="swap-save-day" onclick="saveWorkoutToday()">Save Today</button>
       <button class="swap-save-week" onclick="saveWorkoutWeek()">Save Week</button>
     </div>`;

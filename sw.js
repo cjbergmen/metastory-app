@@ -1,4 +1,4 @@
-const VERSION = '20260708-libswipe1';
+const VERSION = '20260717-woedit1';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
