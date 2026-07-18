@@ -3512,21 +3512,266 @@ function _stressAssessCardsHTML(){
 function stressStartAssess(id){_assessPage=id;_assessAnswers={};_assessSection=0;goPage('assess');}
 function stressOpenInsights(){_assessPage='insights';goPage('assess');}
 
+
+
+/* ═══════════════════ STRESS PAGE v2 — computed load domains ═══════════════════ */
+/* Reads the same daily signals the app already tracks (meals, protein, water,
+   blood sugar, workouts, mindful-eating context, mood, polyvagal check-ins,
+   wind-down, rest/prayer, bowel, journal) and turns them into a real-time
+   read of where stress load is landing across six holistic domains. Fully
+   computed & deterministic — no AI, always available. */
+const STRESS_LM={
+  none: {lbl:'No signal',col:'#b9b3a6',v:0},
+  light:{lbl:'Light',    col:'#8fa07e',v:1},
+  mod:  {lbl:'Moderate', col:'#c4855f',v:2},
+  high: {lbl:'Elevated', col:'#c47070',v:3}
+};
+const STRESS_ICONS={
+ physical:'<path d="M20.5 6.5 18 4l-2 2 4 4 2-2ZM3.5 17.5 6 20l2-2-4-4-2 2ZM7 7l10 10"/>',
+ nutritional:'<path d="M4 3v7a2 2 0 0 0 2 2 2 2 0 0 0 2-2V3M6 12v9M18 3c-2 0-3 2-3 5s1 4 3 4 3-1 3-4-1-5-3-5ZM18 12v9"/>',
+ exercise:'<path d="M6 6v12M18 6v12M3 9v6M21 9v6M6 12h12"/>',
+ mental:'<path d="M12 3a5 5 0 0 0-5 5c0 1-1 2-1 3s1 2 1 3a5 5 0 0 0 10 0c0-1 1-2 1-3s-1-2-1-3a5 5 0 0 0-5-5ZM12 3v18"/>',
+ emotional:'<path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 21.5l8.8-8.8a5 5 0 0 0 0-7.1Z"/>',
+ relational:'<circle cx="9" cy="8" r="3"/><circle cx="17" cy="10" r="2.4"/><path d="M4 20c0-3 2-5 5-5s5 2 5 5M14.5 20c.2-2 1.4-3.4 3-3.4"/>'
+};
+const _clamp01=x=>Math.max(0,Math.min(1,x));
+function _stressLevel(frac,hasSignal){
+  if(!hasSignal)return 'none';
+  if(frac>=0.5)return 'high';
+  if(frac>=0.22)return 'mod';
+  return 'light';
+}
+function _stressData(){
+  const N=7,now=new Date(),all=[],keys=[];
+  for(let i=0;i<N;i++){const d=new Date(now);d.setDate(d.getDate()-i);all.push(_dayFacts(d));keys.push(_dkOf(d));}
+  const t=_sumFacts(all);
+  let windDays=0,bowelEntries=0,bowelIrr=0,bsCount=0,bsHigh=0;
+  keys.forEach(k=>{
+    try{const w=JSON.parse(lsGet('wind_'+k,'{}'))||{};if(w&&Object.values(w).some(Boolean))windDays++;}catch(e){}
+    try{const b=JSON.parse(lsGet('bm_'+k,'[]'))||[];(Array.isArray(b)?b:[]).forEach(e=>{bowelEntries++;if([1,2,6,7].includes(+e.type))bowelIrr++;});}catch(e){}
+    try{const bs=JSON.parse(lsGet('bs_'+k,'[]'))||[];(Array.isArray(bs)?bs:[]).forEach(r=>{bsCount++;if(+r.v>=110)bsHigh++;});}catch(e){}
+  });
+  let journalDays=0;try{const kset=new Set(keys);journalDays=new Set(_journalAll().filter(e=>kset.has(e.date)).map(e=>e.date)).size;}catch(e){}
+  const pv=pvCounts(N);
+  let profile={};try{profile=JSON.parse(lsGet('_userProfile','{}'))||{};}catch(e){}
+  return {N,all,t,keys,windDays,bowelEntries,bowelIrr,bsCount,bsHigh,journalDays,pv,profile};
+}
+function _pvDysShare(pv){
+  if(!pv||!pv.total)return 0;
+  let dys=0;pv.arr.forEach(x=>{if(PV_STATES[x.id]&&PV_STATES[x.id].zone==='dysreg')dys+=x.n;});
+  return dys/pv.total;
+}
+/* Build the six domain readings from real data. */
+function _stressDomains(dat){
+  const {N,t,windDays,bowelEntries,bowelIrr,bsCount,bsHigh,journalDays,pv,profile}=dat;
+  const D=[];
+  // ── Nutritional ──
+  (function(){
+    const has=t.logged>0||t.waterTracked>0||bsCount>0;
+    const protMiss=t.logged?1-t.protHit/t.logged:0;
+    const waterMiss=t.waterTracked?1-(t.waterFrac/t.waterTracked):0;
+    const glucose=bsCount?bsHigh/bsCount:0;
+    const skipDays=t.logged>=3?Math.max(0,N-t.logged):0;
+    const skipFrac=skipDays/N;
+    const frac=_clamp01(protMiss*0.3+waterMiss*0.25+glucose*0.3+skipFrac*0.4);
+    let drive,phrase,lever;
+    if(skipFrac>=0.28){drive=skipDays+' skipped-meal days → glucose swings';phrase='blood-sugar swings ('+skipDays+' skipped-meal days)';lever={label:'Anchor a protein breakfast',why:'Skipped meals drive glucose swings your body reads as stress. Protein first stabilizes the biggest lever you have.',page:'food',go:'Log a meal →'};}
+    else if(glucose>=0.34){drive=bsHigh+' of '+bsCount+' readings ran high';phrase='blood-sugar highs';lever={label:'Pair carbs with protein + fat',why:'Your readings have been running high. Pairing carbs with protein and fat blunts the spike that reads as stress.',page:'food',go:'Log a meal →'};}
+    else if(protMiss>=0.34){drive='Protein goal hit '+t.protHit+'/'+t.logged+' logged days';phrase='low-protein days';lever={label:'Protein first at each meal',why:'Protein steadies blood sugar and recovery. Building the plate around it closes your biggest gap.',page:'food',go:'Log a meal →'};}
+    else if(waterMiss>=0.3){drive='Water goal hit '+t.waterMet+'/'+t.waterTracked+' tracked days';phrase='low hydration';lever={label:'One extra glass before noon',why:'Even mild dehydration amplifies everything your body is processing. One earlier glass closes the gap.',page:'water',go:'Log water →'};}
+    else if(has){drive='Meals '+t.logged+'/'+N+' days · protein '+t.protHit+'/'+(t.logged||0);phrase='nutrition';lever={label:'Keep the plate steady',why:'Nutrition is holding. Keep protein first and meals regular to protect it.',page:'food',go:'Open Diet →'};}
+    else {drive='No meals logged yet';phrase='nutrition';lever={label:'Log today’s first meal',why:'Even one meal begins the nutritional picture — timing, protein, and how you felt after.',page:'food',go:'Log a meal →'};}
+    D.push({id:'nutritional',name:'Nutritional',level:_stressLevel(frac,has),frac,drive,phrase,lever});
+  })();
+  // ── Physical (recovery capacity) ──
+  (function(){
+    const usesRec=t.restAny>0||windDays>0||t.lisDay>0;
+    const has=usesRec||bowelEntries>0||!!profile.sleep;
+    const recDays=Math.max(t.restDone,windDays,t.lisDay);
+    const recScore=recDays/N;
+    const recGap=usesRec?1-recScore:(profile.sleep?0.25:0);
+    const sleepPen=profile.sleep==='poor'?0.35:((profile.sleep==='fair'||profile.sleep==='variable')?0.15:0);
+    const bowelPen=bowelEntries?(bowelIrr/bowelEntries)*0.3:0;
+    const frac=_clamp01(recGap*0.55+sleepPen+bowelPen);
+    let drive,phrase,lever;
+    if(usesRec&&recScore<0.5){drive='Wind-down logged '+windDays+'/'+N+' nights';phrase='short recovery (wind-down '+windDays+' of '+N+' nights)';lever={label:'A 5-min wind-down tonight',why:'Only '+windDays+' wind-downs in '+N+' nights. A short shutdown ritual is how the day’s load discharges instead of carrying over.',page:'rest',go:'Open Rest →'};}
+    else if(sleepPen>0){drive='Sleep running '+(profile.sleep||'short');phrase='short sleep';lever={label:'Protect a wind-down tonight',why:'Short sleep keeps the system braced. A calm wind-down helps you fall asleep faster and deeper.',page:'rest',go:'Open Rest →'};}
+    else if(bowelPen>0.08){drive='Bowel irregular ('+bowelIrr+'/'+bowelEntries+' entries)';phrase='digestive irregularity';lever={label:'Slow, unhurried meals',why:'Irregular bowels often track with stress and rushed eating. Eating slowly activates rest-and-digest.',page:'rest',go:'Open Rest →'};}
+    else if(has){drive='Rest & wind-down on track';phrase='recovery';lever={label:'Protect your wind-down',why:'Your recovery habits are holding — this is the routine that keeps load down. Guard it before adding anything.',page:'rest',go:'Open Rest →'};}
+    else {drive='No rest data yet';phrase='recovery';lever={label:'Try one wind-down',why:'A short evening wind-down is the simplest way to start lowering physical load.',page:'rest',go:'Open Rest →'};}
+    D.push({id:'physical',name:'Physical',level:_stressLevel(frac,has),frac,drive,phrase,lever});
+  })();
+  // ── Exercise ──
+  (function(){
+    const has=t.planned>0||t.woAny>0;
+    const missed=t.planned?1-Math.min(1,t.woAny/t.planned):0;
+    const frac=_clamp01(missed);
+    let drive,phrase,lever;
+    if(t.planned>0&&missed>=0.34){drive=t.woAny+' of '+t.planned+' planned workouts done';phrase='missed movement ('+t.woAny+'/'+t.planned+' workouts)';lever={label:'Swap in a 15-min steady walk',why:'Movement is slipping. A short steady walk keeps the routine alive and lowers stress hormones without adding fatigue.',page:'workout',go:'Open Exercise →'};}
+    else if(has){drive=t.woAny+' of '+(t.planned||t.woAny)+' planned workouts done';phrase='movement';lever={label:'Stay on schedule',why:'Training is on track — keep the rhythm; consistency matters more than any single session.',page:'workout',go:'Open Exercise →'};}
+    else {drive='No workouts logged yet';phrase='movement';lever={label:'Log a session',why:'Movement is one of the strongest stress buffers — even one logged session starts the picture.',page:'workout',go:'Open Exercise →'};}
+    D.push({id:'exercise',name:'Exercise',level:_stressLevel(frac,has),frac,drive,phrase,lever});
+  })();
+  // ── Mental (cognitive load / pace) ──
+  (function(){
+    const has=t.ctxTot>0||t.ckAny>0;
+    const rush=t.ctxTot?1-t.ctxGood/t.ctxTot:0;
+    const frac=_clamp01(rush*0.8);
+    let drive,phrase,lever;
+    if(rush>=0.34&&t.ctxTot){drive='Unhurried at '+t.ctxGood+'/'+t.ctxTot+' meals';phrase='a rushed pace';lever={label:'One unhurried, off-screen meal',why:'Most meals have been rushed or on-screen. A single slow, screen-free meal gives the mind a real pause.',page:'rest',go:'Open Rest →'};}
+    else if(has){drive='Calm, unhurried at most meals';phrase='mental pace';lever={label:'Keep single-tasking meals',why:'You’ve been eating unhurried — a small but real way you’re lowering mental load. Keep it.',page:'rest',go:'Open Rest →'};}
+    else {drive='No check-ins yet';phrase='mental pace';lever=null;}
+    D.push({id:'mental',name:'Mental',level:_stressLevel(frac,has),frac,drive,phrase,lever});
+  })();
+  // ── Emotional (mood + nervous-system state) ──
+  (function(){
+    const has=t.moodTot>0||pv.total>0;
+    const moodMiss=t.moodTot?1-t.moodReg/t.moodTot:0;
+    const dys=_pvDysShare(pv);
+    const frac=_clamp01(moodMiss*0.5+dys*0.6);
+    let drive,phrase,lever;
+    const dom=pv.arr&&pv.arr[0]?PV_STATES[pv.arr[0].id]:null;
+    if(pv.total&&dys>=0.34&&dom){drive=pv.arr[0].n+'/'+pv.total+' check-ins '+dom.label+(moodMiss>=0.5?' · mood dysregulated':'');phrase='a nervous system running hot (mostly '+dom.label+')';lever={label:'Extended exhale, 3 minutes',why:'Your check-ins have leaned '+dom.label+'. Lengthening the exhale signals “threat passed” and settles the system in minutes.',page:'rest',go:'Open Rest →'};}
+    else if(moodMiss>=0.4&&t.moodTot){drive=t.moodReg+'/'+t.moodTot+' meals ended regulated';phrase='mood dipping';lever={label:'One slow breath before eating',why:'Mood has been dipping around meals. A single slow breath before eating shifts you toward regulated.',page:'rest',go:'Open Rest →'};}
+    else if(has){drive=(dom?'Mostly '+dom.label+' · ':'')+'mood regulated';phrase='emotional tone';lever={label:'Bank the calm — 30s of savoring',why:'You’ve been landing regulated. A short savoring practice deepens the state so it’s easier to return to later.',page:'rest',go:'Open Rest →'};}
+    else {drive='No check-ins yet';phrase='emotional tone';lever={label:'Take a nervous-system check-in',why:'Ten seconds. It anchors the emotional read and starts tracking which states you spend time in.',page:'rest',go:'Check in →'};}
+    D.push({id:'emotional',name:'Emotional',level:_stressLevel(frac,has),frac,drive,phrase,lever});
+  })();
+  // ── Relational (inferred, read-only for now) ──
+  (function(){
+    const has=journalDays>0;
+    let drive,lever,level;
+    if(has){level='light';drive=journalDays+' reflection '+(journalDays===1?'day':'days')+' logged';lever={label:'A short repair or gratitude note',why:'Relationships are a quiet load lever. A brief reflection on one connection helps you tend it on purpose.',page:'journal',go:'Open Reflections →'};}
+    else {level='none';drive='No relational signal yet';lever={label:'Add a reflection',why:'Jot a line about a relationship that’s energizing or draining — it starts this domain’s picture.',page:'journal',go:'Open Reflections →'};}
+    D.push({id:'relational',name:'Relational',level,frac:0,drive,phrase:'relationships',lever});
+  })();
+  // fixed display order
+  const order=['physical','nutritional','exercise','mental','emotional','relational'];
+  return order.map(id=>D.find(d=>d.id===id));
+}
+function _wordNum(n){return ({2:'two',3:'three',4:'four',5:'five',6:'six'})[n]||String(n);}
+function _joinPhrases(arr){
+  if(arr.length===1)return arr[0];
+  if(arr.length===2)return arr[0]+' and '+arr[1];
+  return arr.slice(0,-1).join(', ')+', and '+arr[arr.length-1];
+}
+/* Plain-language load reading for the dark hero. */
+function _stressReading(D,pv){
+  const rank={high:3,mod:2,light:1,none:0};
+  const highs=D.filter(d=>d.level==='high');
+  const mods=D.filter(d=>d.level==='mod');
+  const hasAny=D.some(d=>d.level!=='none');
+  let lead;
+  if(!hasAny){
+    lead='This page becomes a <b>mirror of your stress load</b> as you use the app. There isn’t much to read yet — log a meal, a nervous-system check-in, or a wind-down and the domains below start filling in with what’s helping and what’s adding load.';
+  }else if(highs.length>=2){
+    const top=highs.slice().sort((a,b)=>b.frac-a.frac).slice(0,3);
+    const word=highs.length===2?'two':(highs.length===3?'three':'several');
+    lead='Your load is <b>concentrating in '+word+' places</b>: '+_joinPhrases(top.map(d=>d.phrase))+'. That combination is what tends to keep the whole system braced — easing any one of them gives the others room.';
+  }else if(highs.length===1){
+    lead='Your load is landing mostly in <b>'+highs[0].name.toLowerCase()+'</b> right now — '+highs[0].phrase+'. The rest of your system looks steadier, so this is the place to spend your energy.';
+  }else if(mods.length){
+    const top=mods.slice().sort((a,b)=>b.frac-a.frac)[0];
+    lead='Your load is <b>light and fairly well-distributed</b>. The one place it’s gathering is <b>'+top.name.toLowerCase()+'</b> — '+top.drive.toLowerCase()+'.';
+  }else{
+    lead='Your load looks <b>light and well-distributed</b> right now. Nothing is flaring — this is a week to protect the routine that’s working.';
+  }
+  let lean=null,note,col='#b9b3a6';
+  if(pv.total){
+    const dom=PV_STATES[pv.arr[0].id];lean=dom.label;col=dom.color;
+    note=pv.arr[0].n+' of your last '+pv.total+' check-in'+(pv.total===1?'':'s')+' landed in '+dom.label;
+  }else{
+    note='No check-ins yet — your first one starts the picture';
+  }
+  return {lead,lean,note,col};
+}
+/* Prioritized next-step levers, drawn across domains (max 3). */
+function _stressLevers(D){
+  const withL=D.filter(d=>d.lever);
+  const bySev=withL.slice().sort((a,b)=>STRESS_LM[b.level].v-STRESS_LM[a.level].v||b.frac-a.frac);
+  let picks=bySev.filter(d=>STRESS_LM[d.level].v>=2).slice(0,3);
+  if(!picks.length)picks=bySev.filter(d=>STRESS_LM[d.level].v===1).slice(0,2);
+  if(!picks.length)picks=bySev.slice(0,2);
+  return picks.map(d=>({h:d.lever.label,w:d.lever.why,page:d.lever.page,go:d.lever.go}));
+}
+/* Staggered, contextual assessment nudge — at most ONE, only when data
+   triggers it, snoozeable for a week, and silent when nothing is relevant. */
+function _stressNudge(dat){
+  const nsDone=!!lsGet('_assess_ns_result','');
+  const gutDone=!!lsGet('_assess_gut_result','');
+  const aaDone=!!lsGet('_assess_aa_result','');
+  const pv14=pvCounts(14);const dys=_pvDysShare(pv14);
+  const t=dat.t;const moodMiss=t.moodTot?1-t.moodReg/t.moodTot:0;
+  const cands=[];
+  if(!nsDone&&pv14.total>=4&&dys>=0.45){
+    const dom=pv14.arr[0]?PV_STATES[pv14.arr[0].id].label:'activated';
+    cands.push({type:'ns',title:'Nervous System',strength:1+dys,why:'Your check-ins have leaned '+dom+' for a couple of weeks — a quick nervous-system assessment would show whether this is situational or a deeper pattern.'});
+  }
+  if(!gutDone&&dat.bowelIrr>=2){
+    cands.push({type:'gut',title:'Gut Health',strength:0.9+dat.bowelIrr*0.1,why:'Irregular bowel entries have lined up this week — the gut assessment would help pinpoint what’s driving it.'});
+  }
+  if(!aaDone&&(moodMiss>=0.5||dys>=0.5)){
+    cands.push({type:'aa',title:'Amino Acid',strength:0.6,why:'Mood and energy have been swinging — the amino-acid assessment maps the neurotransmitter side of that.'});
+  }
+  let snz={};try{snz=JSON.parse(lsGet('_stressNudgeSnooze','{}'))||{};}catch(e){}
+  const now=Date.now();
+  const active=cands.filter(c=>!(snz[c.type]&&now<snz[c.type])).sort((a,b)=>b.strength-a.strength);
+  return {pick:active[0]||null,allDone:nsDone&&gutDone&&aaDone,anyDone:nsDone||gutDone||aaDone};
+}
+function stressSnoozeNudge(type){
+  let s={};try{s=JSON.parse(lsGet('_stressNudgeSnooze','{}'))||{};}catch(e){}
+  s[type]=Date.now()+7*86400000;lsSet('_stressNudgeSnooze',JSON.stringify(s));
+  try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}
+  try{_repaintRegulation();}catch(e){}
+  try{showToast('We’ll bring it back if the pattern holds');}catch(e){}
+}
+function stressLeverGo(page){try{goPage(page);}catch(e){}}
+/* ── row + section renderers ── */
+function _stressRowHTML(d,first){
+  const m=STRESS_LM[d.level];const pct=Math.max(6,Math.round(m.v/3*100));
+  return '<div style="display:flex;align-items:flex-start;gap:11px;padding:12px 0;'+(first?'':'border-top:1px solid var(--border)')+'">'
+    +'<span style="width:26px;height:26px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:8px;background:var(--surface2)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'+STRESS_ICONS[d.id]+'</svg></span>'
+    +'<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:13.5px;font-weight:700">'+d.name+'</span><span style="margin-left:auto;font-size:10px;font-weight:700;padding:2px 7px;border-radius:7px;background:'+m.col+'22;color:'+m.col+'">'+m.lbl+'</span></div>'
+    +'<div style="background:var(--surface2);border-radius:6px;height:7px;overflow:hidden;margin-top:6px"><div style="height:100%;border-radius:6px;width:'+pct+'%;background:'+m.col+'"></div></div>'
+    +'<div style="font-size:12px;color:var(--sub);line-height:1.45;margin-top:6px">'+d.drive+(d.lever?' · <span style="color:var(--green);font-weight:700">'+d.lever.label+'</span>':'')+'</div></div></div>';
+}
 function rRecovery(){
-  let h = _tabRoutineHTML('recovery');
-  // ── Environmental load — what this page is about ──
-  h += `<div class="fdn-focus" style="margin-bottom:14px">
-    <span class="kicker">Stress</span>
-    <h3>What is your system carrying?</h3>
-    <p>Stress is not only in the mind &mdash; it is everything your body has to process and defend against. Sleep debt, blood-sugar swings, stimulants and alcohol, screens late at night, ultra-processed food, noise, mold and toxins, unresolved relational strain. Each one adds load. The assessments below show where that load is landing &mdash; and your daily rhythms on the Rest tab are how you lower it.</p></div>`;
-  // ── Progress & Weekly Review (moved from the top menu) ──
+  let h=_tabRoutineHTML('recovery');
+  var dat,D,reading,levers,nudge;
+  try{dat=_stressData();D=_stressDomains(dat);reading=_stressReading(D,dat.pv);levers=_stressLevers(D);nudge=_stressNudge(dat);}catch(e){console.error('stress v2',e);}
+  h+='<div style="padding:0 2px 8px"><span class="kicker">Stress</span><div class="disp" style="font-size:26px;line-height:1.05;margin-top:2px">Your load &amp; your levers</div></div>';
+  if(reading){
+    h+='<div class="fdn-focus" style="margin-bottom:12px"><span class="kicker">Stress · today</span>'
+      +'<h3>What your system is carrying</h3>'
+      +'<div style="font-size:14px;line-height:1.6;color:#d7dbdf">'+reading.lead+'</div>'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-top:13px;padding-top:12px;border-top:1px solid rgba(255,255,255,.14);font-size:12.5px;color:#b9bec4;line-height:1.4"><span style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:'+reading.col+'"></span><span>'+(reading.lean?'<b style="color:#fff">Nervous system: leaning '+reading.lean+'.</b> ':'')+reading.note+'</span></div></div>';
+  }
+  if(D){
+    h+='<div class="ct" style="padding:6px 3px 8px">Where load is landing</div>';
+    h+='<div class="card" style="padding:2px 14px">'+D.map((d,i)=>_stressRowHTML(d,i===0)).join('')+'</div>';
+  }
+  if(levers&&levers.length){
+    h+='<div class="ct" style="padding:6px 3px 8px">What would help most right now</div>';
+    h+='<div class="card" style="padding:2px 14px">'+levers.map((s,i)=>'<div style="display:flex;gap:11px;align-items:flex-start;padding:12px 0;'+(i===0?'':'border-top:1px solid var(--border)')+'"><div style="width:22px;height:22px;border-radius:50%;background:var(--green);color:#fff;font-size:11.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">'+(i+1)+'</div><div><div style="font-size:14px;font-weight:700">'+s.h+'</div><div style="font-size:12px;color:var(--sub);line-height:1.45;margin-top:2px">'+s.w+'</div><button onclick="stressLeverGo(\''+s.page+'\')" style="background:none;border:none;padding:5px 0 0;font-size:11px;font-weight:700;color:var(--green);cursor:pointer;font-family:var(--font-sans)">'+s.go+'</button></div></div>').join('')+'</div>';
+  }
+  // ── Go deeper: staggered, contextual assessment ──
+  h+='<div class="ct" style="padding:6px 3px 8px">Go deeper</div>';
+  if(nudge&&nudge.pick){
+    const p=nudge.pick;
+    h+='<div style="background:var(--surface2);border:1px dashed var(--border);border-radius:var(--rs);padding:14px">'
+      +'<div style="font-size:13.5px;font-weight:700;margin-bottom:3px">'+p.title+' assessment</div>'
+      +'<div style="font-size:12.5px;color:var(--sub);line-height:1.5;margin-bottom:11px">'+p.why+'</div>'
+      +'<div style="display:flex;gap:8px"><button class="btn btn-g btn-sm" style="flex:1" onclick="stressStartAssess(\''+p.type+'\')">Take it (~5 min)</button><button class="btn btn-s btn-sm" onclick="stressSnoozeNudge(\''+p.type+'\')">Not now</button></div></div>';
+  }else{
+    h+='<div style="background:var(--surface2);border:1px dashed var(--border);border-radius:var(--rs);padding:13px;font-size:12px;color:var(--sub);line-height:1.5;text-align:center">'
+      +(nudge&&nudge.allDone?'Your health profile is current. ':'')+'Assessments live quietly here and surface only when your data suggests one would help.'
+      +'<div style="margin-top:9px"><span class="mk-link" onclick="stressOpenInsights()">'+(nudge&&nudge.anyDone?'View all assessments &amp; insights →':'Browse all assessments →')+'</span></div></div>';
+  }
+  // ── Optional AI color + progress detail, kept below the new experience ──
   try{setTimeout(maybeAutoWeekly,400);}catch(e){}
-  try{h += rProgressCard();}catch(e){}
-  try{h += rAIWeeklyCard();}catch(e){}
-  // ── Assessments (moved from the top menu) ──
-  h += `<div class="ct" style="padding:10px 3px 8px">Assessments</div>`;
-  h += _stressAssessCardsHTML();
-  document.getElementById('page-recovery').innerHTML = h;
+  try{h+='<div class="ct" style="padding:14px 3px 8px">Weekly review</div>'+rAIWeeklyCard();}catch(e){}
+  try{h+='<details style="margin-top:4px"><summary style="font-size:12px;color:var(--sub);cursor:pointer;padding:4px 3px">Progress &amp; adherence detail</summary><div style="margin-top:8px">'+rProgressCard()+'</div></details>';}catch(e){}
+  document.getElementById('page-recovery').innerHTML=h;
 }
 
 function _repaintRegulation(){try{if(curPage==='rest')rRest();else if(curPage==='recovery')rRecovery();}catch(e){}}
@@ -4093,9 +4338,7 @@ ${fx.quick?'QUICK WIN: '+fx.quick.label+' — '+fx.quick.line:''}
 7-DAY DATA (score 0-100, trend = last half vs prior half of each category's history):
 - Overall: ${pr.overall}/100 (${pr.label}, ${pr.trendLabel})
 ${pr.cats.map(c=>'- '+c.label+': '+(c.score===null?'no data yet':c.score+'/100, trend '+(c.trend>0?'+':'')+c.trend)+' ('+c.detail+')').join('\n')}
-- Nervous system assessment: ${st.ns?JSON.stringify(st.ns):'not taken'}
-- Gut assessment: ${st.gut?JSON.stringify(st.gut):'not taken'}
-- Amino acid assessment: ${st.aa?'taken':'not taken'}
+${st.ns?'- Nervous system assessment: '+JSON.stringify(st.ns)+'\n':''}${st.gut?'- Gut assessment: '+JSON.stringify(st.gut)+'\n':''}${st.aa?'- Amino acid assessment: taken\n':''}(Only reference an assessment if its result is listed above. Never mention or nudge assessments the client hasn't taken.)
 
 Write ONE single paragraph (4-6 sentences) that expands on the focus and quick win above: name a genuine win from the data, then make the focus and quick win feel doable and worth it this week. When you point to the focus habit, include a brief why that connects it to their whole-body/metabolic health (one short clause, e.g. "hydration helps digestion and recovery by…") so they feel how this one piece supports the whole. No lists, no headers.
 
