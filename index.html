@@ -3278,10 +3278,68 @@ function _weekSourcePlan(){
 function _planControlsHTML(){
     const link='font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer';
     const dot='<span style="color:var(--sub);opacity:.4;margin:0 7px">·</span>';
-    let h='<span onclick="openMoveDay()" style="'+link+'">Move a day</span>'+dot
+    let h='<span onclick="openPlanEditor()" style="'+link+'">Edit my week</span>'+dot
+         +'<span onclick="openMoveDay()" style="'+link+'">Move a day</span>'+dot
          +'<span onclick="openShiftWeek()" style="'+link+'">Shift week</span>';
     if(_hasWeekAdjust()) h+=dot+'<span onclick="clearWeekAdjust()" style="font-size:11px;color:var(--orange);font-weight:700;text-decoration:underline;cursor:pointer">↩ Back to my plan</span>';
     return h;
+}
+// ── SAVED-PLAN EDITING (durable) ──────────────────────────────────────────────
+// Writes the user's saved weekly plan. Unlike the old sync path, this REPLACES
+// the cloud customWorkouts map (not a merge) so removing a day actually sticks
+// across devices — a merge can only add/update keys, never delete them.
+function _durableSaveBasePlan(next){
+    const hasDays=next&&Object.keys(next).length>0;
+    lsSet('_customWorkouts', hasDays?JSON.stringify(next):'');
+    try{
+        if(typeof fbUser!=='undefined'&&fbUser&&typeof fbDb!=='undefined'&&fbDb){
+            const FV=(window.firebase&&firebase.firestore)?firebase.firestore.FieldValue:null;
+            const val=hasDays?next:(FV?FV.delete():{});
+            fbDb.collection('users').doc(fbUser.uid).update({'settings.customWorkouts':val}).catch(function(){
+                try{fbDb.collection('users').doc(fbUser.uid).set({settings:{customWorkouts:hasDays?next:{}},updated:Date.now()},{merge:true});}catch(e){}
+            });
+        }
+    }catch(e){}
+    try{fbSyncSettings();}catch(e){}
+}
+function _knownWorkouts(){
+    const map={};
+    const add=function(o){ if(o&&o.name&&!map[o.name]) map[o.name]=o; };
+    const base=_basePlan(); Object.keys(base).forEach(function(k){add(base[k]);});
+    Object.keys(WORKOUTS).forEach(function(k){add(WORKOUTS[k]);});
+    return map;
+}
+function openPlanEditor(){
+    const dn=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const base=_basePlan();
+    const known=_knownWorkouts();
+    const names=Object.keys(known);
+    let rows='';
+    for(let d=0;d<7;d++){
+        const cur=base[d]?base[d].name:'';
+        const opts='<option value="__rest__"'+(cur?'':' selected')+'>Rest day</option>'+
+            names.map(function(n){return '<option value="'+n.replace(/"/g,'&quot;')+'"'+(n===cur?' selected':'')+'>'+n+'</option>';}).join('');
+        rows+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="width:80px;font-size:12px;font-weight:700;color:var(--sub);flex-shrink:0">'+dn[d]+'</div><select id="_pe-'+d+'" class="fi" style="flex:1">'+opts+'</select></div>';
+    }
+    const overlay=document.createElement('div');
+    overlay.id='_planEditorModal';
+    overlay.className='ov open';
+    overlay.innerHTML='<div class="modal" onclick="event.stopPropagation()"><div class="mh"></div><div class="mt2">Edit My Week</div><p style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:14px">Set what each day is in your <b>saved plan</b> — your permanent weekly schedule. Temporary shifts always revert back to whatever you set here.</p>'+rows+'<button class="btn btn-o" style="width:100%;margin-top:12px" onclick="savePlanEditor()">Save my plan</button></div>';
+    overlay.addEventListener('click',function(){overlay.remove();});
+    document.body.appendChild(overlay);
+}
+function savePlanEditor(){
+    const known=_knownWorkouts();
+    const next={};
+    for(let d=0;d<7;d++){
+        const el=document.getElementById('_pe-'+d);
+        const v=el?el.value:'__rest__';
+        if(v&&v!=='__rest__'&&known[v]) next[d]=JSON.parse(JSON.stringify(known[v]));
+    }
+    _durableSaveBasePlan(next);
+    const m=document.getElementById('_planEditorModal'); if(m)m.remove();
+    try{showToast('Saved plan updated ✓');}catch(e){}
+    try{if(typeof rWorkout==='function')rWorkout();}catch(e){}
 }
   function _shiftWeekPlan(offset){
       const src=_weekSourcePlan();
@@ -8198,7 +8256,7 @@ function migrateWorkoutPlan(){
 }
 function resetWorkoutPlan(){
   if(!confirm('Reset to the default workout plan? Your custom plan from onboarding will be cleared.'))return;
-  lsSet('_customWorkouts','');
+  _durableSaveBasePlan({});   // clears saved plan locally AND in the cloud (so it sticks)
   refresh();
   closeSettings();
 }
