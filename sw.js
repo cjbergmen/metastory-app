@@ -1,4 +1,4 @@
-const VERSION = '20260718-swipeclose1';
+const VERSION = '20260722-labs1';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately

@@ -566,6 +566,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     <div class="page" id="page-detective"></div>
     <div class="page" id="page-summary"></div>
     <div class="page" id="page-journal"></div>
+    <div class="page" id="page-labs"></div>
+    <div class="page" id="page-labsadmin"></div>
   </div>
   <div id="mini-player">
     <div id="mp-prog" onclick="musSeekBar(event)"><div id="mp-fill"></div></div>
@@ -2853,7 +2855,7 @@ function pct(v,t){return Math.min(100,Math.round(v/t*100))}
 
 // ── NAV ───────────────────────────────────────────────────────────────────────
 let curPage='today';
-const TITLES={today:'Today',workout:'Exercise',food:'Diet',water:'Water',recovery:'Stress',assess:'Assessments',rest:'Rest',supps:'Supplements',detective:'Health Detective',summary:'My DRESS Summary',journal:'Reflections'};
+const TITLES={today:'Today',workout:'Exercise',food:'Diet',water:'Water',recovery:'Stress',assess:'Assessments',rest:'Rest',supps:'Supplements',detective:'Health Detective',summary:'My DRESS Summary',journal:'Reflections',labs:'Functional Lab Testing',labsadmin:'Lab Order Queue'};
 function goPage(p){
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.nb').forEach(e=>e.classList.remove('active'));
@@ -2876,8 +2878,229 @@ function render(p){
   else if(p==='detective')rDetective();
   else if(p==='summary')rDressSummary();
   else if(p==='journal')rJournal();
+  else if(p==='labs')rLabs();
+  else if(p==='labsadmin')rLabsAdmin();
 }
 function refresh(){render(curPage)}
+/* ═══════════════════ FUNCTIONAL LAB ORDERING (GI-MAP) ═══════════════════
+   Self-contained. Uses the app's existing fbDb (Firestore) + fbUser (Auth).
+   Collection: labOrders. Practitioner queue gated to LAB_CONFIG.adminEmails.
+   Edit LAB_CONFIG below to go live (Practice Better links, notify endpoint). */
+const LAB_CONFIG={
+  prices:{giMap:500,review:300,followUp:150},
+  practiceBetter:{
+    resultsReview:"https://megaphonefunctionalhealth.practicebetter.io/#/65b9546e5972361885cfed52/bookings?r=65bbeac40e6f29598e0f4ed2&step=services",
+    followUp:"https://megaphonefunctionalhealth.practicebetter.io/#/65b9546e5972361885cfed52/bookings?r=65bbeac40e6f29598e0f4ed2&step=services"
+  },
+  evexiaPortalUrl:"https://portal.evexiadiagnostics.com/",
+  excludedStates:["NJ","NY","RI"],       // Evexia cannot order here
+  notifyEndpoint:"https://metastory-lab-orders.cjbergmen.workers.dev", // LIVE lab-orders Worker (deployed 2026-07-22)
+  notifyEmail:"cj@metastoryhealth.com",    // new-order emails go here (the Worker reads this field)
+  adminEmails:["cjbergmen@gmail.com"]      // logins that can see the order queue
+};
+const LAB_US_STATES=["AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
+const LAB_STATUSES=[
+  {key:'new',label:'New — add in Evexia',color:'var(--red)'},
+  {key:'evexia',label:'Added in Evexia',color:'var(--orange)'},
+  {key:'shipped',label:'Kit shipped',color:'var(--blue)'},
+  {key:'results',label:'Results in',color:'var(--purple)'},
+  {key:'complete',label:'Complete',color:'var(--green)'}
+];
+let _labView='intro', _labForm={}, _labLastId=null, _labOrders=[], _labListenerOn=false;
+function _labEsc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function _labIsAdmin(){try{return !!(typeof fbUser!=='undefined'&&fbUser&&LAB_CONFIG.adminEmails.map(e=>e.toLowerCase()).includes((fbUser.email||'').toLowerCase()));}catch(e){return false;}}
+function _labStatus(k){return LAB_STATUSES.find(s=>s.key===k)||LAB_STATUSES[0];}
+function _labToast(m){try{showToast(m);}catch(e){}}
+
+/* ---- entry card shown at top of the Supplements tab ---- */
+function _labEntryCardHTML(){
+  const admin=_labIsAdmin();
+  return `<div class="card" style="border:1px solid var(--border)">
+    <span class="kicker">Functional testing</span>
+    <div style="font-family:var(--font-serif);font-size:20px;margin:6px 0 4px">GI-MAP® gut test</div>
+    <p style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:12px">See what's driving digestion, mood, and immune symptoms — then build your plan together.</p>
+    <button onclick="goPage('labs')" style="width:100%;background:var(--green);color:#fff;border:none;border-radius:var(--rs);padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font-sans)">Learn more &amp; order →</button>
+    ${admin?`<button onclick="goPage('labsadmin')" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--rs);padding:11px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;font-family:var(--font-sans)">Practitioner: order queue</button>`:''}
+  </div>`;
+}
+
+/* ---- main render: intro / intake / confirm ---- */
+function rLabs(){
+  const el=document.getElementById('page-labs');if(!el)return;
+  if(_labView==='intake'){el.innerHTML=_labIntakeHTML();_labRestoreForm();_labStateCheck();}
+  else if(_labView==='confirm')el.innerHTML=_labConfirmHTML();
+  else el.innerHTML=_labIntroHTML();
+}
+function _labIntroHTML(){
+  const p=LAB_CONFIG.prices;
+  const step=(n,t,c,d)=>`<div style="display:flex;gap:12px;margin:14px 0"><div style="flex:none;width:30px;height:30px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700">${n}</div><div style="flex:1"><div style="font-weight:700;font-size:15px">${t} <span style="color:var(--orange)">· $${c}</span></div><div style="font-size:13px;color:var(--sub);line-height:1.5;margin-top:2px">${d}</div></div></div>`;
+  return `<div class="card">
+    <span class="kicker">GI-MAP® Program</span>
+    <div style="font-family:var(--font-serif);font-size:23px;line-height:1.25;margin:6px 0 4px">Find out what your gut is actually doing</div>
+    <p style="font-size:13.5px;color:var(--sub);line-height:1.55">The GI-MAP is a DNA-based stool test measuring the bacteria, parasites, fungi, and markers behind digestion, mood, and immune issues — then we meet to build your plan.</p>
+  </div>
+  <div class="card">
+    ${step(1,'Order your GI-MAP',p.giMap,'Paid securely to the lab (Evexia). A kit ships to your door; you collect at home and mail it back.')}
+    ${step(2,'Results &amp; Review',p.review,'Once results are in, we meet 1-on-1 to walk through every marker and build your protocol.')}
+    ${step(3,'Follow-up sessions',p.followUp+' each','Ongoing 1-on-1 support with your practitioner as you work the plan.')}
+    <div class="fdn-chip" style="background:rgba(122,154,171,.14);border-color:#a9c1cd;color:#3f5a68;margin-top:8px"><span>You only pay for step 1 to get started. Sessions are booked and paid separately when you're ready.</span></div>
+  </div>
+  <button onclick="_labGo('intake')" style="width:100%;background:var(--green);color:#fff;border:none;border-radius:var(--rs);padding:15px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font-sans)">Start my GI-MAP order →</button>
+  <a href="${LAB_CONFIG.practiceBetter.resultsReview}" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;background:var(--surface);color:var(--green);border:1.5px solid var(--green);border-radius:var(--rs);padding:13px;font-weight:700;margin-top:10px;font-size:14px">Already tested? Book a Results &amp; Review ($${p.review})</a>
+  <p style="font-size:11.5px;color:var(--sub);line-height:1.5;margin-top:16px">The GI-MAP is ordered through Evexia Diagnostics. This program supports wellness and is not a substitute for diagnosis or treatment by a licensed physician. Always consult your doctor before making medical decisions or changing medications.</p>`;
+}
+function _labField(label,name,type,ph,req){
+  return `<label style="display:block;font-weight:700;font-size:13px;margin:12px 0 5px">${label}${req?' <span style="color:var(--red)">*</span>':''}</label>
+  <input name="${name}" type="${type||'text'}" placeholder="${ph||''}" oninput="_labCapture()" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:var(--rs);font-size:16px;font-family:var(--font-sans);background:var(--surface)">`;
+}
+function _labIntakeHTML(){
+  const opts='<option value="">Select…</option>'+LAB_US_STATES.map(s=>`<option value="${s}">${s}</option>`).join('');
+  return `<div class="card">
+    <div style="font-family:var(--font-serif);font-size:21px;margin-bottom:4px">GI-MAP intake</div>
+    <p style="font-size:13px;color:var(--sub);line-height:1.5">This sets up your lab order. After you submit, Evexia emails you a secure link to pay the $${LAB_CONFIG.prices.giMap} and ship your kit.</p>
+    <div id="lab-state-banner" class="fdn-chip" style="display:none;background:rgba(196,112,112,.14);border-color:#d8a0a0;color:#7a4a4a;margin-top:12px"><span></span></div>
+    <form id="lab-form" onsubmit="return _labSubmit(event)">
+      ${_labField('Full name','fullName','text','',true)}
+      <div style="display:flex;gap:10px">
+        <div style="flex:1">${_labField('Email','email','email','',true)}</div>
+        <div style="flex:1">${_labField('Phone','phone','tel','',true)}</div>
+      </div>
+      ${_labField('Date of birth','dob','date','',true)}
+      <div style="font-weight:700;font-size:14px;margin:18px 0 2px">Shipping address</div>
+      ${_labField('Street address','address1','text','',true)}
+      <div style="display:flex;gap:10px">
+        <div style="flex:2">${_labField('City','city','text','',true)}</div>
+        <div style="flex:1">${_labField('ZIP','zip','text','',true)}</div>
+      </div>
+      <label style="display:block;font-weight:700;font-size:13px;margin:12px 0 5px">State <span style="color:var(--red)">*</span></label>
+      <select name="state" onchange="_labCapture();_labStateCheck()" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:var(--rs);font-size:16px;background:var(--surface);font-family:var(--font-sans)">${opts}</select>
+      <label style="display:block;font-weight:700;font-size:13px;margin:12px 0 5px">What's going on? <span style="color:var(--sub);font-weight:400">(optional)</span></label>
+      <textarea name="concerns" oninput="_labCapture()" placeholder="Bloating, irregularity, fatigue, mood, food reactions…" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:var(--rs);font-size:16px;min-height:70px;font-family:var(--font-sans);background:var(--surface)"></textarea>
+      <div style="font-weight:700;font-size:14px;margin:18px 0 2px">Consent</div>
+      ${_labCheck('cPay',`I understand the <b>$${LAB_CONFIG.prices.giMap} lab fee is paid directly to Evexia</b>, and the $${LAB_CONFIG.prices.review} review and $${LAB_CONFIG.prices.followUp} follow-ups are booked and paid separately.`)}
+      ${_labCheck('cMed',`I understand this testing supports wellness, is <b>not a diagnosis</b>, and I should consult my physician before changing any medication or treatment.`)}
+      ${_labCheck('cPriv',`I consent to Metastory Health storing this intake to set up my order.`)}
+      <button type="submit" id="lab-submit" style="width:100%;background:var(--green);color:#fff;border:none;border-radius:var(--rs);padding:15px;font-size:15px;font-weight:700;cursor:pointer;margin-top:16px;font-family:var(--font-sans)">Submit &amp; start my order</button>
+      <button type="button" onclick="_labGo('intro')" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--rs);padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;font-family:var(--font-sans)">Back</button>
+    </form>
+  </div>`;
+}
+function _labCheck(name,txt){
+  return `<label style="display:flex;gap:10px;align-items:flex-start;font-size:13px;margin:12px 0;line-height:1.45"><input type="checkbox" name="${name}" onchange="_labCapture()" style="width:20px;height:20px;flex:none;margin-top:1px"><span>${txt}</span></label>`;
+}
+function _labCapture(){
+  const f=document.getElementById('lab-form');if(!f)return;
+  ['fullName','email','phone','dob','address1','city','zip','state','concerns'].forEach(n=>{const el=f.elements[n];if(el)_labForm[n]=el.value;});
+  ['cPay','cMed','cPriv'].forEach(n=>{const el=f.elements[n];if(el)_labForm[n]=el.checked;});
+}
+function _labRestoreForm(){
+  const f=document.getElementById('lab-form');if(!f)return;
+  Object.keys(_labForm).forEach(k=>{const el=f.elements[k];if(!el)return;if(el.type==='checkbox')el.checked=!!_labForm[k];else el.value=_labForm[k];});
+}
+function _labStateCheck(){
+  const f=document.getElementById('lab-form');if(!f)return;
+  const st=f.elements['state']?f.elements['state'].value:'';
+  const excluded=LAB_CONFIG.excludedStates.includes(st);
+  const b=document.getElementById('lab-state-banner');
+  if(b){b.style.display=excluded?'flex':'none';b.querySelector('span').innerHTML=excluded?`Evexia can't ship kits to <b>${_labEsc(st)}</b> due to state regulations. Reach out and we'll discuss alternatives.`:'';}
+  const btn=document.getElementById('lab-submit');if(btn){btn.disabled=excluded;btn.style.opacity=excluded?.5:1;}
+}
+function _labGo(v){_labView=v;rLabs();try{document.getElementById('pages').scrollTop=0;}catch(e){}}
+function _labSubmit(e){
+  e.preventDefault();_labCapture();
+  const d=_labForm;
+  const emailOk=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email||'');
+  const missing=['fullName','phone','dob','address1','city','zip','state'].some(k=>!d[k])||!emailOk;
+  const consent=d.cPay&&d.cMed&&d.cPriv;
+  if(LAB_CONFIG.excludedStates.includes(d.state)){_labToast("Sorry — we can't order in that state.");return false;}
+  if(missing){_labToast('Please complete all required fields.');return false;}
+  if(!consent){_labToast('Please check all three consent boxes.');return false;}
+  const order={
+    fullName:d.fullName.trim(),email:d.email.trim(),phone:d.phone.trim(),dob:d.dob,
+    address1:d.address1.trim(),city:d.city.trim(),state:d.state,zip:d.zip.trim(),
+    concerns:(d.concerns||'').trim(),product:'GI-MAP',priceQuoted:LAB_CONFIG.prices.giMap,status:'new',
+    createdAt:(typeof fbDb!=='undefined'&&fbDb&&window.firebase&&firebase.firestore)?firebase.firestore.FieldValue.serverTimestamp():new Date().toISOString(),
+    submittedBy:(typeof fbUser!=='undefined'&&fbUser)?(fbUser.email||fbUser.uid||''):''
+  };
+  const btn=document.getElementById('lab-submit');if(btn){btn.disabled=true;btn.textContent='Submitting…';}
+  const done=id=>{_labLastId=id;_labNotify(order);_labView='confirm';rLabs();_labForm={};};
+  if(typeof fbDb!=='undefined'&&fbDb){
+    fbDb.collection('labOrders').add(order).then(ref=>done(ref.id)).catch(err=>{console.warn('lab order save failed',err);_labToast('Could not save — please try again.');if(btn){btn.disabled=false;btn.textContent='Submit & start my order';}});
+  }else{ _labOrders.unshift({id:'local-'+Date.now(),...order}); done('local-'+Date.now()); }
+  return false;
+}
+function _labNotify(order){
+  if(LAB_CONFIG.notifyEndpoint&&/^https?:\/\//.test(LAB_CONFIG.notifyEndpoint)){try{fetch(LAB_CONFIG.notifyEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({notifyEmail:LAB_CONFIG.notifyEmail},order))}).catch(()=>{});}catch(e){}}
+  if('Notification' in window && Notification.permission==='granted'){try{new Notification('New GI-MAP order',{body:order.fullName+' — add in Evexia'});}catch(e){}}
+}
+function _labConfirmHTML(){
+  const p=LAB_CONFIG.prices, first=(_labLastName()||'friend');
+  return `<div class="card" style="text-align:center">
+    <div style="font-size:44px">✅</div>
+    <div style="font-family:var(--font-serif);font-size:23px;margin:4px 0 2px">You're all set, ${_labEsc(first)}!</div>
+    <p style="font-size:13px;color:var(--sub);line-height:1.5">Watch your email — Evexia will send a secure link to pay $${p.giMap} and ship your kit. Check spam if you don't see it within a day.</p>
+  </div>
+  <div class="card">
+    <span class="kicker">What happens next</span>
+    <p style="font-size:13.5px;line-height:1.6;margin-top:8px">1. Pay &amp; receive your kit from Evexia<br>2. Collect your sample at home and mail it back<br>3. Book your Results &amp; Review once results are in (~3 weeks)</p>
+  </div>
+  <a href="${p.review&&LAB_CONFIG.practiceBetter.resultsReview}" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;background:var(--green);color:#fff;border-radius:var(--rs);padding:15px;font-weight:700;font-size:15px">Book my Results &amp; Review ($${p.review}) →</a>
+  <a href="${LAB_CONFIG.practiceBetter.followUp}" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;background:var(--surface);color:var(--green);border:1.5px solid var(--green);border-radius:var(--rs);padding:13px;font-weight:700;margin-top:10px;font-size:14px">Book a follow-up ($${p.followUp})</a>
+  <button onclick="_labGo('intro')" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--rs);padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-top:14px;font-family:var(--font-sans)">Done</button>
+  <p style="font-size:11.5px;color:var(--sub);line-height:1.5;margin-top:14px;text-align:center">Need to remove your info? <a href="#" onclick="_labDeleteMine();return false;" style="color:var(--green)">Delete my submitted data</a>.</p>`;
+}
+function _labLastName(){const o=_labOrders.find(x=>x.id===_labLastId);if(o)return (o.fullName||'').split(' ')[0];return (_labForm&&_labForm.fullName)?String(_labForm.fullName).split(' ')[0]:'';}
+function _labDeleteMine(){
+  if(!_labLastId){_labToast('Nothing to delete here.');return;}
+  if(typeof fbDb!=='undefined'&&fbDb&&!String(_labLastId).startsWith('local-'))fbDb.collection('labOrders').doc(_labLastId).delete().catch(()=>{});
+  _labOrders=_labOrders.filter(o=>o.id!==_labLastId);_labLastId=null;_labToast('Your data was deleted.');_labGo('intro');
+}
+
+/* ---- practitioner order queue ---- */
+function _labStartListener(){
+  if(_labListenerOn||typeof fbDb==='undefined'||!fbDb)return;
+  _labListenerOn=true;
+  try{fbDb.collection('labOrders').orderBy('createdAt','desc').onSnapshot(snap=>{
+    _labOrders=snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(curPage==='labsadmin')rLabsAdmin();
+  },err=>{console.warn('lab queue listen failed',err);});}catch(e){_labListenerOn=false;}
+}
+function _labHandoff(o){
+  return `PATIENT (add in Evexia)\nName:  ${o.fullName}\nDOB:   ${o.dob}\nEmail: ${o.email}\nPhone: ${o.phone}\nAddress: ${o.address1}, ${o.city}, ${o.state} ${o.zip}\nTest:  GI-MAP  (retail $${o.priceQuoted})`;
+}
+function rLabsAdmin(){
+  const el=document.getElementById('page-labsadmin');if(!el)return;
+  if(!_labIsAdmin()){el.innerHTML=`<div class="card">Sign in as a practitioner to view the order queue.</div>`;return;}
+  _labStartListener();
+  const demo=(typeof fbDb==='undefined'||!fbDb);
+  let h=`<div class="fdn-chip" style="background:rgba(122,154,171,.14);border-color:#a9c1cd;color:#3f5a68;margin-bottom:10px"><span>${demo?'Demo mode — no Firestore. Orders live only in this session.':'Live — connected to your Firestore (labOrders).'}</span></div>
+  <a href="${LAB_CONFIG.evexiaPortalUrl}" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;background:var(--green);color:#fff;border-radius:var(--rs);padding:13px;font-weight:700;margin-bottom:12px;font-size:14px">Open Evexia portal — add patient ↗</a>`;
+  if(!_labOrders.length){h+=`<div class="card" style="color:var(--sub)">No orders yet. Submit one from the Order screen to see it here live.</div>`;}
+  _labOrders.forEach(o=>{
+    const st=_labStatus(o.status);
+    const when=(o.createdAt&&o.createdAt.toDate)?o.createdAt.toDate().toLocaleString():(typeof o.createdAt==='string'?new Date(o.createdAt).toLocaleString():'just now');
+    h+=`<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <b style="font-size:15px">${_labEsc(o.fullName)}</b>
+        <span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;color:#fff;background:${st.color}">${st.label}</span>
+      </div>
+      <div style="font-size:12px;color:var(--sub);margin:5px 0">${_labEsc(o.email)} · ${_labEsc(o.phone)} · ${_labEsc(o.state)} · ${when}</div>
+      ${o.concerns?`<div style="font-size:12px;color:var(--sub);font-style:italic">"${_labEsc(o.concerns)}"</div>`:''}
+      <pre style="background:var(--text);color:#e8e2d8;border-radius:var(--rs);padding:11px;font-size:11.5px;white-space:pre-wrap;margin:10px 0;overflow-x:auto">${_labEsc(_labHandoff(o))}</pre>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button onclick="_labCopy('${o.id}')" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer">Copy for Evexia</button>
+        <select onchange="_labSetStatus('${o.id}',this.value)" style="padding:8px;border:1px solid var(--border);border-radius:8px;font-size:12px;background:var(--surface)">${LAB_STATUSES.map(s=>`<option value="${s.key}" ${s.key===o.status?'selected':''}>${s.label}</option>`).join('')}</select>
+        <button onclick="_labAdminDelete('${o.id}')" style="background:rgba(196,112,112,.14);color:var(--red);border:none;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer">Delete</button>
+      </div>
+    </div>`;
+  });
+  h+=`<button onclick="goPage('supps')" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--rs);padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-top:6px;font-family:var(--font-sans)">← Back</button>`;
+  el.innerHTML=h;
+}
+function _labCopy(id){const o=_labOrders.find(x=>x.id===id);if(!o)return;const t=_labHandoff(o);if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t);else{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();}_labToast('Copied — paste into Evexia');}
+function _labSetStatus(id,v){if(typeof fbDb!=='undefined'&&fbDb&&!String(id).startsWith('local-'))fbDb.collection('labOrders').doc(id).update({status:v}).catch(()=>{});const o=_labOrders.find(x=>x.id===id);if(o)o.status=v;if(curPage==='labsadmin')rLabsAdmin();}
+function _labAdminDelete(id){if(typeof fbDb!=='undefined'&&fbDb&&!String(id).startsWith('local-'))fbDb.collection('labOrders').doc(id).delete().catch(()=>{});_labOrders=_labOrders.filter(o=>o.id!==id);if(curPage==='labsadmin')rLabsAdmin();}
+/* ═══════════════════ END FUNCTIONAL LAB ORDERING ═══════════════════ */
 
 // ── DATE NAV ──────────────────────────────────────────────────────────────────
 const _D=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -11498,6 +11721,7 @@ function startTitr(id){
 function rSupps(){
   const plan=_suppPlan();const taken=_suppTaken();const t=_titr();
   let h=_tabRoutineHTML('supps');
+  h+=_labEntryCardHTML();
   // Safety banner — reflects the user's health flags so gating is visible on this tab
   try{
     const f=_detFlags();
