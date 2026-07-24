@@ -1159,6 +1159,7 @@ function fbSyncSettings(){
     if(lsGet('_onboardDone','')) settings.onboardDone='1';
     try { const df=lsGet('_detFlags',''); if(df) settings.detFlags=JSON.parse(df); } catch(e){}
     try { const cw=lsGet('_customWorkouts',''); if(cw) settings.customWorkouts=JSON.parse(cw); } catch(e){}
+    try { const wa=lsGet('_weekAdjust',''); if(wa) settings.weekAdjust=JSON.parse(wa); } catch(e){}
     try { const aw=lsGet('_aiWeekly',''); if(aw) settings.aiWeekly=JSON.parse(aw); } catch(e){}
     try { const ns=lsGet('_assess_ns_result',''); if(ns) settings.assessNs=JSON.parse(ns); } catch(e){}
     try { const gut=lsGet('_assess_gut_result',''); if(gut) settings.assessGut=JSON.parse(gut); } catch(e){}
@@ -1283,6 +1284,7 @@ async function fbPullAll(){
         if(s.onboardDone || s.userProfile || s.userTargets || s.routineTR) lsSet('_onboardDone', '1');
         if(s.detFlags) lsSet('_detFlags', JSON.stringify(s.detFlags));
         if(s.customWorkouts) lsSet('_customWorkouts', JSON.stringify(s.customWorkouts));
+        if(s.weekAdjust) lsSet('_weekAdjust', JSON.stringify(s.weekAdjust));
         if(s.aiWeekly) lsSet('_aiWeekly', JSON.stringify(s.aiWeekly));
         if(s.assessNs) lsSet('_assess_ns_result', JSON.stringify(s.assessNs));
         if(s.assessGut) lsSet('_assess_gut_result', JSON.stringify(s.assessGut));
@@ -2062,7 +2064,7 @@ function getWeekData(){
     const water=parseFloat(lsGet('wa_'+key,'0'));
     const p=log.reduce((s,e)=>s+(+e.p||0),0);
     const k=log.reduce((s,e)=>s+(+e.k||0),0);
-    const isTr=_trainDaySet().includes(d.getDay());
+    const isTr=_trainDaySet(_dkOf(d)).includes(d.getDay());
     const _tgt=_tgtFor(isTr);
     result.push({key,label:['Su','Mo','Tu','We','Th','Fr','Sa'][d.getDay()],
       p:Math.round(p),k:Math.round(k),water,
@@ -2798,21 +2800,46 @@ function askAIForSwaps(){
     showToast('AI error — please try again');
   });
 }
+// ── WEEKLY PLAN RESOLUTION ────────────────────────────────────────────────────
+// The saved plan (_customWorkouts) is the source of truth and is NEVER mutated by
+// shift/move. A shift or move instead writes a TEMPORARY adjustment for one week
+// only (_weekAdjust, keyed to that week's Monday). Once the calendar reaches the
+// next week the adjustment stops applying and the user's saved plan returns on its
+// own — no default assumptions about what any given day "should" be.
+function _weekKeyFor(dstr){
+  const d=new Date((dstr||dk())+'T12:00:00');
+  d.setDate(d.getDate()-((d.getDay()+6)%7)); // back to Monday — weeks start Monday
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function _basePlan(){
+  const raw=lsGet('_customWorkouts','');
+  if(raw){try{const cw=JSON.parse(raw);if(cw&&typeof cw==='object'&&Object.keys(cw).length)return cw;}catch(e){}}
+  return WORKOUTS;
+}
+// The temporary adjustment plan for dstr's week, or null if none applies that week.
+function _weekAdjustFor(dstr){
+  try{const raw=lsGet('_weekAdjust','');if(raw){const a=JSON.parse(raw);if(a&&a.week===_weekKeyFor(dstr)&&a.plan&&typeof a.plan==='object')return a.plan;}}catch(e){}
+  return null;
+}
+function _effectivePlan(dstr){ return _weekAdjustFor(dstr)||_basePlan(); }
+function _hasWeekAdjust(){ return !!_weekAdjustFor(viewDate); }
+// Persist a one-week adjustment for the CURRENT view's week (never touches the saved plan).
+function _saveWeekAdjust(plan){
+  lsSet('_weekAdjust',JSON.stringify({week:_weekKeyFor(viewDate),plan:plan}));
+  try{fbSyncSettings();}catch(e){}
+}
+// Drop this week's adjustment → snap straight back to the saved plan.
+function clearWeekAdjust(){
+  if(!_hasWeekAdjust()){try{showToast('Already on your plan');}catch(e){}return;}
+  lsSet('_weekAdjust','');
+  try{fbSyncSettings();}catch(e){}
+  try{showToast('Back to your plan ↩');}catch(e){}
+  try{if(typeof rWorkout==='function')rWorkout();}catch(e){}
+}
 function getWO(){
   const d=vdDate().getDay();
-  const custom=lsGet('_customWorkouts','');
-  if(custom){
-    try{
-      const cw=JSON.parse(custom);
-      // Once a user has a custom schedule, it's the complete week: a day with
-      // no entry is a rest day. This keeps the workout, the training-day badge,
-      // and the macro targets all in sync when days are shifted or moved.
-      if(cw&&typeof cw==='object'&&Object.keys(cw).length){
-        return cw[d]||null;
-      }
-    }catch(e){}
-  }
-  return WORKOUTS[d]||null;
+  const plan=_effectivePlan(viewDate);
+  return (plan&&plan[d])||null;
 }
 function isWODone(){return lsGet('wd_'+viewDate,'0')==='1'}
 function setWODone(v){lsSet('wd_'+viewDate,v?'1':'0');refresh();}
@@ -3242,13 +3269,77 @@ function rToday(){
 }
 
 function _weekSourcePlan(){
-    let src={};
+    // The plan currently in effect for the viewed week: a live adjustment if one
+    // exists for this week, otherwise the saved plan. Shift/move build on top of this.
+    return _effectivePlan(viewDate);
+}
+// Shared controls row for the Exercise page (workout and rest-day views).
+// When a one-week adjustment is active, offer an instant "Back to my plan".
+function _planControlsHTML(){
+    const link='font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer';
+    const dot='<span style="color:var(--sub);opacity:.4;margin:0 7px">·</span>';
+    let h='<span onclick="openPlanEditor()" style="'+link+'">Edit my week</span>'+dot
+         +'<span onclick="openMoveDay()" style="'+link+'">Move a day</span>'+dot
+         +'<span onclick="openShiftWeek()" style="'+link+'">Shift week</span>';
+    if(_hasWeekAdjust()) h+=dot+'<span onclick="clearWeekAdjust()" style="font-size:11px;color:var(--orange);font-weight:700;text-decoration:underline;cursor:pointer">↩ Back to my plan</span>';
+    return h;
+}
+// ── SAVED-PLAN EDITING (durable) ──────────────────────────────────────────────
+// Writes the user's saved weekly plan. Unlike the old sync path, this REPLACES
+// the cloud customWorkouts map (not a merge) so removing a day actually sticks
+// across devices — a merge can only add/update keys, never delete them.
+function _durableSaveBasePlan(next){
+    const hasDays=next&&Object.keys(next).length>0;
+    lsSet('_customWorkouts', hasDays?JSON.stringify(next):'');
     try{
-          const raw=lsGet('_customWorkouts','');
-          if(raw)src=JSON.parse(raw);
-    }catch(e){src={};}
-    if(!src||typeof src!=='object'||!Object.keys(src).length)src=WORKOUTS;
-    return src;
+        if(typeof fbUser!=='undefined'&&fbUser&&typeof fbDb!=='undefined'&&fbDb){
+            const FV=(window.firebase&&firebase.firestore)?firebase.firestore.FieldValue:null;
+            const val=hasDays?next:(FV?FV.delete():{});
+            fbDb.collection('users').doc(fbUser.uid).update({'settings.customWorkouts':val}).catch(function(){
+                try{fbDb.collection('users').doc(fbUser.uid).set({settings:{customWorkouts:hasDays?next:{}},updated:Date.now()},{merge:true});}catch(e){}
+            });
+        }
+    }catch(e){}
+    try{fbSyncSettings();}catch(e){}
+}
+function _knownWorkouts(){
+    const map={};
+    const add=function(o){ if(o&&o.name&&!map[o.name]) map[o.name]=o; };
+    const base=_basePlan(); Object.keys(base).forEach(function(k){add(base[k]);});
+    Object.keys(WORKOUTS).forEach(function(k){add(WORKOUTS[k]);});
+    return map;
+}
+function openPlanEditor(){
+    const dn=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const base=_basePlan();
+    const known=_knownWorkouts();
+    const names=Object.keys(known);
+    let rows='';
+    for(let d=0;d<7;d++){
+        const cur=base[d]?base[d].name:'';
+        const opts='<option value="__rest__"'+(cur?'':' selected')+'>Rest day</option>'+
+            names.map(function(n){return '<option value="'+n.replace(/"/g,'&quot;')+'"'+(n===cur?' selected':'')+'>'+n+'</option>';}).join('');
+        rows+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="width:80px;font-size:12px;font-weight:700;color:var(--sub);flex-shrink:0">'+dn[d]+'</div><select id="_pe-'+d+'" class="fi" style="flex:1">'+opts+'</select></div>';
+    }
+    const overlay=document.createElement('div');
+    overlay.id='_planEditorModal';
+    overlay.className='ov open';
+    overlay.innerHTML='<div class="modal" onclick="event.stopPropagation()"><div class="mh"></div><div class="mt2">Edit My Week</div><p style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:14px">Set what each day is in your <b>saved plan</b> — your permanent weekly schedule. Temporary shifts always revert back to whatever you set here.</p>'+rows+'<button class="btn btn-o" style="width:100%;margin-top:12px" onclick="savePlanEditor()">Save my plan</button></div>';
+    overlay.addEventListener('click',function(){overlay.remove();});
+    document.body.appendChild(overlay);
+}
+function savePlanEditor(){
+    const known=_knownWorkouts();
+    const next={};
+    for(let d=0;d<7;d++){
+        const el=document.getElementById('_pe-'+d);
+        const v=el?el.value:'__rest__';
+        if(v&&v!=='__rest__'&&known[v]) next[d]=JSON.parse(JSON.stringify(known[v]));
+    }
+    _durableSaveBasePlan(next);
+    const m=document.getElementById('_planEditorModal'); if(m)m.remove();
+    try{showToast('Saved plan updated ✓');}catch(e){}
+    try{if(typeof rWorkout==='function')rWorkout();}catch(e){}
 }
   function _shiftWeekPlan(offset){
       const src=_weekSourcePlan();
@@ -3259,18 +3350,17 @@ function _weekSourcePlan(){
             const nd=((d+offset)%7+7)%7;
             next[nd]=src[k];
       });
-      lsSet('_customWorkouts',JSON.stringify(next));
-      try{fbSyncSettings();}catch(e){}
+      _saveWeekAdjust(next);   // this week only — never touches the saved plan
       const m=document.getElementById('_shiftWeekModal');
       if(m)m.remove();
-      try{showToast('Week shifted '+(offset>0?offset+' day'+(offset>1?'s':'')+' later':Math.abs(offset)+' day'+(Math.abs(offset)>1?'s':'')+' earlier'));}catch(e){}
+      try{showToast('Week shifted '+(offset>0?offset+' day'+(offset>1?'s':'')+' later':Math.abs(offset)+' day'+(Math.abs(offset)>1?'s':'')+' earlier')+' · this week only');}catch(e){}
       try{if(typeof rWorkout==='function')rWorkout();}catch(e){}
   }
   function openShiftWeek(){
       const overlay=document.createElement('div');
       overlay.id='_shiftWeekModal';
       overlay.className='ov open';
-      overlay.innerHTML=`<div class="modal" onclick="event.stopPropagation()"><div class="mh"></div><div class="mt2">Shift Your Week</div><p style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:14px">Can't train on the usual day? Move your whole week's plan earlier or later — every workout keeps its place in the order, it just lands on different days.</p><div style="display:flex;gap:8px;margin-bottom:14px"><button class="btn btn-s" style="flex:1" onclick="_shiftWeekPlan(-1)">◀ 1 day earlier</button><button class="btn btn-s" style="flex:1" onclick="_shiftWeekPlan(1)">1 day later ▶</button></div><div class="kicker" style="margin-bottom:8px">Or shift by any amount</div><div style="display:flex;gap:6px;flex-wrap:wrap">${[-3,-2,-1,1,2,3].map(function(n){return '<button class="wo-chip" onclick="_shiftWeekPlan('+n+')">'+(n>0?'+'+n:n)+' day'+(Math.abs(n)>1?'s':'')+'</button>';}).join('')}</div></div>`;
+      overlay.innerHTML=`<div class="modal" onclick="event.stopPropagation()"><div class="mh"></div><div class="mt2">Shift Your Week</div><p style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:14px">Can't train on the usual day? Move your whole week's plan earlier or later — every workout keeps its place in the order, it just lands on different days. <b>This changes just this week; your saved plan returns Monday.</b></p><div style="display:flex;gap:8px;margin-bottom:14px"><button class="btn btn-s" style="flex:1" onclick="_shiftWeekPlan(-1)">◀ 1 day earlier</button><button class="btn btn-s" style="flex:1" onclick="_shiftWeekPlan(1)">1 day later ▶</button></div><div class="kicker" style="margin-bottom:8px">Or shift by any amount</div><div style="display:flex;gap:6px;flex-wrap:wrap">${[-3,-2,-1,1,2,3].map(function(n){return '<button class="wo-chip" onclick="_shiftWeekPlan('+n+')">'+(n>0?'+'+n:n)+' day'+(Math.abs(n)>1?'s':'')+'</button>';}).join('')}</div></div>`;
       overlay.addEventListener('click',function(){overlay.remove();});
       document.body.appendChild(overlay);
   }
@@ -3299,11 +3389,10 @@ function _weekSourcePlan(){
             next[to]=moving;
             delete next[from];
       }
-      lsSet('_customWorkouts',JSON.stringify(next));
-      try{fbSyncSettings();}catch(e){}
+      _saveWeekAdjust(next);   // this week only — never touches the saved plan
       if(m)m.remove();
       const dn=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-      try{showToast(swapped?(dn[from]+' ↔ '+dn[to]+' swapped'):((moving.name||'Workout')+' moved to '+dn[to]));}catch(e){}
+      try{showToast((swapped?(dn[from]+' ↔ '+dn[to]+' swapped'):((moving.name||'Workout')+' moved to '+dn[to]))+' · this week only');}catch(e){}
       try{if(typeof rWorkout==='function')rWorkout();}catch(e){}
   }
   function openMoveDay(){
@@ -3318,7 +3407,7 @@ function _weekSourcePlan(){
       const overlay=document.createElement('div');
       overlay.id='_moveDayModal';
       overlay.className='ov open';
-      overlay.innerHTML='<div class="modal" onclick="event.stopPropagation()"><div class="mh"></div><div class="mt2">Move a Workout</div><p style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:16px">Move one day\'s session to a different day. If the day you pick already has a workout, the two days trade places.</p><div class="kicker" style="margin-bottom:6px">Move this workout</div><select id="_moveFrom" class="fi">'+fromOpts+'</select><div class="kicker" style="margin:14px 0 6px">To this day</div><select id="_moveTo" class="fi">'+toOpts+'</select><button class="btn btn-o" style="width:100%;margin-top:18px" onclick="_moveDayPlan(document.getElementById(\'_moveFrom\').value,document.getElementById(\'_moveTo\').value)">Move workout</button></div>';
+      overlay.innerHTML='<div class="modal" onclick="event.stopPropagation()"><div class="mh"></div><div class="mt2">Move a Workout</div><p style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:16px">Move one day\'s session to a different day. If the day you pick already has a workout, the two days trade places. <b>Just for this week — your saved plan returns Monday.</b></p><div class="kicker" style="margin-bottom:6px">Move this workout</div><select id="_moveFrom" class="fi">'+fromOpts+'</select><div class="kicker" style="margin:14px 0 6px">To this day</div><select id="_moveTo" class="fi">'+toOpts+'</select><button class="btn btn-o" style="width:100%;margin-top:18px" onclick="_moveDayPlan(document.getElementById(\'_moveFrom\').value,document.getElementById(\'_moveTo\').value)">Move workout</button></div>';
       overlay.addEventListener('click',function(){overlay.remove();});
       document.body.appendChild(overlay);
   }
@@ -3332,8 +3421,7 @@ function rWorkout(){
     // Read custom workouts if available, otherwise fall back to hardcoded defaults
     let weekWO={};
     let usingCustom=false;
-    try{const raw=lsGet('_customWorkouts','');if(raw){weekWO=JSON.parse(raw);usingCustom=Object.keys(weekWO).length>0;}}catch(e){}
-    if(!usingCustom)weekWO=WORKOUTS;
+    weekWO=_effectivePlan(viewDate);  // saved plan, or this week's adjustment if one is active
     // Build the day list from whatever plan is active
     const dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
     const activeDays=Object.keys(weekWO).map(Number).filter(d=>weekWO[d]).sort((a,b)=>a-b);
@@ -3347,7 +3435,7 @@ function rWorkout(){
       <span class="kicker">Today · Recovery</span>
       <h3>Rest day</h3>
       <p>Movement heals only when the body can afford it. Today is for walking, mobility, and contrast therapy — under-recovery is when progress quietly stalls.</p></div>
-      <div class="card"><div style="display:flex;align-items:center;justify-content:space-between"><div class="ct">${splitTitle}</div><span style="flex-shrink:0;margin-left:8px;white-space:nowrap"><span onclick="openMoveDay()" style="font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer">Move a day</span><span style="color:var(--sub);opacity:.4;margin:0 7px">·</span><span onclick="openShiftWeek()" style="font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer">Shift week</span></span></div>`;
+      <div class="card"><div style="display:flex;align-items:center;justify-content:space-between"><div class="ct">${splitTitle}${_hasWeekAdjust()?' <span style="font-size:10px;color:var(--orange);font-weight:700">· adjusted this week</span>':''}</div><span style="flex-shrink:0;margin-left:8px;white-space:nowrap">${_planControlsHTML()}</span></div>`;
     activeDays.forEach(d=>{
       const w=weekWO[d];
       if(!w)return;
@@ -3387,7 +3475,7 @@ function rWorkout(){
     </div>`;
   }
   h+=_exHeroBlock(wo);
-  h+=`<div style="display:flex;justify-content:flex-end;align-items:center;gap:0;margin:-4px 3px 8px;white-space:nowrap"><span onclick="openMoveDay()" style="font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer">Move a day</span><span style="color:var(--sub);opacity:.4;margin:0 7px">·</span><span onclick="openShiftWeek()" style="font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer">Shift week</span></div>`;
+  h+=`<div style="display:flex;justify-content:flex-end;align-items:center;gap:0;margin:-4px 3px 8px;white-space:nowrap">${_planControlsHTML()}</div>`;
   if(wo.info){
     const inf=wo.info;
     h+=`<div class="wo-info-wrap" id="wic-today" onclick="flipWOCard('wic-today',event)">
@@ -4330,8 +4418,9 @@ const PROG_REVIEW_DAYS=7; // Progress card + Weekly Review use a recent 7-day wi
 const CK_POS_MOODS=['Calm','Content','Energized'];
 const CK_GOOD_CTX=['relaxing','with_people','eating_slowly'];
 function _dkOf(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-function _trainDaySet(){
-  try{const cw=JSON.parse(lsGet('_customWorkouts','{}')||'{}');const ks=Object.keys(cw).map(Number).filter(n=>!isNaN(n)&&n>=0&&n<=6);if(ks.length)return ks;}catch(e){}
+function _trainDaySet(dstr){
+  // Week-aware: honours a temporary adjustment for that date's week, else the saved plan.
+  try{const plan=_effectivePlan(dstr||viewDate);const ks=Object.keys(plan).map(Number).filter(n=>!isNaN(n)&&n>=0&&n<=6&&plan[n]);if(ks.length)return ks;}catch(e){}
   return [1,2,4,5];
 }
 function _tgtFor(isT){
@@ -4341,7 +4430,7 @@ function _tgtFor(isT){
 }
 function _dayFacts(d){
   const key=_dkOf(d);
-  const isT=_trainDaySet().includes(d.getDay());
+  const isT=_trainDaySet(key).includes(d.getDay());
   const tgt=_tgtFor(isT);
   const f={planned:isT?1:0,woAny:0,logged:0,protHit:0,calOk:0,waterTracked:0,waterMet:0,waterFrac:0,
     ctxGood:0,ctxTot:0,moodReg:0,moodTot:0,pairs:0,improved:0,suppTaken:0,suppSched:0,suppDay:0,ckAny:0,
@@ -8167,7 +8256,7 @@ function migrateWorkoutPlan(){
 }
 function resetWorkoutPlan(){
   if(!confirm('Reset to the default workout plan? Your custom plan from onboarding will be cleared.'))return;
-  lsSet('_customWorkouts','');
+  _durableSaveBasePlan({});   // clears saved plan locally AND in the cloud (so it sticks)
   refresh();
   closeSettings();
 }
