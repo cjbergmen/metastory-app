@@ -1,4 +1,4 @@
-const VERSION = '20260722-labs3';
+const VERSION = '20260722-timerfix';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately

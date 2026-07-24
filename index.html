@@ -2739,6 +2739,19 @@ function saveExEdit(){
   var wv=document.getElementById('exedit-weight').value;
   if(wv==='')delete ne.dw;else ne.dw=wv;
   if(wv!==''){if(!_woState[ne.n])_woState[ne.n]={selW:null,rep:''};_woState[ne.n].selW=(wv==='bw'?0:parseFloat(wv));}
+  var _origName=_woExList[idx]||ne.n;
+  // Persist the edit straight to the saved plan so it's permanent and survives
+  // logging, re-renders, and reloads (fixes the "timer reverts after logging" bug).
+  if(_persistExEditToPlan(vdDate().getDay(),_origName,ne)){
+    delete _woPendingSwaps[idx];
+    _woExList[idx]=ne.n;
+    closeExEdit();
+    try{showToast('Saved to your plan ✓');}catch(_){}
+    try{rWorkout();}catch(_){}
+    return;
+  }
+  // Fallback (e.g. a rest day, or the exercise isn't in the base plan): stage it as
+  // a pending change the user can Save Today / Save Week.
   _woPendingSwaps[idx]=ne;
   _woExList[idx]=ne.n;
   closeExEdit();
@@ -2750,6 +2763,20 @@ function saveExEdit(){
   if(card)card.outerHTML=buildExCard(ne,idx,num,wo?wo.col:'',isWODone());
   _updatePendingBar();
   try{showToast('Updated — tap Save to keep it');}catch(_){}
+}
+// Write a single exercise edit into the SAVED plan (all days materialized first so
+// none are ever dropped), then durably persist (local + Firestore) via _durableSaveBasePlan.
+function _persistExEditToPlan(dayIdx,origName,ne){
+  try{
+    var base=_basePlan(); if(!base) return false;
+    var next={};
+    Object.keys(base).forEach(function(k){var kn=Number(k);if(!isNaN(kn)&&kn>=0&&kn<=6&&base[k])next[kn]=JSON.parse(JSON.stringify(base[k]));});
+    var wo=next[dayIdx]; if(!wo) return false;
+    var repl=function(arr){ if(!arr) return false; for(var i=0;i<arr.length;i++){ if(arr[i].n===origName||arr[i].n===ne.n){ arr[i]=ne; return true; } } return false; };
+    if(!(repl(wo.ex)||repl(wo.pm))) return false;
+    _durableSaveBasePlan(next);
+    return true;
+  }catch(e){ return false; }
 }
 function _updatePendingBar(){
   var pc=Object.keys(_woPendingSwaps).length;
