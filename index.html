@@ -2487,7 +2487,7 @@ function buildExCard(e,idx,num,col,wdone){
     </div>
     <div class="wo-done-row">
       <button class="wo-done-ex-btn" onclick="markExDone(${idx})">✓ Done</button>
-      <button id="card-timer-${idx}" class="card-timer-btn" onclick="cardTimerClick(${idx},${_parseRestSec(e.rest)})">${_fmtCT(_parseRestSec(e.rest))}</button>
+      <button id="card-timer-${idx}" class="card-timer-btn${(_cardTimers[idx]&&_cardTimers[idx].iv)?' ctr':''}" onclick="cardTimerClick(${idx},${_parseRestSec(e.rest)})">${(_cardTimers[idx]&&_cardTimers[idx].iv)?_fmtCT(_cardTimers[idx].sec):_fmtCT(_parseRestSec(e.rest))}</button>
     </div>`;
   }
   h+=`</div>`;
@@ -7718,17 +7718,19 @@ function cardTimerClick(idx,initSec){
     if(el){el.textContent=_fmtCT(t.sec);el.className='card-timer-btn ctr';}
     t.iv=setInterval(()=>{
       t.sec--;
+      // Keep counting even if the button is momentarily gone (e.g. the card is
+      // flipped to the how-to / info side, which has no timer button). Only touch
+      // the DOM when it exists — so clicking "info" no longer stops the rest timer.
       const el2=document.getElementById('card-timer-'+idx);
-      if(!el2){clearInterval(t.iv);t.iv=null;return;}
       if(t.sec<=0){
         clearInterval(t.iv);t.iv=null;
-        el2.textContent=_fmtCT(t.init);
-        el2.className='card-timer-btn cdone';
+        if(el2){el2.textContent=_fmtCT(t.init);el2.className='card-timer-btn cdone';}
         playAlarm();
         // Auto-reset class after 3s so they can click for next set
         setTimeout(()=>{const e3=document.getElementById('card-timer-'+idx);if(e3&&e3.className.includes('cdone'))e3.className='card-timer-btn';},3000);
-      } else {
+      } else if(el2){
         el2.textContent=_fmtCT(t.sec);
+        if(el2.className.indexOf('ctr')<0)el2.className='card-timer-btn ctr';
       }
     },1000);
   }

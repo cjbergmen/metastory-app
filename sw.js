@@ -1,4 +1,4 @@
-const VERSION = '20260722-timerfix';
+const VERSION = '20260722-cardtimer';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
