@@ -2195,40 +2195,49 @@ function fmtLastSets(sets){
 }
 
 // ── PERSONAL BEST ────────────────────────────────────────────────────────────
-// The heaviest single set ever logged for an exercise, across all history (today
-// included, so beating your record shows the moment you log it), displayed with
-// the reps you hit at that weight. Ties on weight go to the higher rep count.
-// Bodyweight sets carry w=0, so an all-bodyweight exercise naturally resolves to
-// the most reps. Built once per render and cached; every write to a wl_ key
-// clears it (see lsSet), so it can't go stale.
+// Your best session for an exercise: the one containing the heaviest single set
+// ever logged, across all history (today included, so beating your record shows
+// the moment you log it). We return that whole session's sets so the line reads
+// like the "Last:" line — e.g. 25lb×15 · 25lb×15 · 25lb×12.
+//
+// Sessions rank by their heaviest set, then by the reps hit at that weight, then
+// by recency. Bodyweight sets carry w=0, so an all-bodyweight exercise naturally
+// resolves to the session with the most reps. Built once per render and cached;
+// every write to a wl_ key clears it (see lsSet), so it can't go stale.
 var _maxSetCache=null;
 function _buildMaxSets(){
   const map={};
-  const scan=function(raw){
+  const scan=function(dateKey,raw){
     let wl;try{wl=JSON.parse(raw||'[]');}catch(e){return;}
     if(!Array.isArray(wl))return;
     wl.forEach(function(en){
       if(!en||!en.ex||!Array.isArray(en.sets))return;
+      // Best single set within this one session.
+      let bw=-1,br=-1;
       en.sets.forEach(function(st){
         if(!st)return;
         const r=+st.r||0,w=+st.w||0;
         if(r<=0)return;
-        const cur=map[en.ex];
-        if(!cur||w>cur.w||(w===cur.w&&r>cur.r))map[en.ex]={r:r,w:w};
+        if(w>bw||(w===bw&&r>br)){bw=w;br=r;}
       });
+      if(br<0)return; // nothing usable logged that day
+      const cur=map[en.ex];
+      if(!cur||bw>cur.w||(bw===cur.w&&br>cur.r)||(bw===cur.w&&br===cur.r&&dateKey>cur.date)){
+        map[en.ex]={w:bw,r:br,date:dateKey,sets:en.sets};
+      }
     });
   };
   try{
     for(let i=0;i<localStorage.length;i++){
       const k=localStorage.key(i);
-      if(k&&k.indexOf('wl_')===0)scan(localStorage.getItem(k));
+      if(k&&k.indexOf('wl_')===0)scan(k.slice(3),localStorage.getItem(k));
     }
   }catch(e){}
   // Keys that failed to reach localStorage live in MEM instead.
-  try{Object.keys(MEM).forEach(function(k){if(k.indexOf('wl_')===0)scan(MEM[k]);});}catch(e){}
+  try{Object.keys(MEM).forEach(function(k){if(k.indexOf('wl_')===0)scan(k.slice(3),MEM[k]);});}catch(e){}
   return map;
 }
-function getMaxSet(exName){
+function getMaxSession(exName){
   if(!_maxSetCache)_maxSetCache=_buildMaxSets();
   return _maxSetCache[exName]||null;
 }
@@ -2534,12 +2543,12 @@ function buildExCard(e,idx,num,col,wdone){
     <div><span class="wo-ex-tag" style="background:${col}22;color:${col}">${e.tag}</span></div>
     <div class="wo-ex-inst">${e.i} · Rest: ${e.rest}</div>
   </div>`;
-  const maxSet=getMaxSet(name);
-  if(maxSet){
-    h+=`<div class="wo-last-hint" style="display:flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg>Max: ${fmtLastSets([maxSet])}</div>`;
+  const maxSess=getMaxSession(name);
+  if(maxSess&&maxSess.sets&&maxSess.sets.length){
+    h+=`<div class="wo-last-hint" style="display:flex;align-items:flex-start;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:2px"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg><span>Max: ${fmtLastSets(maxSess.sets)}</span></div>`;
   }
   if(lastSets&&lastSets.length){
-    h+=`<div class="wo-last-hint" style="display:flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg>Last: ${fmtLastSets(lastSets)}</div>`;
+    h+=`<div class="wo-last-hint" style="display:flex;align-items:flex-start;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:2px"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg><span>Last: ${fmtLastSets(lastSets)}</span></div>`;
   }
   if(todaySets.length){
     h+=`<div class="wo-sets-list">`;
