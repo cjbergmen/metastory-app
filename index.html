@@ -2195,10 +2195,12 @@ function fmtLastSets(sets){
 }
 
 // ── PERSONAL BEST ────────────────────────────────────────────────────────────
-// The most reps ever logged in a single set of an exercise, across all history
-// (today included, so beating your record shows the moment you log it). Ties on
-// reps go to the heavier set. Built once per render and cached; every write to a
-// wl_ key clears it (see lsSet), so it can't go stale.
+// The heaviest single set ever logged for an exercise, across all history (today
+// included, so beating your record shows the moment you log it), displayed with
+// the reps you hit at that weight. Ties on weight go to the higher rep count.
+// Bodyweight sets carry w=0, so an all-bodyweight exercise naturally resolves to
+// the most reps. Built once per render and cached; every write to a wl_ key
+// clears it (see lsSet), so it can't go stale.
 var _maxSetCache=null;
 function _buildMaxSets(){
   const map={};
@@ -2212,7 +2214,7 @@ function _buildMaxSets(){
         const r=+st.r||0,w=+st.w||0;
         if(r<=0)return;
         const cur=map[en.ex];
-        if(!cur||r>cur.r||(r===cur.r&&w>cur.w))map[en.ex]={r:r,w:w};
+        if(!cur||w>cur.w||(w===cur.w&&r>cur.r))map[en.ex]={r:r,w:w};
       });
     });
   };
