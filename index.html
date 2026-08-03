@@ -2191,7 +2191,11 @@ function getLastSession(exName){
 
 function fmtLastSets(sets){
   if(!sets||!sets.length)return '';
-  return sets.map(s=>s.w===0?`BW×${s.r}`:`${s.w}lb×${s.r}`).join(' · ');
+  // Drop non-sets (0 reps, malformed rows) so they can't render as "20lb×0", and
+  // coerce numbers so a stringy 0 weight still reads as bodyweight.
+  return sets.filter(function(s){return s&&(+s.r||0)>0;})
+    .map(function(s){const w=+s.w||0,r=+s.r||0;return w===0?`BW×${r}`:`${w}lb×${r}`;})
+    .join(' · ');
 }
 
 // ── PERSONAL BEST ────────────────────────────────────────────────────────────
@@ -2543,13 +2547,11 @@ function buildExCard(e,idx,num,col,wdone){
     <div><span class="wo-ex-tag" style="background:${col}22;color:${col}">${e.tag}</span></div>
     <div class="wo-ex-inst">${e.i} · Rest: ${e.rest}</div>
   </div>`;
-  const maxSess=getMaxSession(name);
-  if(maxSess&&maxSess.sets&&maxSess.sets.length){
-    h+=`<div class="wo-last-hint" style="display:flex;align-items:flex-start;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:2px"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg><span>Max: ${fmtLastSets(maxSess.sets)}</span></div>`;
-  }
-  if(lastSets&&lastSets.length){
-    h+=`<div class="wo-last-hint" style="display:flex;align-items:flex-start;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:2px"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg><span>Last: ${fmtLastSets(lastSets)}</span></div>`;
-  }
+  const _maxSess=getMaxSession(name),_maxTxt=_maxSess?fmtLastSets(_maxSess.sets):'';
+  const _lastTxt=fmtLastSets(lastSets);
+  const _hint=(label,txt)=>`<div class="wo-last-hint" style="display:flex;align-items:flex-start;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:2px"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg><span>${label}: ${txt}</span></div>`;
+  if(_maxTxt)h+=_hint('Max',_maxTxt);
+  if(_lastTxt)h+=_hint('Last',_lastTxt);
   if(todaySets.length){
     h+=`<div class="wo-sets-list">`;
     todaySets.forEach((s,si)=>{
