@@ -525,6 +525,39 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 /* motion is driven per-joint by SMIL <animate> generated in _exPose; reduced-motion handled in JS */
 .nsi{display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;border-radius:50%;background:var(--border);color:var(--sub);font-size:11px;font-weight:700;font-style:normal;margin-left:6px;cursor:pointer;vertical-align:middle}
   .nsi:hover{background:var(--sub);color:var(--surface)}
+
+/* ── GUIDED WALKTHROUGH (runs once the intake wizard is done) ───────────── */
+#tour-ov{position:fixed;inset:0;z-index:10600;display:none;font-family:var(--font-sans);-webkit-tap-highlight-color:transparent}
+#tour-ov.open{display:block}
+#tour-spot{position:absolute;left:50%;top:50%;width:0;height:0;border-radius:14px;pointer-events:none;box-shadow:0 0 0 9999px rgba(52,60,70,.6);transition:top .3s cubic-bezier(.2,.7,.3,1),left .3s cubic-bezier(.2,.7,.3,1),width .3s cubic-bezier(.2,.7,.3,1),height .3s cubic-bezier(.2,.7,.3,1)}
+#tour-pop{position:absolute;left:0;top:0;width:min(430px,calc(100vw - 24px));overflow-y:auto;background:var(--surface);border:0.5px solid var(--border);border-radius:20px;box-shadow:0 16px 44px rgba(66,76,87,.32);padding:16px 17px 12px;opacity:0;transition:opacity .2s ease}
+#tour-pop.show{opacity:1}
+#tour-pop::-webkit-scrollbar{display:none}
+.tour-quit{background:none;border:none;color:var(--sub);font-size:12.5px;font-weight:700;text-decoration:underline;cursor:pointer;font-family:var(--font-sans);padding:10px 0;flex:none}
+.tour-kicker{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--green);font-weight:700}
+.tour-h{font-family:var(--font-serif);font-size:23px;font-weight:500;line-height:1.15;margin:5px 0 8px;color:var(--text)}
+.tour-p{font-size:13.5px;line-height:1.6;color:var(--text)}
+.tour-p+.tour-p{margin-top:9px}
+.tour-note{margin-top:11px;background:var(--surface2);border-radius:12px;padding:11px 13px;font-size:12.5px;line-height:1.55;color:var(--sub)}
+.tour-note b{color:var(--text);font-weight:700}
+.tour-list{margin-top:11px;display:flex;flex-direction:column;gap:9px}
+.tour-li{display:flex;gap:10px;align-items:flex-start;font-size:12.8px;line-height:1.5;color:var(--text)}
+.tour-li i{flex:none;width:19px;height:19px;border-radius:6px;background:var(--surface2);color:var(--green);font-style:normal;font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.tour-li.b i{width:6px;height:6px;border-radius:50%;background:var(--green);margin:7px 6px 0 5px}
+.tour-li b{font-weight:700}
+.tour-pillar{display:flex;gap:11px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--border)}
+.tour-pillar:first-child{border-top:none;padding-top:4px}
+.tour-pl{width:30px;height:30px;border-radius:9px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--surface2)}
+.tour-pn{font-size:13.5px;font-weight:700}
+.tour-pd{font-size:12px;color:var(--sub);line-height:1.45;margin-top:1px}
+.tour-prog{height:3px;background:var(--border);border-radius:2px;margin:14px 0 11px}
+.tour-prog i{display:block;height:100%;background:var(--green);border-radius:2px;transition:width .3s ease}
+.tour-foot{display:flex;align-items:center;gap:9px}
+.tour-count{font-size:11px;color:var(--sub);font-weight:600;flex:none}
+.tour-gap{flex:1}
+.tour-btn{border:none;border-radius:var(--rs);padding:10px 17px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:var(--font-sans);flex:none}
+.tour-next{background:var(--green);color:#fff}
+.tour-back{background:var(--surface2);color:var(--sub);padding:10px 13px}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -1010,6 +1043,8 @@ function rSettingsModal(){
       <div class="ct">✏️ My Plan</div>
       <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Re-run the setup wizard to rebuild your workout plan and nutrition targets.</div>
       <button class="btn btn-s btn-sm btn-f" style="color:var(--purple)" onclick="closeSettings();showWizard(true)">✏️ Rebuild My Plan</button>
+      <button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--green)" onclick="closeSettings();setTimeout(function(){startTour();},260)">🧭 Replay the walkthrough</button>
+      <div style="font-size:11px;color:var(--sub);line-height:1.5;margin-top:4px">The DRESS model and a guided tour of every tab.</div>
       <button class="btn btn-s btn-sm btn-f" style="color:var(--sub);margin-top:8px" onclick="resetWorkoutPlan()">↩️ Reset to Default Plan</button>
     </div>
     <div class="card" style="margin-bottom:10px">
@@ -1157,6 +1192,7 @@ function fbSyncSettings(){
     try { const up=lsGet('_userProfile',''); if(up) settings.userProfile=JSON.parse(up); } catch(e){}
     try { const mp=lsGet('_macroProfile',''); if(mp) settings.macroProfile=JSON.parse(mp); } catch(e){}
     if(lsGet('_onboardDone','')) settings.onboardDone='1';
+    if(lsGet('_tourDone','')) settings.tourDone='1';
     try { const df=lsGet('_detFlags',''); if(df) settings.detFlags=JSON.parse(df); } catch(e){}
     try { const cw=lsGet('_customWorkouts',''); if(cw) settings.customWorkouts=JSON.parse(cw); } catch(e){}
     try { const wa=lsGet('_weekAdjust',''); if(wa) settings.weekAdjust=JSON.parse(wa); } catch(e){}
@@ -1282,6 +1318,7 @@ async function fbPullAll(){
         if(s.listenDials) lsSet('_listenDials', JSON.stringify(s.listenDials));
         if(s.fltOn) lsSet('_fltOn', s.fltOn);
         if(s.onboardDone || s.userProfile || s.userTargets || s.routineTR) lsSet('_onboardDone', '1');
+        if(s.tourDone) lsSet('_tourDone', '1');
         if(s.detFlags) lsSet('_detFlags', JSON.stringify(s.detFlags));
         if(s.customWorkouts) lsSet('_customWorkouts', JSON.stringify(s.customWorkouts));
         if(s.weekAdjust) lsSet('_weekAdjust', JSON.stringify(s.weekAdjust));
@@ -3247,7 +3284,7 @@ function rToday(){
   const lead=R.active.length
     ? 'Here’s what your day is asking for right now.'
     : (R.next ? ('Next up: '+R.next.a+' · '+_winLabel(R.next)) : 'Nothing scheduled right now — a good moment to just check in with yourself.');
-  let h=`<div class="fdn-focus" style="margin-bottom:14px">
+  let h=`<div class="fdn-focus" id="td-hero" style="margin-bottom:14px">
     <span class="kicker">Right now · ${_fmtClock(now)}</span>
     <h3>${greet}${name}</h3>
     <p>${lead}</p></div>`;
@@ -3269,13 +3306,13 @@ function rToday(){
     h+=`<div class="card" style="background:rgba(183,186,167,.18);border-color:var(--purple)"><span class="kicker" style="color:#6d7868">This week's focus</span><div style="font-size:14px;font-weight:700;margin-top:4px">${focus}</div></div>`;
   }
   // Detective entry
-  h+=`<div class="card mk-row" onclick="goPage('detective')" style="cursor:pointer">
+  h+=`<div class="card mk-row" id="td-detective" onclick="goPage('detective')" style="cursor:pointer">
     <div class="mk-meal-ic" style="background:rgba(196,112,112,.16);color:var(--green)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></div>
     <div style="flex:1;min-width:0"><h4 style="font-size:14px;font-weight:700">Ask the Health Detective</h4><small style="font-size:11.5px;color:var(--sub)">Anything about your sleep, energy, digestion, stress…</small></div>
     <span style="color:var(--sub);margin-left:auto">›</span></div>`;
   // The rest of today (the routine, as a timeline)
   const upcoming=R.all.filter(it=>!it.done && it.h1>hr && !(hr>=it.h0&&hr<it.h1));
-  h+=`<div class="card">
+  h+=`<div class="card" id="td-timeline">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <span class="kicker" style="color:var(--sub)">The rest of today</span>
       <button class="mk-link" onclick="openRoutineEditor()">Edit</button>
@@ -9720,6 +9757,8 @@ function wizApply(){
     }
   }catch(e){}
   lsSet('_onboardDone','1');
+  // Arm the guided walkthrough for this account's first trip into the app.
+  try{ if(!lsGet('_tourDone','')) lsSet('_tourPending','1'); }catch(e){}
   try{ fbSyncSettings(); }catch(e){}
 }
 
@@ -9727,6 +9766,8 @@ function wizFinish(){
   wizApply();
   closeWizard();
   refresh();
+  // Hand off to the guided walkthrough (DRESS model + tour of the app).
+  try{ setTimeout(function(){ if(typeof _tourWatch==='function') _tourWatch(); }, 500); }catch(e){}
 }
 
 function _assessAllDone(){
@@ -10213,16 +10254,23 @@ if('serviceWorker' in navigator){
       <h3 id="dr-name">Your story</h3>
       <p id="dr-sub">The five daily pillars, working together</p>
     </div>
-    <div class="dr-scroll">
-      <button class="dr-i" onclick="drawerGo('today')"><span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span><div>Today<small>Your daily snapshot</small></div></button>
-      <button class="dr-i" onclick="drawerGo('detective')"><span class="ic" style="background:rgba(196,112,112,.16)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></span><div>Health Detective<small>Ask anything about your story</small></div></button>
-      <button class="dr-i" onclick="drawerGo('progress')"><span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 12V7M12 12l3.5 3.5"/></svg></span><div>Progress &amp; Weekly Review<small>Scores, trends, this week's focus</small></div></button>
-      <button class="dr-i" onclick="drawerDressSummary()"><span class="ic" style="background:rgba(196,112,112,.16)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M9 13h6M9 17h6M9 9h2"/></svg></span><div>My DRESS Summary<small>Your whole program, one page</small></div></button>
-      <button class="dr-i" onclick="drawerGo('journal')"><span class="ic" style="background:rgba(120,140,196,.18)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span><div>Reflections<small>Your prayers &amp; insights, summarized over time</small></div></button>
-      <button class="dr-i" onclick="closeDrawer();openSettings()"><span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1l-.4-2.6H10l-.4 2.6a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.4 2.6h3.8l.4-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5a7 7 0 0 0 .1-1z"/></svg></span><div>Settings<small>Profile, health flags, sign out</small></div></button>
+    <div class="dr-scroll" id="dr-list">
+      <button class="dr-i" id="dr-today" onclick="drawerGo('today')"><span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span><div>Today<small>Your daily snapshot</small></div></button>
+      <button class="dr-i" id="dr-detective" onclick="drawerGo('detective')"><span class="ic" style="background:rgba(196,112,112,.16)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></span><div>Health Detective<small>Ask anything about your story</small></div></button>
+      <button class="dr-i" id="dr-progress" onclick="drawerGo('progress')"><span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 12V7M12 12l3.5 3.5"/></svg></span><div>Progress &amp; Weekly Review<small>Scores, trends, this week's focus</small></div></button>
+      <button class="dr-i" id="dr-summary" onclick="drawerDressSummary()"><span class="ic" style="background:rgba(196,112,112,.16)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M9 13h6M9 17h6M9 9h2"/></svg></span><div>My DRESS Summary<small>Your whole program, one page</small></div></button>
+      <button class="dr-i" id="dr-journal" onclick="drawerGo('journal')"><span class="ic" style="background:rgba(120,140,196,.18)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span><div>Reflections<small>Your prayers &amp; insights, summarized over time</small></div></button>
+      <button class="dr-i" id="dr-tour" onclick="closeDrawer();setTimeout(function(){startTour();},260)"><span class="ic" style="background:rgba(171,108,82,.14)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 1 1 3.3 2.9c-.6.2-.9.8-.9 1.4v.4"/><path d="M12 17.2v.01"/></svg></span><div>How this works<small>The DRESS model &amp; a tour of the app</small></div></button>
+      <button class="dr-i" id="dr-settings" onclick="closeDrawer();openSettings()"><span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1l-.4-2.6H10l-.4 2.6a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.4 2.6h3.8l.4-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5a7 7 0 0 0 .1-1z"/></svg></span><div>Settings<small>Profile, health flags, sign out</small></div></button>
     </div>
     <div class="dr-foot">Education &amp; self-care — not medical diagnosis or treatment.</div>
   </div>
+</div>
+
+<!-- ══════════ GUIDED WALKTHROUGH (DRESS model + app tour) ══════════ -->
+<div id="tour-ov" role="dialog" aria-modal="true" aria-label="App walkthrough">
+  <div id="tour-spot"></div>
+  <div id="tour-pop"></div>
 </div>
 
 <script>
@@ -12730,6 +12778,311 @@ try{_initPreviewSandbox();}catch(e){}
 // The init block in the 1st <script> runs rToday() before this 2nd block defines
 // _routineNow; now that everything is loaded, re-render Today so it shows fully.
 try{if(typeof curPage!=='undefined'&&curPage==='today'&&typeof rToday==='function')rToday();}catch(e){}
+
+/* ════════════ GUIDED WALKTHROUGH — the DRESS model + a tour of the app ═══════
+   Runs once, automatically, after the intake wizard finishes. Replayable any
+   time from the drawer ("How this works") or Settings.
+
+   A step may navigate the app (`before`) and spotlight a real element
+   (`target`). If a target is ever missing the step falls back to a centred
+   card, so a future UI change can't strand the tour mid-walk.               */
+
+let _tour={i:0,active:false};
+
+const _TOUR_ICON={
+  D:'<path d="M12 21c-5 0-8-3.5-8-8 0-5.5 4.5-9 12-10-1 7.5-4.5 12-12 13"/><path d="M4 21c3-4 7-7 12-8"/>',
+  R:'<path d="M21 13.5A8.5 8.5 0 1 1 10.5 3a7 7 0 0 0 10.5 10.5z"/>',
+  E:'<path d="M3 12h4l3-7 4 14 3-7h4"/>',
+  S:'<path d="M5 14c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 9c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 19c2-1.5 4-1.5 6 0s4 1.5 6 0"/>',
+  Su:'<rect x="4" y="9" width="16" height="7" rx="3.5" transform="rotate(-35 12 12.5)"/><path d="M9.5 9.5l5 5.5"/>'
+};
+function _tourPillar(name,color,icon,desc){
+  return '<div class="tour-pillar"><div class="tour-pl" style="color:'+color+'">'
+    +'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+icon+'</svg></div>'
+    +'<div><div class="tour-pn">'+name+'</div><div class="tour-pd">'+desc+'</div></div></div>';
+}
+function _tourLi(n,t){return '<div class="tour-li"><i>'+n+'</i><span>'+t+'</span></div>';}
+function _tourBul(t){return '<div class="tour-li b"><i></i><span>'+t+'</span></div>';}
+
+const TOUR_STEPS=[
+  // ── 1. Why we're here ──────────────────────────────────────────────────
+  {k:'Welcome',h:'Your plan is built. Here’s how to use it.',
+   body:`<p class="tour-p">Everything you just told us has been turned into a week — training, nutrition targets, and a daily rhythm built around the times you actually keep.</p>
+   <p class="tour-p">Before you dive in, let’s cover the model underneath it all, then walk the app together so nothing stays hidden.</p>
+   <div class="tour-note">About two minutes. You can stop at any point and pick it back up from <b>☰ → How this works</b>.</div>`},
+
+  // ── 2. The DRESS model ─────────────────────────────────────────────────
+  {k:'The model',h:'Your body works as one system',
+   body:`<p class="tour-p">You can’t spot-treat your health one piece at a time. Sleep moves blood sugar, stress moves digestion, movement moves mood — it’s all one connected system. So rather than chase symptoms, we work five pillars together: <b>D.R.E.S.S.</b></p>
+   <div style="margin-top:11px">
+   ${_tourPillar('Diet','var(--green)',_TOUR_ICON.D,'Steady fuel and the raw materials your body rebuilds with.')}
+   ${_tourPillar('Rest','var(--blue)',_TOUR_ICON.R,'When the body repairs, resets hormones, and clears the day.')}
+   ${_tourPillar('Exercise','var(--green)',_TOUR_ICON.E,'Movement matched to what you can actually recover from.')}
+   ${_tourPillar('Stress','var(--purple)',_TOUR_ICON.S,'Calming the nervous system so everything else can work.')}
+   ${_tourPillar('Supplements','var(--green)',_TOUR_ICON.Su,'Targeted support — last, once the foundations hold.')}
+   </div>`},
+
+  // ── 3. How to read the model ───────────────────────────────────────────
+  {k:'How to read it',h:'Foundations first, supplements last',
+   body:`<p class="tour-p">The order is deliberate. Diet, rest, exercise and stress carry almost all of the load. Supplements are targeted support once those are steady — never a shortcut past them.</p>
+   <div class="tour-list">
+   ${_tourLi('1','<b>Symptoms are signals, not enemies.</b> A 3pm crash or a 3am wake-up is information about which pillar needs attention.')}
+   ${_tourLi('2','<b>Consistency beats intensity.</b> A half-logged day still counts — the app is reading patterns over weeks, not grading perfect days.')}
+   ${_tourLi('3','<b>One change at a time.</b> Change five things at once and you learn nothing about which one worked.')}
+   </div>`},
+
+  // ── 4. The five tabs ───────────────────────────────────────────────────
+  {k:'Getting around',h:'Five pillars, five tabs',target:'#nav',wait:260,
+   before:function(){goPage('today');},
+   body:`<p class="tour-p">The bar along the bottom <i>is</i> the DRESS model — <b>Diet, Rest, Exercise, Stress</b> and <b>Supps</b>. Each tab is where you log that pillar and see what it’s telling you.</p>
+   <p class="tour-p">Let’s take them one at a time.</p>`},
+
+  // ── 5. Diet ────────────────────────────────────────────────────────────
+  {k:'Diet',h:'Fuel, and how it lands',target:'#nb-food',wait:280,
+   before:function(){goPage('food');},
+   body:`<p class="tour-p">Your calories-left ring and protein / carb / fat targets sit at the top, then <b>+ Log Food</b>. Describe a meal in plain words and let <b>Analyze Meal</b> do the macros, build one from components, or pull something you’ve saved from your <b>Library</b>.</p>
+   <p class="tour-p">Water, blood sugar and a Bristol stool chart live further down the same tab.</p>
+   <div class="tour-note">The part people skip: after logging, you’ll be asked how the meal felt. <b>How you feel 90 minutes to 2 hours after eating</b> is the real signal — steady energy means the ratio fits you; foggy, sleepy or hungry means we shift it.</div>`},
+
+  // ── 6. Rest ────────────────────────────────────────────────────────────
+  {k:'Rest',h:'Where the repair actually happens',target:'#nb-rest',wait:280,
+   before:function(){goPage('rest');},
+   body:`<p class="tour-p">Log last night’s sleep, and check in on where your nervous system is right now — wired, active, safe, restful or shut down. Over a week that becomes a pattern you can see.</p>
+   <p class="tour-p">Underneath sit the tools: an evening <b>Wind-down</b> checklist, a library of <b>Practices</b> (breath, grounding, thermal, vocal), guided prayer or reflection, and <i>Safe Inside</i> — an album to listen to while you settle.</p>`},
+
+  // ── 7. Exercise ────────────────────────────────────────────────────────
+  {k:'Exercise',h:'Movement you can recover from',target:'#nb-workout',wait:280,
+   before:function(){goPage('workout');},
+   body:`<p class="tour-p">Today’s session is here — tap a weight, enter reps, log the set. Every exercise has a <b>How to do it</b> side with an animation and cues, a <b>Swap exercise</b> option if one doesn’t suit you, and rest timers along the bottom.</p>
+   <p class="tour-p">Life moves, so the plan moves: <b>Edit my week</b>, <b>Move a day</b> and <b>Shift week</b> sit right above the workout. On a rest day this tab shows the week’s plan and the reasoning behind it.</p>`},
+
+  // ── 8. Stress ──────────────────────────────────────────────────────────
+  {k:'Stress',h:'Your load and your levers',target:'#nb-recovery',wait:280,
+   before:function(){goPage('recovery');},
+   body:`<p class="tour-p">This tab reads everything you’ve logged and shows where load is actually landing — <b>nutritional, physical, exercise, mental, emotional</b> and <b>relational</b>. Tap any one for the breakdown.</p>
+   <p class="tour-p">Below that, <b>What would help most right now</b> is a short ranked list of next moves, each linking straight to where you’d do it. Your <b>Weekly Review</b> lives at the bottom.</p>`},
+
+  // ── 9. Supplements ─────────────────────────────────────────────────────
+  {k:'Supplements',h:'Last, and one at a time',target:'#nb-supps',wait:280,
+   before:function(){goPage('supps');},
+   body:`<p class="tour-p">Add what you take and it becomes a morning / midday / evening schedule you tick off. Anything new gets <b>titrated</b> — introduced slowly, with a daily "feeling fine / something’s off" check so we can hold at a dose instead of pushing through.</p>
+   <div class="tour-note">Set your <b>health &amp; safety flags</b> in Settings (pregnancy, medications, conditions). The Health Detective respects them and won’t suggest anything that should go through your practitioner first. Functional lab testing is ordered from this tab too.</div>`},
+
+  // ── 10. Today ──────────────────────────────────────────────────────────
+  {k:'Today',h:'Your day, in order',target:'#td-hero',wait:320,
+   before:function(){goPage('today');},
+   body:`<p class="tour-p">The times you gave us built a real daily rhythm — water before coffee, morning light, protein anchors, when to stop eating, when to dim the lights.</p>
+   <p class="tour-p">Today surfaces only the piece that’s live <b>right now</b>, so there’s never more than one thing being asked of you.</p>`},
+
+  // ── 11. The rest of today ──────────────────────────────────────────────
+  {k:'Today',h:'The rest of the day — and Edit',target:'#td-timeline',
+   body:`<p class="tour-p">Everything still ahead of you, on a timeline. Tick items off as you go; those check-offs are what feed your progress scores.</p>
+   <p class="tour-p"><b>Edit</b> reshapes the rhythm itself. If your wake time changes or a habit isn’t landing, change it here rather than quietly ignoring it.</p>`},
+
+  // ── 12. Health Detective ───────────────────────────────────────────────
+  {k:'Health Detective',h:'Ask it anything',target:'#td-detective',
+   body:`<p class="tour-p">The Detective reads <b>your own tracked data</b> — sleep, meals, training, stress, assessment results — answers in that context, and offers one good next step.</p>
+   <p class="tour-p">“Why do I keep waking around 3am?” · “Why do I crash every afternoon?” · “What should I focus on this week?”</p>
+   <div class="tour-note">It’s education and self-care guidance, not diagnosis or treatment — and it will hand you to a human when something needs one.</div>`},
+
+  // ── 13. The date bar ───────────────────────────────────────────────────
+  {k:'Easy to miss',h:'You can log for another day',target:'.mk-datebar',
+   body:`<p class="tour-p">Forgot to log dinner last night? Use the arrows to move to another date and log it there — every page follows the date you’re viewing. Tap <b>Today</b> to jump back.</p>`},
+
+  // ── 14. The menu ───────────────────────────────────────────────────────
+  {k:'The menu',h:'Everything else lives behind ☰',target:'#dr-list',wait:380,
+   before:function(){try{goPage('today');}catch(e){} openDrawer();},
+   body:`<p class="tour-p">The five tabs are the daily work. The menu is where you step back and look at the whole picture.</p>
+   <div class="tour-list">
+   ${_tourBul('<b>Health Detective</b> — the same chat, from anywhere.')}
+   ${_tourBul('<b>Progress &amp; Weekly Review</b> — scores, trends, this week’s focus.')}
+   ${_tourBul('<b>My DRESS Summary</b> — your whole program on one page.')}
+   ${_tourBul('<b>Reflections</b> — what you’ve written, read back to you over time.')}
+   ${_tourBul('<b>Settings</b> — health flags, cloud sync, targets, rebuild your plan.')}
+   </div>`},
+
+  // ── 15. DRESS Summary ──────────────────────────────────────────────────
+  {k:'The menu',h:'My DRESS Summary',target:'#dr-summary',wait:260,
+   before:function(){openDrawer();},
+   body:`<p class="tour-p">One page: where each of the five pillars stands, your numbers (protein, calories, water, sleep window), a 30-day snapshot, and a written read on your story so far.</p>
+   <p class="tour-p">There’s a copy button at the bottom of it — this is the page to hand a practitioner or coach.</p>`},
+
+  // ── 16. Progress & Weekly Review ───────────────────────────────────────
+  {k:'The menu',h:'Progress &amp; Weekly Review',target:'#dr-progress',wait:260,
+   before:function(){openDrawer();},
+   body:`<p class="tour-p">Scored on what you actually control — did you log it, did you do it — never on a number on a scale. A pillar only starts counting from the first day you use it, so nothing you haven’t started yet drags your score down.</p>
+   <p class="tour-p">The <b>Weekly Review</b> reads your week back to you and names one focus for the next one.</p>`},
+
+  // ── 17. Assessments ────────────────────────────────────────────────────
+  {k:'Worth doing early',h:'Three assessments',wait:300,
+   before:function(){try{closeDrawer();}catch(e){}},
+   body:`<p class="tour-p">These are what turn a good generic plan into yours. About five minutes each, from the <b>Stress</b> tab under “Go deeper”, or the Assessments hub.</p>
+   <div class="tour-list">
+   ${_tourLi('1','<b>Nervous System</b> — whether you’re running activated, shut down, or regulated, and what each one needs.')}
+   ${_tourLi('2','<b>Gut Health</b> — leaky gut, inflammation, and the gut–sleep–mood connections.')}
+   ${_tourLi('3','<b>Amino Acid</b> — neurotransmitter patterns behind mood, energy, stress and cravings.')}
+   </div>
+   <div class="tour-note">Once they’re done, <b>Assessment Insights</b> gives you what you need, what backfires, and protocols for exercise, nutrition, hydration and recovery.</div>`},
+
+  // ── 18. Making it work ─────────────────────────────────────────────────
+  {k:'Making it work',h:'What actually moves the needle',
+   body:`<div class="tour-list">
+   ${_tourLi('1','<b>Log imperfectly, but daily.</b> Patterns need days, not precision.')}
+   ${_tourLi('2','<b>Answer the after-meal check-in.</b> It’s the single most useful thing you can give the app.')}
+   ${_tourLi('3','<b>Do the three assessments this week.</b> Everything downstream gets sharper.')}
+   ${_tourLi('4','<b>Read the Weekly Review the same day each week.</b> Sunday evening works well.')}
+   ${_tourLi('5','<b>Change one thing at a time</b> — and give it a full week before you judge it.')}
+   ${_tourLi('6','<b>Ask the Detective when something feels off</b> instead of guessing. It can see your data; a search engine can’t.')}
+   </div>`},
+
+  // ── 19. Close ──────────────────────────────────────────────────────────
+  {k:'You’re set',h:'Start with today',
+   body:`<p class="tour-p">You don’t need all five pillars perfect today. Open <b>Today</b>, do the one thing it’s asking for right now, and tick it off. Tomorrow, do that again.</p>
+   <div class="tour-note">Replay this walkthrough any time from <b>☰ → How this works</b>. Metastory is education and self-care support — not medical diagnosis or treatment.</div>`}
+];
+
+/* ---------- engine ---------- */
+function startTour(){
+  const ov=document.getElementById('tour-ov');
+  if(!ov)return;
+  try{lsSet('_tourPending','');}catch(e){}
+  _tour.i=0;_tour.active=true;
+  ov.classList.add('open');
+  document.addEventListener('keydown',_tourKey);
+  window.addEventListener('resize',_tourReflow);
+  window.addEventListener('orientationchange',_tourReflow);
+  _tourRender();
+}
+function tourNext(){ if(!_tour.active)return; if(_tour.i>=TOUR_STEPS.length-1)return tourEnd(false); _tour.i++; _tourRender(); }
+function tourBack(){ if(!_tour.active||_tour.i<=0)return; _tour.i--; _tourRender(); }
+function tourEnd(){
+  _tour.active=false;
+  const ov=document.getElementById('tour-ov');
+  if(ov)ov.classList.remove('open');
+  document.removeEventListener('keydown',_tourKey);
+  window.removeEventListener('resize',_tourReflow);
+  window.removeEventListener('orientationchange',_tourReflow);
+  try{lsSet('_tourDone','1');lsSet('_tourPending','');}catch(e){}
+  try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}
+  try{closeDrawer();}catch(e){}
+  try{goPage('today');}catch(e){}
+}
+function _tourKey(e){
+  if(!_tour.active)return;
+  if(e.key==='Escape'){e.preventDefault();tourEnd();}
+  else if(e.key==='ArrowRight'||e.key==='Enter'){e.preventDefault();tourNext();}
+  else if(e.key==='ArrowLeft'){e.preventDefault();tourBack();}
+}
+let _tourReflowT=null;
+function _tourReflow(){
+  if(!_tour.active)return;
+  clearTimeout(_tourReflowT);
+  _tourReflowT=setTimeout(function(){const s=TOUR_STEPS[_tour.i];if(s)_tourPlace(s.target);},150);
+}
+function _tourRender(){
+  const s=TOUR_STEPS[_tour.i],pop=document.getElementById('tour-pop');
+  if(!s||!pop)return tourEnd();
+  pop.classList.remove('show');
+  const total=TOUR_STEPS.length,last=_tour.i===total-1;
+  pop.innerHTML=(s.k?'<span class="tour-kicker">'+s.k+'</span>':'')
+    +'<div class="tour-h">'+s.h+'</div>'
+    +s.body
+    +'<div class="tour-prog"><i style="width:'+Math.round(((_tour.i+1)/total)*100)+'%"></i></div>'
+    +'<div class="tour-foot"><button class="tour-quit" onclick="tourEnd()">Skip tour</button>'
+    +'<span class="tour-count">'+(_tour.i+1)+'/'+total+'</span><span class="tour-gap"></span>'
+    +(_tour.i>0?'<button class="tour-btn tour-back" onclick="tourBack()">Back</button>':'')
+    +'<button class="tour-btn tour-next" onclick="tourNext()">'+(last?'Start my week':'Next')+'</button></div>';
+  pop.scrollTop=0;
+  const run=function(){_tourPlace(s.target);pop.classList.add('show');};
+  if(s.before){try{s.before();}catch(e){} setTimeout(run,s.wait||220);}
+  else setTimeout(run,s.wait||30);
+}
+// Position the spotlight over the step's target and park the card beside it.
+// No target (or a target that isn't on screen) → centred card, full dim.
+function _tourPlace(sel){
+  const spot=document.getElementById('tour-spot'),pop=document.getElementById('tour-pop');
+  if(!spot||!pop)return;
+  const vw=window.innerWidth,vh=window.innerHeight,M=12;
+  let el=null;try{el=sel?document.querySelector(sel):null;}catch(e){}
+  if(el){ // scroll it into view first, but only within the app's scroll container
+    try{
+      const pg=document.getElementById('pages');
+      if(pg&&pg.contains(el)){
+        const r0=el.getBoundingClientRect(),pr=pg.getBoundingClientRect();
+        if(r0.top<pr.top+16||r0.bottom>pr.bottom-16)el.scrollIntoView({block:'center'});
+      }
+    }catch(e){}
+  }
+  pop.style.maxHeight=(vh-M*2)+'px';
+  const pw=pop.offsetWidth,ph=pop.offsetHeight;
+  const r=el?el.getBoundingClientRect():null;
+  if(!r||(!r.width&&!r.height)){
+    spot.style.left=Math.round(vw/2)+'px';spot.style.top=Math.round(vh/2)+'px';
+    spot.style.width='0px';spot.style.height='0px';
+    spot.style.boxShadow='0 0 0 9999px rgba(52,60,70,.66)';
+    pop.style.left=Math.round((vw-pw)/2)+'px';
+    pop.style.top=Math.round(Math.max(M,(vh-ph)/2))+'px';
+    return;
+  }
+  const pad=6;
+  const sx=Math.max(3,r.left-pad),sy=Math.max(3,r.top-pad);
+  const sw=Math.min(vw-6,r.width+pad*2),sh=Math.min(vh-6,r.height+pad*2);
+  spot.style.left=Math.round(sx)+'px';spot.style.top=Math.round(sy)+'px';
+  spot.style.width=Math.round(sw)+'px';spot.style.height=Math.round(sh)+'px';
+  spot.style.boxShadow='0 0 0 3px rgba(183,186,167,.95), 0 0 0 9999px rgba(52,60,70,.62)';
+  let L=Math.round(r.left+r.width/2-pw/2);
+  L=Math.max(M,Math.min(L,vw-pw-M));
+  const below=sy+sh+12,above=sy-12-ph;
+  let T;
+  if(below+ph<=vh-M)T=below;
+  else if(above>=M)T=above;
+  else T=Math.max(M,Math.min(vh-ph-M,(vh-ph)/2));
+  pop.style.left=L+'px';pop.style.top=Math.round(T)+'px';
+}
+
+/* ---------- when it fires ----------
+   wizApply() sets _tourPending the first time onboarding completes. We start
+   as soon as the user lands in the app — straight off the wizard, after the
+   optional assessments, or on the next launch if they closed the app first. */
+// Returns true when there's nothing left to wait for (started, or not armed),
+// false while something is still in the way — sign-in gate, an open modal, the
+// wizard itself. _tourWatch() keeps checking so we never miss the moment.
+function _tourAuto(){
+  try{
+    if(_tour.active)return true;
+    if(!lsGet('_tourPending',''))return true;
+    if(lsGet('_tourDone','')){lsSet('_tourPending','');return true;}
+    const gate=document.getElementById('signin-screen');
+    if(gate&&getComputedStyle(gate).display!=='none')return false;
+    if(document.querySelector('.ov.open, #wiz-overlay.open'))return false;
+    if(typeof shouldShowOnboarding==='function'&&shouldShowOnboarding())return false;
+    startTour();
+    return true;
+  }catch(e){return true;}
+}
+let _tourWatchT=null,_tourWatchN=0;
+function _tourWatch(){
+  if(_tourWatchT||_tourAuto())return;
+  _tourWatchN=0;
+  _tourWatchT=setInterval(function(){
+    _tourWatchN++;
+    if(_tourAuto()||_tourWatchN>80){clearInterval(_tourWatchT);_tourWatchT=null;}
+  },1200);
+}
+// Landing on Today is the reliable "they're in the app now" moment — it covers
+// the path where onboarding hands straight off to the assessments.
+try{
+  const _tourOrigGoPage=window.goPage;
+  if(typeof _tourOrigGoPage==='function'){
+    window.goPage=function(p){
+      const r=_tourOrigGoPage.apply(this,arguments);
+      if(p==='today')setTimeout(_tourWatch,500);
+      return r;
+    };
+  }
+}catch(e){}
+try{setTimeout(_tourWatch,1600);}catch(e){}
+
 </script>
 </body>
 </html>
