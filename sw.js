@@ -1,4 +1,4 @@
-const VERSION = '20260803-walkthrough';
+const VERSION = '20260803-maxset';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately

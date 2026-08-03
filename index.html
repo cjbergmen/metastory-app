@@ -920,6 +920,7 @@ function lsGet(k,d){
 }
 function lsSet(k,v){
   let _r;try{localStorage.setItem(k,v);delete MEM[k];_r=true;}catch(e){MEM[k]=v;_r=false;}
+  try{if(k&&k.indexOf('wl_')===0)_maxSetCache=null;}catch(e){}
   try{fbSyncDayMisc(k,v);}catch(e){}
   return _r;
 }
@@ -2193,6 +2194,43 @@ function fmtLastSets(sets){
   return sets.map(s=>s.w===0?`BW×${s.r}`:`${s.w}lb×${s.r}`).join(' · ');
 }
 
+// ── PERSONAL BEST ────────────────────────────────────────────────────────────
+// The most reps ever logged in a single set of an exercise, across all history
+// (today included, so beating your record shows the moment you log it). Ties on
+// reps go to the heavier set. Built once per render and cached; every write to a
+// wl_ key clears it (see lsSet), so it can't go stale.
+var _maxSetCache=null;
+function _buildMaxSets(){
+  const map={};
+  const scan=function(raw){
+    let wl;try{wl=JSON.parse(raw||'[]');}catch(e){return;}
+    if(!Array.isArray(wl))return;
+    wl.forEach(function(en){
+      if(!en||!en.ex||!Array.isArray(en.sets))return;
+      en.sets.forEach(function(st){
+        if(!st)return;
+        const r=+st.r||0,w=+st.w||0;
+        if(r<=0)return;
+        const cur=map[en.ex];
+        if(!cur||r>cur.r||(r===cur.r&&w>cur.w))map[en.ex]={r:r,w:w};
+      });
+    });
+  };
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k&&k.indexOf('wl_')===0)scan(localStorage.getItem(k));
+    }
+  }catch(e){}
+  // Keys that failed to reach localStorage live in MEM instead.
+  try{Object.keys(MEM).forEach(function(k){if(k.indexOf('wl_')===0)scan(MEM[k]);});}catch(e){}
+  return map;
+}
+function getMaxSet(exName){
+  if(!_maxSetCache)_maxSetCache=_buildMaxSets();
+  return _maxSetCache[exName]||null;
+}
+
 // Called when user changes the weight dropdown
 function woSelWeight(idx,val){
   const name=_woExList[idx];
@@ -2494,6 +2532,10 @@ function buildExCard(e,idx,num,col,wdone){
     <div><span class="wo-ex-tag" style="background:${col}22;color:${col}">${e.tag}</span></div>
     <div class="wo-ex-inst">${e.i} · Rest: ${e.rest}</div>
   </div>`;
+  const maxSet=getMaxSet(name);
+  if(maxSet){
+    h+=`<div class="wo-last-hint" style="display:flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg>Max: ${fmtLastSets([maxSet])}</div>`;
+  }
   if(lastSets&&lastSets.length){
     h+=`<div class="wo-last-hint" style="display:flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg>Last: ${fmtLastSets(lastSets)}</div>`;
   }
