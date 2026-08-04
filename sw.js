@@ -1,4 +1,4 @@
-const VERSION = '20260804-rename-restore-timer';
+const VERSION = '20260804-practitioner-protocol-codes';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
