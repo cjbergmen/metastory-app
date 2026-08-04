@@ -3002,7 +3002,13 @@ function pct(v,t){return Math.min(100,Math.round(v/t*100))}
 // ── NAV ───────────────────────────────────────────────────────────────────────
 let curPage='today';
 const TITLES={today:'Today',workout:'Exercise',food:'Diet',water:'Water',recovery:'Stress',assess:'Assessments',rest:'Rest',supps:'Supplements',detective:'Health Detective',summary:'My DRESS Summary',journal:'Reflections',labs:'Functional Lab Testing',labsadmin:'Lab Order Queue'};
+// Pages we never restore into on launch: admin-only, or meaningless cold.
+const NO_RESTORE_PAGES={labsadmin:1};
 function goPage(p){
+  // Remember where we are so a refresh (or the service worker's post-update
+  // reload) comes back here instead of dropping to Today. Device-local: the
+  // key matches no sync prefix, so it never reaches the cloud.
+  try{if(!NO_RESTORE_PAGES[p])lsSet('_lastPage',p);}catch(e){}
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.nb').forEach(e=>e.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
@@ -3438,7 +3444,14 @@ function openPlanEditor(){
         const cur=base[d]?base[d].name:'';
         const opts='<option value="__rest__"'+(cur?'':' selected')+'>Rest day</option>'+
             names.map(function(n){return '<option value="'+n.replace(/"/g,'&quot;')+'"'+(n===cur?' selected':'')+'>'+n+'</option>';}).join('');
-        rows+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="width:80px;font-size:12px;font-weight:700;color:var(--sub);flex-shrink:0">'+dn[d]+'</div><select id="_pe-'+d+'" class="fi" style="flex:1">'+opts+'</select></div>';
+        const esc=function(x){return String(x||'').replace(/"/g,'&quot;');};
+        rows+='<div style="margin-bottom:10px">'
+            +'<div style="display:flex;align-items:center;gap:8px"><div style="width:80px;font-size:12px;font-weight:700;color:var(--sub);flex-shrink:0">'+dn[d]+'</div>'
+            +'<select id="_pe-'+d+'" class="fi" style="flex:1" onchange="_peSyncName('+d+')">'+opts+'</select></div>'
+            +'<div id="_pew-'+d+'" style="display:'+(cur?'flex':'none')+';align-items:center;gap:8px;margin-top:5px">'
+            +'<div style="width:80px;flex-shrink:0;text-align:right;padding-right:5px;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--sub);font-weight:700">Name</div>'
+            +'<input id="_pen-'+d+'" class="fi" type="text" maxlength="40" placeholder="Rename this workout" value="'+esc(cur)+'" style="flex:1;padding:7px 11px;font-size:16px;background:transparent;border-style:dashed">'
+            +'</div></div>';
     }
     const overlay=document.createElement('div');
     overlay.id='_planEditorModal';
@@ -3447,13 +3460,37 @@ function openPlanEditor(){
     overlay.addEventListener('click',function(){overlay.remove();});
     document.body.appendChild(overlay);
 }
+// Keep the rename field in step with the dropdown: hide it on a rest day, and
+// seed it with the newly picked workout's name when the selection changes.
+function _peSyncName(d){
+    const sel=document.getElementById('_pe-'+d);
+    const wrap=document.getElementById('_pew-'+d);
+    const inp=document.getElementById('_pen-'+d);
+    if(!sel||!wrap||!inp)return;
+    const rest=sel.value==='__rest__';
+    wrap.style.display=rest?'none':'flex';
+    inp.value=rest?'':sel.value;
+}
 function savePlanEditor(){
     const known=_knownWorkouts();
+    const base=_basePlan();
     const next={};
     for(let d=0;d<7;d++){
         const el=document.getElementById('_pe-'+d);
         const v=el?el.value:'__rest__';
-        if(v&&v!=='__rest__'&&known[v]) next[d]=JSON.parse(JSON.stringify(known[v]));
+        if(!v||v==='__rest__')continue;
+        // If the dropdown wasn't changed, keep THIS day's own workout object.
+        // _knownWorkouts() is keyed by name, so two days renamed alike would
+        // otherwise both collapse onto whichever one was registered first and
+        // silently lose the other's exercises.
+        const curName=(base[d]&&base[d].name)?base[d].name:'';
+        const src=(v===curName&&base[d])?base[d]:known[v];
+        if(!src)continue;
+        const w=JSON.parse(JSON.stringify(src));
+        const nmEl=document.getElementById('_pen-'+d);
+        const nm=nmEl?String(nmEl.value||'').trim().slice(0,40):'';
+        if(nm)w.name=nm;
+        next[d]=w;
     }
     _durableSaveBasePlan(next);
     const m=document.getElementById('_planEditorModal'); if(m)m.remove();
@@ -7790,43 +7827,116 @@ function _parseRestSec(r){
   const s=parseInt(r);return s>0?s:90;
 }
 function _fmtCT(sec){const m=Math.floor(sec/60);return m>0?m+':'+(sec%60<10?'0':'')+(sec%60):(sec+'s')}
-function cardTimerClick(idx,initSec){
-  if(!_cardTimers[idx])_cardTimers[idx]={iv:null,sec:initSec,init:initSec};
-  const t=_cardTimers[idx];
+// Wall-clock, like the main timer: we store the epoch ms the rest ends at and
+// derive the remaining seconds on every tick. A decrementing counter freezes
+// the moment iOS suspends the page (switching apps, locking the screen), so the
+// timer would come back showing whatever it read when you left. Deriving from
+// Date.now() means it's simply correct whenever the page runs again.
+function _ctPersist(){
+  try{
+    const out={};
+    Object.keys(_cardTimers).forEach(function(k){
+      const t=_cardTimers[k];
+      if(t&&t.endMs>Date.now())out[k]={endMs:t.endMs,init:t.init,ex:t.ex||''};
+    });
+    if(Object.keys(out).length)localStorage.setItem('_cardTimers',JSON.stringify({d:dk(),t:out}));
+    else localStorage.removeItem('_cardTimers');
+  }catch(e){}
+}
+function _ctDone(idx,t){
+  clearInterval(t.iv);t.iv=null;t.endMs=0;t.sec=0;
+  _ctPersist();
   const el=document.getElementById('card-timer-'+idx);
+  if(el){el.textContent=_fmtCT(t.init);el.className='card-timer-btn cdone';}
+  playAlarm();
+  // Auto-reset the class after 3s so they can click for the next set
+  setTimeout(function(){const e3=document.getElementById('card-timer-'+idx);if(e3&&e3.className.indexOf('cdone')>=0)e3.className='card-timer-btn';},3000);
+}
+function _ctTick(idx){
+  const t=_cardTimers[idx];
+  if(!t||!t.endMs)return;
+  const left=Math.max(0,Math.ceil((t.endMs-Date.now())/1000));
+  t.sec=left;
+  if(left<=0){_ctDone(idx,t);return;}
+  // Keep counting even if the button is momentarily gone (e.g. the card is
+  // flipped to the how-to / info side, which has no timer button). Only touch
+  // the DOM when it exists — so clicking "info" no longer stops the rest timer.
+  const el=document.getElementById('card-timer-'+idx);
+  if(el){
+    el.textContent=_fmtCT(left);
+    if(el.className.indexOf('ctr')<0)el.className='card-timer-btn ctr';
+  }
+}
+function _ctStop(idx,initSec){
+  const t=_cardTimers[idx];
+  if(!t)return;
+  clearInterval(t.iv);t.iv=null;t.endMs=0;
+  t.sec=initSec;t.init=initSec;
+  _ctPersist();
+  // Only pull the background bell if it's ours — the main timer shares the slot.
+  if(typeof timerOn==='undefined'||!timerOn)_swTimerMsg({type:'CANCEL_TIMER_NOTIF'});
+  const el=document.getElementById('card-timer-'+idx);
+  if(el){el.textContent=_fmtCT(initSec);el.className='card-timer-btn';}
+}
+function cardTimerClick(idx,initSec){
+  if(!_cardTimers[idx])_cardTimers[idx]={iv:null,sec:initSec,init:initSec,endMs:0,ex:''};
+  const t=_cardTimers[idx];
   // Refresh init whenever the timer isn't actively counting. The same idx can
   // map to a different exercise after a swap/reorder/re-render, and without
   // this the cached init from the first click would override the new rest
   // value — making every timer fall back to whatever the original was
   // (typically 2:00 since that's the most common rest in this plan).
-  if(!t.iv)t.init=initSec;
-  if(t.iv){
-    // Running → reset
-    clearInterval(t.iv);t.iv=null;t.sec=initSec;t.init=initSec;
-    if(el){el.textContent=_fmtCT(t.init);el.className='card-timer-btn';}
-  } else {
-    // Start countdown
-    t.sec=t.init;
-    if(el){el.textContent=_fmtCT(t.sec);el.className='card-timer-btn ctr';}
-    t.iv=setInterval(()=>{
-      t.sec--;
-      // Keep counting even if the button is momentarily gone (e.g. the card is
-      // flipped to the how-to / info side, which has no timer button). Only touch
-      // the DOM when it exists — so clicking "info" no longer stops the rest timer.
-      const el2=document.getElementById('card-timer-'+idx);
-      if(t.sec<=0){
-        clearInterval(t.iv);t.iv=null;
-        if(el2){el2.textContent=_fmtCT(t.init);el2.className='card-timer-btn cdone';}
-        playAlarm();
-        // Auto-reset class after 3s so they can click for next set
-        setTimeout(()=>{const e3=document.getElementById('card-timer-'+idx);if(e3&&e3.className.includes('cdone'))e3.className='card-timer-btn';},3000);
-      } else if(el2){
-        el2.textContent=_fmtCT(t.sec);
-        if(el2.className.indexOf('ctr')<0)el2.className='card-timer-btn ctr';
-      }
-    },1000);
+  const running=!!(t.iv&&t.endMs>Date.now());
+  if(!running)t.init=initSec;
+  if(running){_ctStop(idx,initSec);return;}
+  try{t.ex=(typeof _woExList!=='undefined'&&_woExList)?(_woExList[idx]||''):'';}catch(e){t.ex='';}
+  t.endMs=Date.now()+t.init*1000;
+  t.sec=t.init;
+  clearInterval(t.iv);
+  t.iv=setInterval(function(){_ctTick(idx);},250);
+  _ctPersist();
+  // We're inside a user gesture — unlock audio and ask for the notification
+  // permission that lets the bell ring while the app is backgrounded.
+  try{_unlockAudio();}catch(e){}
+  try{_reqNotifPerm();}catch(e){}
+  if(typeof timerOn==='undefined'||!timerOn){
+    _swTimerMsg({type:'SCHEDULE_TIMER_NOTIF',delayMs:t.init*1000,
+      title:'⏱ Rest Over',body:"Time to get back to it!"});
   }
+  _ctTick(idx);
 }
+// Re-attach any rest timer still running after a reload / PWA re-open. Scoped to
+// today and to the same exercise still sitting at that index, so a stale entry
+// can't light up an unrelated card.
+function _ctRestore(){
+  try{
+    const raw=localStorage.getItem('_cardTimers');
+    if(!raw)return;
+    const o=JSON.parse(raw);
+    if(!o||o.d!==dk()||!o.t){localStorage.removeItem('_cardTimers');return;}
+    let any=false;
+    Object.keys(o.t).forEach(function(k){
+      const r=o.t[k];
+      if(!r||!(r.endMs>Date.now()))return;
+      const idx=Number(k);
+      if(isNaN(idx))return;
+      try{
+        if(r.ex&&typeof _woExList!=='undefined'&&_woExList&&_woExList.length&&_woExList[idx]!==r.ex)return;
+      }catch(e){}
+      _cardTimers[idx]={iv:null,sec:0,init:r.init,endMs:r.endMs,ex:r.ex||''};
+      _cardTimers[idx].iv=setInterval(function(){_ctTick(idx);},250);
+      _ctTick(idx);
+      any=true;
+    });
+    if(!any)localStorage.removeItem('_cardTimers');
+  }catch(e){}
+}
+// Coming back to the foreground: resync immediately rather than waiting for the
+// next poll, and fire any timer that ran out while we were suspended.
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden)return;
+  try{Object.keys(_cardTimers).forEach(function(k){if(_cardTimers[k]&&_cardTimers[k].endMs)_ctTick(Number(k));});}catch(e){}
+});
 
 // ── PULL TO REFRESH ───────────────────────────────────────────────────────────
 (function(){
@@ -12833,6 +12943,16 @@ try{_initPreviewSandbox();}catch(e){}
 // The init block in the 1st <script> runs rToday() before this 2nd block defines
 // _routineNow; now that everything is loaded, re-render Today so it shows fully.
 try{if(typeof curPage!=='undefined'&&curPage==='today'&&typeof rToday==='function')rToday();}catch(e){}
+
+try{if(typeof _ctRestore==='function')setTimeout(_ctRestore,300);}catch(e){}
+
+/* ════════════ RESTORE THE LAST-VIEWED TAB ════════════ */
+try{
+  const _lp=lsGet('_lastPage','');
+  if(_lp&&_lp!=='today'&&!NO_RESTORE_PAGES[_lp]&&document.getElementById('page-'+_lp)&&typeof goPage==='function'){
+    goPage(_lp);
+  }
+}catch(e){}
 
 /* ════════════ GUIDED WALKTHROUGH — the DRESS model + a tour of the app ═══════
    Runs once, automatically, after the intake wizard finishes. Replayable any

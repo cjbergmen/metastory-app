@@ -1,4 +1,4 @@
-const VERSION = '20260803-maxsession';
+const VERSION = '20260804-rename-restore-timer';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
