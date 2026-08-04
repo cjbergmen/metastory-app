@@ -856,6 +856,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   <div class="swap-divider"></div>
   <div style="padding:4px 18px 18px;overflow-y:auto">
     <div style="margin-bottom:16px">
+      <label class="fl">Exercise name</label>
+      <input id="exedit-name" class="fi" type="text" maxlength="60" placeholder="e.g. Calf Raises" style="font-size:16px">
+      <div style="font-size:11px;color:var(--sub);margin-top:5px">Renaming keeps your logged history — past sets follow the new name.</div>
+    </div>
+    <div style="margin-bottom:16px">
       <label class="fl">Sets &amp; reps</label>
       <div style="display:flex;gap:8px;align-items:center">
         <input id="exedit-sets" class="re-time" style="width:56px" type="number" inputmode="numeric" min="1" max="10" placeholder="Sets">
@@ -2788,6 +2793,8 @@ function openExEdit(idx,ev){
   if(!e){try{showToast('Could not load exercise');}catch(_){}return;}
   _exEditIdx=idx;
   document.getElementById('exedit-title').textContent='Edit: '+e.n;
+  var _nmEl=document.getElementById('exedit-name');
+  if(_nmEl)_nmEl.value=e.n||'';
   // Split the tag into "sets × reps" when possible; otherwise treat the whole
   // tag as the reps/scheme text (covers Rest-Pause / drop-set style tags).
   var tag=(e.tag||'').trim();
@@ -2818,10 +2825,54 @@ function closeExEdit(){
   if(sh)sh.classList.remove('open');
   _exEditIdx=null;
 }
+// Workout logs are keyed by exercise name, so renaming an exercise would orphan
+// every set you'd already logged under the old name (the Max/Last lines would go
+// blank). Carry the history across. If a day somehow holds both names, merge the
+// old sets into the new entry rather than dropping either. Returns the number of
+// days touched. Each changed day is pushed to the cloud explicitly — wl_ isn't a
+// day-sync prefix, so lsSet alone wouldn't replicate it.
+function _renameExerciseHistory(oldName,newName){
+  if(!oldName||!newName||oldName===newName)return 0;
+  var days=0;
+  var keys=[];
+  try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('wl_')===0)keys.push(k);}}catch(e){}
+  try{Object.keys(MEM).forEach(function(k){if(k.indexOf('wl_')===0&&keys.indexOf(k)<0)keys.push(k);});}catch(e){}
+  keys.forEach(function(k){
+    var wl;
+    try{wl=JSON.parse(lsGet(k,'[]'));}catch(e){return;}
+    if(!Array.isArray(wl))return;
+    var hit=false;
+    var target=null;
+    wl.forEach(function(en){if(en&&en.ex===newName&&!target)target=en;});
+    for(var j=wl.length-1;j>=0;j--){
+      var en=wl[j];
+      if(!en||en.ex!==oldName)continue;
+      hit=true;
+      if(target&&target!==en){
+        if(Array.isArray(en.sets)&&en.sets.length){
+          target.sets=(Array.isArray(target.sets)?target.sets:[]).concat(en.sets);
+        }
+        if(en.done)target.done=true;
+        wl.splice(j,1);
+      }else{
+        en.ex=newName;
+        target=en;
+      }
+    }
+    if(!hit)return;
+    days++;
+    lsSet(k,JSON.stringify(wl));
+    try{fbSyncWorkoutLog(k.slice(3),wl);}catch(e){}
+  });
+  return days;
+}
 function saveExEdit(){
   var idx=_exEditIdx;if(idx==null)return;
   var base=_curEx(idx);if(!base){closeExEdit();return;}
   var ne=JSON.parse(JSON.stringify(base));
+  var _nmIn=document.getElementById('exedit-name');
+  var _newName=_nmIn?String(_nmIn.value||'').trim().slice(0,60):'';
+  if(_newName)ne.n=_newName;
   var sets=(document.getElementById('exedit-sets').value||'').trim();
   var reps=(document.getElementById('exedit-reps').value||'').trim();
   if(sets&&reps)ne.tag=sets+' × '+reps;
@@ -2831,14 +2882,18 @@ function saveExEdit(){
   var wv=document.getElementById('exedit-weight').value;
   if(wv==='')delete ne.dw;else ne.dw=wv;
   if(wv!==''){if(!_woState[ne.n])_woState[ne.n]={selW:null,rep:''};_woState[ne.n].selW=(wv==='bw'?0:parseFloat(wv));}
+  // In-session weight/rep state is keyed by name as well — move it with the rename.
+  if(_newName&&_newName!==base.n&&_woState[base.n]&&!_woState[_newName]){_woState[_newName]=_woState[base.n];delete _woState[base.n];}
   var _origName=_woExList[idx]||ne.n;
+  var _renamedDays=(_newName&&_newName!==_origName)?_renameExerciseHistory(_origName,_newName):0;
+  var _renameNote=_renamedDays?(' · '+_renamedDays+' logged day'+(_renamedDays===1?'':'s')+' moved over'):'';
   // Persist the edit straight to the saved plan so it's permanent and survives
   // logging, re-renders, and reloads (fixes the "timer reverts after logging" bug).
   if(_persistExEditToPlan(vdDate().getDay(),_origName,ne)){
     delete _woPendingSwaps[idx];
     _woExList[idx]=ne.n;
     closeExEdit();
-    try{showToast('Saved to your plan ✓');}catch(_){}
+    try{showToast('Saved to your plan ✓'+_renameNote);}catch(_){}
     try{rWorkout();}catch(_){}
     return;
   }
@@ -2854,7 +2909,7 @@ function saveExEdit(){
   var card=document.getElementById('wo-ex-'+idx);
   if(card)card.outerHTML=buildExCard(ne,idx,num,wo?wo.col:'',isWODone());
   _updatePendingBar();
-  try{showToast('Updated — tap Save to keep it');}catch(_){}
+  try{showToast('Updated — tap Save to keep it'+_renameNote);}catch(_){}
 }
 // Write a single exercise edit into the SAVED plan (all days materialized first so
 // none are ever dropped), then durably persist (local + Firestore) via _durableSaveBasePlan.
@@ -3444,14 +3499,7 @@ function openPlanEditor(){
         const cur=base[d]?base[d].name:'';
         const opts='<option value="__rest__"'+(cur?'':' selected')+'>Rest day</option>'+
             names.map(function(n){return '<option value="'+n.replace(/"/g,'&quot;')+'"'+(n===cur?' selected':'')+'>'+n+'</option>';}).join('');
-        const esc=function(x){return String(x||'').replace(/"/g,'&quot;');};
-        rows+='<div style="margin-bottom:10px">'
-            +'<div style="display:flex;align-items:center;gap:8px"><div style="width:80px;font-size:12px;font-weight:700;color:var(--sub);flex-shrink:0">'+dn[d]+'</div>'
-            +'<select id="_pe-'+d+'" class="fi" style="flex:1" onchange="_peSyncName('+d+')">'+opts+'</select></div>'
-            +'<div id="_pew-'+d+'" style="display:'+(cur?'flex':'none')+';align-items:center;gap:8px;margin-top:5px">'
-            +'<div style="width:80px;flex-shrink:0;text-align:right;padding-right:5px;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--sub);font-weight:700">Name</div>'
-            +'<input id="_pen-'+d+'" class="fi" type="text" maxlength="40" placeholder="Rename this workout" value="'+esc(cur)+'" style="flex:1;padding:7px 11px;font-size:16px;background:transparent;border-style:dashed">'
-            +'</div></div>';
+        rows+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="width:80px;font-size:12px;font-weight:700;color:var(--sub);flex-shrink:0">'+dn[d]+'</div><select id="_pe-'+d+'" class="fi" style="flex:1">'+opts+'</select></div>';
     }
     const overlay=document.createElement('div');
     overlay.id='_planEditorModal';
@@ -3459,17 +3507,6 @@ function openPlanEditor(){
     overlay.innerHTML='<div class="modal" onclick="event.stopPropagation()"><div class="mh"></div><div class="mt2">Edit My Week</div><p style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:14px">Set what each day is in your <b>saved plan</b> — your permanent weekly schedule. Temporary shifts always revert back to whatever you set here.</p>'+rows+'<button class="btn btn-o" style="width:100%;margin-top:12px" onclick="savePlanEditor()">Save my plan</button></div>';
     overlay.addEventListener('click',function(){overlay.remove();});
     document.body.appendChild(overlay);
-}
-// Keep the rename field in step with the dropdown: hide it on a rest day, and
-// seed it with the newly picked workout's name when the selection changes.
-function _peSyncName(d){
-    const sel=document.getElementById('_pe-'+d);
-    const wrap=document.getElementById('_pew-'+d);
-    const inp=document.getElementById('_pen-'+d);
-    if(!sel||!wrap||!inp)return;
-    const rest=sel.value==='__rest__';
-    wrap.style.display=rest?'none':'flex';
-    inp.value=rest?'':sel.value;
 }
 function savePlanEditor(){
     const known=_knownWorkouts();
@@ -3480,17 +3517,14 @@ function savePlanEditor(){
         const v=el?el.value:'__rest__';
         if(!v||v==='__rest__')continue;
         // If the dropdown wasn't changed, keep THIS day's own workout object.
-        // _knownWorkouts() is keyed by name, so two days renamed alike would
-        // otherwise both collapse onto whichever one was registered first and
-        // silently lose the other's exercises.
+        // _knownWorkouts() is keyed by name, but per-exercise edits are saved
+        // per day — so two days running the same workout can legitimately hold
+        // different exercises. Re-fetching by name would collapse both onto
+        // whichever was registered first and lose the other day's edits.
         const curName=(base[d]&&base[d].name)?base[d].name:'';
         const src=(v===curName&&base[d])?base[d]:known[v];
         if(!src)continue;
-        const w=JSON.parse(JSON.stringify(src));
-        const nmEl=document.getElementById('_pen-'+d);
-        const nm=nmEl?String(nmEl.value||'').trim().slice(0,40):'';
-        if(nm)w.name=nm;
-        next[d]=w;
+        next[d]=JSON.parse(JSON.stringify(src));
     }
     _durableSaveBasePlan(next);
     const m=document.getElementById('_planEditorModal'); if(m)m.remove();
