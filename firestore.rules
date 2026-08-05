@@ -1,0 +1,66 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Existing: each user can only read/write their own data tree ──────────
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ── Lab orders (GI-MAP intakes) ──────────────────────────────────────────
+    // Anyone (incl. a not-signed-in patient) may CREATE a well-formed order.
+    // Only the practitioner may read, update, or delete orders.
+    match /labOrders/{orderId} {
+      allow create: if isValidNewOrder();
+      allow read, update, delete: if isPractitioner();
+    }
+
+    // ── Protocol codes (practitioner → client supplement hand-off) ───────────
+    // Doc id = the code itself. Holds only the supplement list, an optional
+    // note, and counters — never a client name, email, uid, or health data.
+    // `get` lets a signed-in client fetch a code they already know; `list`
+    // stays admin-only so codes can't be enumerated/scraped. Admins issue,
+    // revoke, delete. The final `update` is the one write a client may make:
+    // bumping the redeem counter by exactly 1 and touching nothing else.
+    match /protocols/{code} {
+      allow get:  if request.auth != null;
+      allow list: if request.auth != null
+                  && request.auth.token.email in ['cjbergmen@gmail.com']
+                  && request.auth.token.email_verified == true;
+      allow create, update, delete: if request.auth != null
+                  && request.auth.token.email in ['cjbergmen@gmail.com']
+                  && request.auth.token.email_verified == true;
+      allow update: if request.auth != null
+                  && request.resource.data.diff(resource.data)
+                       .affectedKeys().hasOnly(['redeemed','lastRedeemedAt'])
+                  && request.resource.data.redeemed == resource.data.redeemed + 1;
+    }
+
+    function isPractitioner() {
+      return request.auth != null
+             && request.auth.token.email in ['cjbergmen@gmail.com'];
+    }
+
+    function isValidNewOrder() {
+      let d = request.resource.data;
+      let allowed = ['fullName','email','phone','dob','address1','city','state',
+                     'zip','concerns','product','priceQuoted','status',
+                     'createdAt','submittedBy'];
+      return d.keys().hasOnly(allowed)
+        && d.status == 'new'
+        && d.product == 'GI-MAP'
+        && d.fullName is string && d.fullName.size() > 0 && d.fullName.size() < 120
+        && d.email is string && d.email.size() < 160 && d.email.matches('.+@.+[.].+')
+        && d.phone is string && d.phone.size() < 40
+        && d.dob is string && d.dob.size() < 20
+        && d.address1 is string && d.address1.size() < 200
+        && d.city is string && d.city.size() < 100
+        && d.state is string && d.state.size() == 2
+        && d.zip is string && d.zip.size() < 12
+        && d.concerns is string && d.concerns.size() < 2000
+        && d.priceQuoted is number
+        && (d.submittedBy is string);
+    }
+  }
+}

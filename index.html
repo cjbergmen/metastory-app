@@ -601,6 +601,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     <div class="page" id="page-journal"></div>
     <div class="page" id="page-labs"></div>
     <div class="page" id="page-labsadmin"></div>
+    <div class="page" id="page-protoadmin"></div>
   </div>
   <div id="mini-player">
     <div id="mp-prog" onclick="musSeekBar(event)"><div id="mp-fill"></div></div>
@@ -3056,9 +3057,9 @@ function pct(v,t){return Math.min(100,Math.round(v/t*100))}
 
 // ── NAV ───────────────────────────────────────────────────────────────────────
 let curPage='today';
-const TITLES={today:'Today',workout:'Exercise',food:'Diet',water:'Water',recovery:'Stress',assess:'Assessments',rest:'Rest',supps:'Supplements',detective:'Health Detective',summary:'My DRESS Summary',journal:'Reflections',labs:'Functional Lab Testing',labsadmin:'Lab Order Queue'};
+const TITLES={today:'Today',workout:'Exercise',food:'Diet',water:'Water',recovery:'Stress',assess:'Assessments',rest:'Rest',supps:'Supplements',detective:'Health Detective',summary:'My DRESS Summary',journal:'Reflections',labs:'Functional Lab Testing',labsadmin:'Lab Order Queue',protoadmin:'Protocol Codes'};
 // Pages we never restore into on launch: admin-only, or meaningless cold.
-const NO_RESTORE_PAGES={labsadmin:1};
+const NO_RESTORE_PAGES={labsadmin:1,protoadmin:1};
 function goPage(p){
   // Remember where we are so a refresh (or the service worker's post-update
   // reload) comes back here instead of dropping to Today. Device-local: the
@@ -3087,6 +3088,7 @@ function render(p){
   else if(p==='journal')rJournal();
   else if(p==='labs')rLabs();
   else if(p==='labsadmin')rLabsAdmin();
+  else if(p==='protoadmin')rProtoAdmin();
 }
 function refresh(){render(curPage)}
 /* ═══════════════════ FUNCTIONAL LAB ORDERING (GI-MAP) ═══════════════════
@@ -3308,6 +3310,477 @@ function _labCopy(id){const o=_labOrders.find(x=>x.id===id);if(!o)return;const t
 function _labSetStatus(id,v){if(typeof fbDb!=='undefined'&&fbDb&&!String(id).startsWith('local-'))fbDb.collection('labOrders').doc(id).update({status:v}).catch(()=>{});const o=_labOrders.find(x=>x.id===id);if(o)o.status=v;if(curPage==='labsadmin')rLabsAdmin();}
 function _labAdminDelete(id){if(typeof fbDb!=='undefined'&&fbDb&&!String(id).startsWith('local-'))fbDb.collection('labOrders').doc(id).delete().catch(()=>{});_labOrders=_labOrders.filter(o=>o.id!==id);if(curPage==='labsadmin')rLabsAdmin();}
 /* ═══════════════════ END FUNCTIONAL LAB ORDERING ═══════════════════ */
+
+/* ═══════════════════ PRACTITIONER PROTOCOL CODES ═══════════════════
+   During a Results & Review the practitioner builds the supplement protocol
+   here, generates a short code, and reads it out (or texts it). The client
+   types that code into their own app and the protocol drops straight into
+   their Supplements schedule — name, dose, timing, notes.
+
+   Privacy by design: the client PULLS, we never PUSH. A protocol doc holds
+   only the supplement list, an optional note, and counters. No client name,
+   email, uid, or health data is ever written to it, so nothing on our side
+   links a code to a person. Codes expire (30 days) and can be single-use.
+
+   Firestore: collection `protocols`, doc id = the code itself.
+   Required security rules — paste into the Firebase console, keeping the
+   admin email list in sync with LAB_CONFIG.adminEmails:
+
+     match /protocols/{code} {
+       // Anyone signed in can fetch a code they already know. `list` stays
+       // shut so nobody can enumerate or scrape codes.
+       allow get:  if request.auth != null;
+       allow list: if request.auth != null
+                   && request.auth.token.email in ['cjbergmen@gmail.com'];
+       // Practitioners issue, revoke, delete.
+       allow create, update, delete: if request.auth != null
+                   && request.auth.token.email in ['cjbergmen@gmail.com'];
+       // The single write a client is allowed: bumping the redeem counter.
+       allow update: if request.auth != null
+                   && request.resource.data.diff(resource.data)
+                        .affectedKeys().hasOnly(['redeemed','lastRedeemedAt'])
+                   && request.resource.data.redeemed == resource.data.redeemed + 1;
+     }
+*/
+const PROTO_CONFIG={
+  expiryDays:30,   // a code stops working this many days after it's issued
+  codeLength:8     // 8 base32 chars ≈ 40 bits — not guessable by hand
+};
+// Crockford base32: no I, L, O, or U, so nothing gets misheard on a call.
+const PROTO_ALPHABET='0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+const PROTO_SLOT_OPTS=[['morning','Morning'],['midday','Midday'],['evening','Evening']];
+let _protoDraft={items:[],label:'',note:'',singleUse:false};
+let _protoCodes=[], _protoListenerOn=false, _protoIssued=null, _protoPasteOpen=false;
+let _protoRedeem={code:'',found:null,busy:false,err:''};
+
+function _protoNewCode(){
+  const n=PROTO_CONFIG.codeLength;
+  const secure=!!(window.crypto&&crypto.getRandomValues);
+  const rnd=secure?crypto.getRandomValues(new Uint32Array(n)):null;
+  let out='';
+  for(let i=0;i<n;i++){
+    const r=secure?rnd[i]:Math.floor(Math.random()*4294967296);
+    out+=PROTO_ALPHABET[r%32];
+  }
+  return out;
+}
+// Forgiving on the way in: strips spaces and dashes, and folds the letters
+// people confuse when a code is read aloud.
+function _protoNorm(s){
+  return String(s||'').toUpperCase().replace(/[^0-9A-Z]/g,'')
+    .replace(/O/g,'0').replace(/[IL]/g,'1').replace(/U/g,'V');
+}
+function _protoPretty(c){c=_protoNorm(c);return c.length>4?c.slice(0,4)+'-'+c.slice(4):c;}
+function _protoSlot(v){
+  v=String(v||'').toLowerCase().trim();
+  if(/^(mid|noon|afternoon|lunch)/.test(v))return 'midday';
+  if(/(evening|night|bed|dinner|pm)/.test(v))return 'evening';
+  return 'morning';
+}
+function _protoSlotLabel(k){const f=PROTO_SLOT_OPTS.find(s=>s[0]===k);return f?f[1]:'Morning';}
+
+/* ---- offline codes ----------------------------------------------------------
+   A second format that carries the protocol inside itself, so it works with no
+   Firestore and no rules deployed: MSH-P1-<base64url>. Too long to read aloud,
+   but fine to text or email. Trade-off: it can't be revoked or counted, because
+   there's nothing on the server to revoke. */
+function _protoB64(s){
+  const bytes=new TextEncoder().encode(s);let bin='';
+  bytes.forEach(b=>{bin+=String.fromCharCode(b);});
+  return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function _protoB64d(t){
+  t=String(t).replace(/-/g,'+').replace(/_/g,'/');while(t.length%4)t+='=';
+  const bin=atob(t);const bytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+function _protoEncodeOffline(p){
+  const slotIdx=k=>Math.max(0,PROTO_SLOT_OPTS.findIndex(s=>s[0]===_protoSlot(k)));
+  const payload={v:1,x:p.expiresAt||0,n:p.note||'',
+    i:(p.items||[]).map(i=>[i.name||'',i.dose||'',slotIdx(i.slot),i.notes||''])};
+  return 'MSH-P1-'+_protoB64(JSON.stringify(payload));
+}
+function _protoDecodeOffline(raw){
+  try{
+    const o=JSON.parse(_protoB64d(String(raw).replace(/\s+/g,'').replace(/^MSH-P1-/i,'')));
+    if(!o||!Array.isArray(o.i))return null;
+    return {code:'',offline:true,note:o.n||'',expiresAt:o.x||0,redeemed:0,revoked:false,singleUse:false,
+      items:o.i.map(a=>({name:a[0]||'',dose:a[1]||'',slot:(PROTO_SLOT_OPTS[a[2]]||PROTO_SLOT_OPTS[0])[0],notes:a[3]||'',emoji:'💊'}))
+        .filter(i=>i.name)};
+  }catch(e){return null;}
+}
+function _protoDate(ms){try{return new Date(ms).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});}catch(e){return '';}}
+function _protoState(p){
+  if(!p)return {key:'missing',label:'Not found',color:'var(--red)'};
+  if(p.revoked)return {key:'revoked',label:'Revoked',color:'var(--red)'};
+  if(p.expiresAt&&Date.now()>p.expiresAt)return {key:'expired',label:'Expired',color:'var(--sub)'};
+  if(p.singleUse&&(p.redeemed||0)>0)return {key:'used',label:'Already used',color:'var(--sub)'};
+  return {key:'active',label:(p.redeemed?('Active · used '+p.redeemed+'×'):'Active · unused'),color:'var(--green)'};
+}
+
+/* ---- client: entry card + redeem modal ---- */
+function _protoEntryCardHTML(){
+  const admin=_labIsAdmin();
+  return `<div class="card" style="border:1px solid var(--border)">
+    <span class="kicker">From your practitioner</span>
+    <div style="font-family:var(--font-serif);font-size:19px;margin:6px 0 4px">Have a protocol code?</div>
+    <p style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:12px">After your Results &amp; Review you'll get a short code. Enter it and your protocol lands in the schedule below — dose, timing and all. You type it in yourself, so nothing personal travels with it.</p>
+    <button onclick="openProtoModal()" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--rs);padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font-sans)">Enter a protocol code</button>
+    ${admin?`<button onclick="goPage('protoadmin')" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--rs);padding:11px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;font-family:var(--font-sans)">Practitioner: issue a protocol code</button>`:''}
+  </div>`;
+}
+// Shown on the Supps tab for two weeks after a redemption, so the
+// practitioner's note doesn't vanish the moment the modal closes.
+function _protoLastCardHTML(){
+  let x=null;try{x=JSON.parse(lsGet('_protoLast','null'));}catch(e){}
+  if(!x||!x.at||Date.now()-x.at>14*864e5)return '';
+  return `<div class="card" style="border:1px solid var(--green)">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+      <span class="kicker">Protocol added · ${_labEsc(_protoDate(x.at))}</span>
+      <button onclick="_protoDismissLast()" style="background:none;border:none;color:var(--sub);font-size:16px;cursor:pointer;padding:0 2px;line-height:1">✕</button>
+    </div>
+    <div style="font-size:13px;margin-top:6px">${x.added} supplement${x.added===1?'':'s'} from your practitioner${x.skipped?` · ${x.skipped} already on your list`:''}.</div>
+    ${x.note?`<div style="font-size:13px;color:var(--sub);line-height:1.55;margin-top:8px;padding-left:10px;border-left:2px solid var(--green)">${_labEsc(x.note)}</div>`:''}
+  </div>`;
+}
+function _protoDismissLast(){lsSet('_protoLast','null');if(curPage==='supps')rSupps();}
+function openProtoModal(){
+  _protoRedeem={code:'',found:null,busy:false,err:''};
+  rProtoModal();
+  document.getElementById('proto-ov').classList.add('open');
+}
+function closeProtoModal(){
+  document.getElementById('proto-ov').classList.remove('open');
+  _protoRedeem={code:'',found:null,busy:false,err:''};
+}
+function rProtoModal(){
+  const body=document.getElementById('proto-modal-body');if(!body)return;
+  const p=_protoRedeem.found;
+  if(!p){
+    body.innerHTML=`
+      <p style="font-size:13px;color:var(--sub);line-height:1.55;margin-bottom:14px">Enter the code your practitioner gave you — the short one they read out, or the long <b>MSH-P1-…</b> one they sent. We'll show you exactly what it adds before anything changes.</p>
+      <input id="proto-code-in" class="fi" placeholder="ABCD-1234" autocapitalize="characters" autocomplete="off" spellcheck="false"
+        style="text-align:center;font-size:22px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;padding:15px"
+        value="${_labEsc(_protoPretty(_protoRedeem.code))}" onkeydown="if(event.key==='Enter'){event.preventDefault();_protoLookup();}">
+      ${_protoRedeem.err?`<div style="font-size:12.5px;color:var(--red);line-height:1.45;margin-top:10px">${_labEsc(_protoRedeem.err)}</div>`:''}
+      <button class="btn btn-b btn-f" style="margin-top:14px" onclick="_protoLookup()" ${_protoRedeem.busy?'disabled':''}>${_protoRedeem.busy?'Looking up…':'Look up my protocol'}</button>
+      <p style="font-size:11.5px;color:var(--sub);line-height:1.5;margin-top:14px">Codes expire after ${PROTO_CONFIG.expiryDays} days. Nothing about you is attached to the code — you're pulling the protocol in, we're not sending it to you.</p>`;
+    setTimeout(()=>{const el=document.getElementById('proto-code-in');if(el&&!_protoRedeem.busy)el.focus();},50);
+    return;
+  }
+  const items=Array.isArray(p.items)?p.items:[];
+  let list='';
+  PROTO_SLOT_OPTS.forEach(([k,lbl])=>{
+    const rows=items.filter(i=>_protoSlot(i.slot)===k);if(!rows.length)return;
+    list+=`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--sub);margin:12px 0 6px">${lbl}</div>`;
+    rows.forEach(i=>{
+      list+=`<div style="padding:9px 11px;background:var(--surface2);border-radius:var(--rs);margin-bottom:6px">
+        <div style="font-size:13.5px;font-weight:700">${_labEsc(i.emoji||'💊')} ${_labEsc(i.name)}</div>
+        ${i.dose?`<div style="font-size:11.5px;color:var(--sub);margin-left:24px">${_labEsc(i.dose)}</div>`:''}
+        ${i.notes?`<div style="font-size:11.5px;color:var(--sub);margin-left:24px;font-style:italic">${_labEsc(i.notes)}</div>`:''}
+      </div>`;
+    });
+  });
+  const have=_suppPlan().length;
+  body.innerHTML=`
+    <div class="fdn-chip" style="background:rgba(183,186,167,.22)"><span>Code <b>${_labEsc(_protoPretty(p.code||_protoRedeem.code))}</b> — ${items.length} supplement${items.length===1?'':'s'}.</span></div>
+    ${p.note?`<div style="font-size:13px;line-height:1.55;padding-left:10px;border-left:2px solid var(--green);margin-bottom:6px">${_labEsc(p.note)}</div>`:''}
+    ${list||'<div style="font-size:13px;color:var(--sub)">This protocol is empty — ask your practitioner to re-issue it.</div>'}
+    ${items.length?`<button class="btn btn-b btn-f" style="margin-top:16px" onclick="_protoApply('add')">${have?'Add to my supplements':'Add these to my schedule'}</button>
+    ${have?`<button class="btn btn-s btn-f" style="margin-top:8px" onclick="_protoApply('replace')">Replace my current list</button>`:''}`:''}
+    <button class="btn btn-s btn-f" style="margin-top:8px" onclick="_protoRedeem.found=null;_protoRedeem.err='';rProtoModal()">Back</button>`;
+}
+function _protoLookup(){
+  const el=document.getElementById('proto-code-in');
+  const raw=(el?el.value:'').replace(/\s+/g,'');
+  const done=(found,err)=>{_protoRedeem.busy=false;_protoRedeem.found=found||null;_protoRedeem.err=err||'';rProtoModal();};
+  // A long self-contained code carries the protocol with it — no lookup needed.
+  if(/^MSH-P1-/i.test(raw)){
+    const p=_protoDecodeOffline(raw);
+    if(!p||!p.items.length)return done(null,"That code didn't read cleanly — ask your practitioner to resend it, and make sure the whole thing is pasted in.");
+    if(p.expiresAt&&Date.now()>p.expiresAt)return done(null,'That code has expired. Ask your practitioner for a fresh one.');
+    _protoRedeem.code='';return done(p);
+  }
+  if(/^MSH-RPT-/i.test(raw))return done(null,"That's a report code, not a protocol code — paste it under Settings → Practitioner Report.");
+  const code=_protoNorm(raw);
+  if(code.length<4){_protoRedeem.err='Enter the full code from your practitioner.';rProtoModal();return;}
+  _protoRedeem.code=code;_protoRedeem.err='';_protoRedeem.busy=true;rProtoModal();
+  const check=p=>{
+    const st=_protoState(p);
+    if(st.key!=='active')return done(null,'That code is '+st.label.toLowerCase()+'. Ask your practitioner for a fresh one.');
+    done(p);
+  };
+  if(typeof fbDb==='undefined'||!fbDb){
+    const local=_protoCodes.find(x=>x.code===code);
+    return local?check(local):done(null,"We can't reach the server right now — try again once you're back online.");
+  }
+  fbDb.collection('protocols').doc(code).get().then(d=>{
+    if(!d.exists)return done(null,"That code didn't match anything. Check the letters and numbers and try again.");
+    check(Object.assign({id:d.id},d.data()));
+  }).catch(err=>{
+    const denied=err&&(err.code==='permission-denied'||err.code==='unauthenticated');
+    done(null,denied?'Sign in first (Settings → sign in) so we can look up your code.':"Couldn't reach the server — check your connection and try again.");
+  });
+}
+function _protoApply(mode){
+  const p=_protoRedeem.found;if(!p)return;
+  const items=(Array.isArray(p.items)?p.items:[]).filter(i=>i&&i.name);
+  if(!items.length){_labToast('Nothing to add.');return;}
+  if(mode==='replace'&&!confirm('Replace your current supplement list with this protocol? Your existing entries will be removed.'))return;
+  const next=mode==='replace'?[]:_suppPlan().slice();
+  let added=0,skipped=0;
+  items.forEach((it,i)=>{
+    const slot=_protoSlot(it.slot);
+    const name=String(it.name).trim();
+    const dup=next.some(s=>String(s.name||'').trim().toLowerCase()===name.toLowerCase()&&s.slot===slot);
+    if(dup){skipped++;return;}
+    next.push({id:'s'+Date.now()+'p'+i,name,dose:it.dose||'',notes:it.notes||'',slot,emoji:it.emoji||'💊',src:'practitioner'});
+    added++;
+  });
+  _suppSave(next);
+  lsSet('_protoLast',JSON.stringify({at:Date.now(),added,skipped,note:p.note||''}));
+  _protoBumpRedeem(p.code||_protoRedeem.code,p.redeemed);
+  closeProtoModal();
+  _labToast(added?('Protocol added — '+added+' supplement'+(added===1?'':'s')):'Already on your list');
+  if(curPage==='supps')rSupps();else if(curPage==='today')rToday();
+}
+// Counter only — never who redeemed it. Failure here must not block the client.
+function _protoBumpRedeem(code,prev){
+  if(typeof fbDb==='undefined'||!fbDb||!fbUser||!code)return;
+  try{fbDb.collection('protocols').doc(code).update({redeemed:(prev||0)+1,lastRedeemedAt:Date.now()}).catch(()=>{});}catch(e){}
+}
+
+/* ---- practitioner: build a protocol and issue the code ---- */
+function _protoStartListener(){
+  if(_protoListenerOn||typeof fbDb==='undefined'||!fbDb)return;
+  _protoListenerOn=true;
+  try{fbDb.collection('protocols').orderBy('createdAt','desc').limit(60).onSnapshot(snap=>{
+    _protoCodes=snap.docs.map(d=>Object.assign({id:d.id},d.data()));
+    if(curPage==='protoadmin')rProtoAdmin();
+  },err=>{console.warn('protocol code listen failed',err);});}catch(e){_protoListenerOn=false;}
+}
+function _protoCapture(){
+  const wrap=document.getElementById('proto-build');if(!wrap)return;
+  wrap.querySelectorAll('[data-prow]').forEach(r=>{
+    const it=_protoDraft.items[+r.getAttribute('data-prow')];if(!it)return;
+    const g=n=>{const el=r.querySelector('[data-pf="'+n+'"]');return el?el.value:'';};
+    it.name=g('name');it.dose=g('dose');it.notes=g('notes');it.slot=g('slot')||it.slot;
+  });
+  const lab=document.getElementById('proto-label');if(lab)_protoDraft.label=lab.value;
+  const nt=document.getElementById('proto-note');if(nt)_protoDraft.note=nt.value;
+  const su=document.getElementById('proto-single');if(su)_protoDraft.singleUse=su.checked;
+  const ps=document.getElementById('proto-paste');if(ps)_protoDraft._paste=ps.value;
+}
+function _protoAddRow(){_protoCapture();_protoDraft.items.push({name:'',dose:'',slot:'morning',notes:''});rProtoAdmin();}
+function _protoDelRow(i){_protoCapture();_protoDraft.items.splice(i,1);rProtoAdmin();}
+function _protoClearDraft(){
+  if(_protoDraft.items.length&&!confirm('Clear this protocol and start over?'))return;
+  _protoDraft={items:[],label:'',note:'',singleUse:false};_protoIssued=null;rProtoAdmin();
+}
+function _protoTogglePaste(){_protoCapture();_protoPasteOpen=!_protoPasteOpen;rProtoAdmin();}
+// Paste straight from session notes: one per line, "Name | dose | when | notes".
+function _protoImportPaste(){
+  _protoCapture();
+  const raw=String(_protoDraft._paste||'');
+  const rows=raw.split('\n').map(l=>l.trim()).filter(Boolean);
+  if(!rows.length){_labToast('Paste a few lines first.');return;}
+  let n=0;
+  rows.forEach(line=>{
+    const parts=line.split(/\s*[|\t]\s*/);
+    const name=(parts[0]||'').replace(/^[-•*\d.\s]+/,'').trim();
+    if(!name)return;
+    _protoDraft.items.push({name,dose:(parts[1]||'').trim(),slot:_protoSlot(parts[2]||''),notes:(parts[3]||'').trim()});
+    n++;
+  });
+  _protoDraft._paste='';_protoPasteOpen=false;
+  _labToast(n+' line'+(n===1?'':'s')+' imported — check the timing');
+  rProtoAdmin();
+}
+function _protoDuplicate(code){
+  const p=_protoCodes.find(x=>x.code===code||x.id===code);if(!p)return;
+  _protoDraft={
+    items:(p.items||[]).map(i=>({name:i.name||'',dose:i.dose||'',slot:_protoSlot(i.slot),notes:i.notes||''})),
+    label:p.label||'',note:p.note||'',singleUse:!!p.singleUse
+  };
+  _protoIssued=null;
+  _labToast('Loaded into the builder — issue a new code when ready');
+  rProtoAdmin();try{document.getElementById('pages').scrollTop=0;}catch(e){}
+}
+function _protoIssue(){
+  _protoCapture();
+  const items=_protoDraft.items.filter(i=>(i.name||'').trim());
+  if(!items.length){_labToast('Add at least one supplement.');return;}
+  const code=_protoNewCode();
+  const doc={
+    code,
+    label:(_protoDraft.label||'').trim().slice(0,60),
+    note:(_protoDraft.note||'').trim().slice(0,600),
+    items:items.map(i=>({
+      name:i.name.trim().slice(0,80),
+      dose:(i.dose||'').trim().slice(0,60),
+      slot:_protoSlot(i.slot),
+      notes:(i.notes||'').trim().slice(0,140),
+      emoji:i.emoji||'💊'
+    })),
+    singleUse:!!_protoDraft.singleUse,
+    expiresAt:Date.now()+PROTO_CONFIG.expiryDays*864e5,
+    redeemed:0,revoked:false,
+    createdBy:(typeof fbUser!=='undefined'&&fbUser)?(fbUser.email||''):'',
+    createdAt:(typeof fbDb!=='undefined'&&fbDb&&window.firebase&&firebase.firestore)?firebase.firestore.FieldValue.serverTimestamp():new Date().toISOString()
+  };
+  const done=()=>{_protoIssued=doc;_protoDraft={items:[],label:'',note:'',singleUse:false};rProtoAdmin();try{document.getElementById('pages').scrollTop=0;}catch(e){}};
+  if(typeof fbDb!=='undefined'&&fbDb){
+    fbDb.collection('protocols').doc(code).set(doc).then(done).catch(err=>{
+      console.warn('protocol code save failed',err);_labToast('Could not save the code — please try again.');
+    });
+  }else{ _protoCodes.unshift(Object.assign({id:code},doc)); done(); }
+}
+function _protoClientScript(p,offline){
+  const which=offline?_protoEncodeOffline(p):_protoPretty(p.code);
+  return `Your supplement protocol is ready in the Metastory Health app.\n\n1. Open the app and go to the Supps tab\n2. Tap "Enter a protocol code"\n3. ${offline?'Paste this code':'Enter this code'}:\n\n${which}\n\nIt'll show you everything before it adds anything. The code expires ${_protoDate(p.expiresAt)}.`;
+}
+function _protoCopy(text,msg){
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).catch(()=>{});
+  else{const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}ta.remove();}
+  _labToast(msg||'Copied');
+}
+function _protoCopyCode(code){_protoCopy(_protoPretty(code),'Code copied');}
+function _protoFind(code){
+  if(_protoIssued&&_protoIssued.code===code)return _protoIssued;
+  return _protoCodes.find(x=>x.code===code||x.id===code);
+}
+function _protoCopyScript(code,offline){
+  const p=_protoFind(code);if(!p)return;
+  _protoCopy(_protoClientScript(p,offline),(offline?'Offline':'Instructions')+' copied — paste into a text or email');
+}
+function _protoCopyOffline(code){
+  const p=_protoFind(code);if(!p)return;
+  _protoCopy(_protoEncodeOffline(p),'Offline code copied — works with no lookup');
+}
+function _protoRevoke(code){
+  if(!confirm('Revoke this code? Anyone who has it will no longer be able to redeem it.'))return;
+  if(typeof fbDb!=='undefined'&&fbDb)fbDb.collection('protocols').doc(code).update({revoked:true}).catch(()=>{});
+  const p=_protoCodes.find(x=>x.code===code||x.id===code);if(p)p.revoked=true;
+  if(_protoIssued&&_protoIssued.code===code)_protoIssued.revoked=true;
+  rProtoAdmin();
+}
+function _protoDelete(code){
+  if(!confirm('Delete this code permanently?'))return;
+  if(typeof fbDb!=='undefined'&&fbDb)fbDb.collection('protocols').doc(code).delete().catch(()=>{});
+  _protoCodes=_protoCodes.filter(x=>(x.code||x.id)!==code);
+  if(_protoIssued&&_protoIssued.code===code)_protoIssued=null;
+  rProtoAdmin();
+}
+function _protoRowHTML(it,i){
+  const slotOpts=PROTO_SLOT_OPTS.map(([k,l])=>`<option value="${k}" ${_protoSlot(it.slot)===k?'selected':''}>${l}</option>`).join('');
+  return `<div data-prow="${i}" style="border:1px solid var(--border);border-radius:var(--rs);padding:10px;margin-bottom:8px;background:var(--surface2)">
+    <div style="display:flex;gap:8px;align-items:center">
+      <input class="fi" data-pf="name" placeholder="Supplement name" value="${_labEsc(it.name)}" oninput="_protoCapture()" style="flex:1;font-size:14px;padding:9px 11px;background:var(--surface)">
+      <button onclick="_protoDelRow(${i})" title="Remove" style="flex:none;background:none;border:none;color:var(--red);font-size:17px;cursor:pointer;padding:2px 4px">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <input class="fi" data-pf="dose" placeholder="Dose (e.g. 2 caps, 400mg)" value="${_labEsc(it.dose)}" oninput="_protoCapture()" style="flex:1;font-size:13px;padding:9px 11px;background:var(--surface)">
+      <select data-pf="slot" onchange="_protoCapture()" style="flex:none;width:110px;padding:9px;border:1.5px solid var(--border);border-radius:var(--rs);font-size:13px;background:var(--surface);color:var(--text);font-family:var(--font-sans)">${slotOpts}</select>
+    </div>
+    <input class="fi" data-pf="notes" placeholder="Note for them (e.g. with food, start day 5)" value="${_labEsc(it.notes)}" oninput="_protoCapture()" style="margin-top:8px;font-size:13px;padding:9px 11px;background:var(--surface)">
+  </div>`;
+}
+function rProtoAdmin(){
+  const el=document.getElementById('page-protoadmin');if(!el)return;
+  if(!_labIsAdmin()){el.innerHTML=`<div class="card">Sign in as a practitioner to issue protocol codes.</div>`;return;}
+  _protoStartListener();
+  const demo=(typeof fbDb==='undefined'||!fbDb);
+  let h=`<div class="fdn-chip" style="background:rgba(122,154,171,.14);border-color:#a9c1cd;color:#3f5a68"><span>${demo?'Demo mode — no Firestore. Codes live only in this session.':'Live — connected to your Firestore (protocols).'}</span></div>`;
+
+  if(_protoIssued){
+    const p=_protoIssued;
+    h+=`<div class="card" style="border:1.5px solid var(--green);text-align:center">
+      <span class="kicker">Code ready — read it out</span>
+      <div style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:32px;font-weight:800;letter-spacing:.14em;margin:10px 0 4px">${_labEsc(_protoPretty(p.code))}</div>
+      <div style="font-size:12px;color:var(--sub)">${p.items.length} supplement${p.items.length===1?'':'s'} · ${p.singleUse?'single use':'reusable'} · expires ${_labEsc(_protoDate(p.expiresAt))}</div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn btn-s btn-sm" style="flex:1" onclick="_protoCopyCode('${p.code}')">Copy code</button>
+        <button class="btn btn-b btn-sm" style="flex:1" onclick="_protoCopyScript('${p.code}')">Copy instructions</button>
+      </div>
+      <p style="font-size:11.5px;color:var(--sub);line-height:1.5;margin-top:12px">They enter it under Supps → “Enter a protocol code”. Nothing about them is stored against the code.</p>
+      <details style="margin-top:8px;text-align:left">
+        <summary style="font-size:12px;color:var(--sub);cursor:pointer;font-weight:600">Or send a long code that needs no lookup</summary>
+        <p style="font-size:11.5px;color:var(--sub);line-height:1.5;margin:8px 0">The protocol travels inside the code itself, so it works even if the short-code lookup is unavailable. Too long to read aloud, and it can't be revoked or counted — there's nothing on the server to revoke.</p>
+        <button class="btn btn-s btn-sm btn-f" onclick="_protoCopyScript('${p.code}',1)">Copy offline instructions</button>
+        <button class="btn btn-s btn-sm btn-f" style="margin-top:6px" onclick="_protoCopyOffline('${p.code}')">Copy offline code only</button>
+      </details>
+    </div>`;
+  }
+
+  // ── builder ──
+  h+=`<div class="card">
+    <span class="kicker">Build a protocol</span>
+    <div style="font-family:var(--font-serif);font-size:20px;margin:6px 0 4px">New supplement protocol</div>
+    <p style="font-size:12.5px;color:var(--sub);line-height:1.5">Add what you recommended in the review, then generate a code. The client enters it themselves — no client record is created, so no protected data leaves the room.</p>
+    <div id="proto-build" style="margin-top:12px">`;
+  if(!_protoDraft.items.length)h+=`<p style="font-size:13px;color:var(--sub);margin-bottom:10px">Nothing added yet.</p>`;
+  _protoDraft.items.forEach((it,i)=>{h+=_protoRowHTML(it,i);});
+  h+=`<div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-s btn-sm" style="flex:1" onclick="_protoAddRow()">+ Add supplement</button>
+        <button class="btn btn-s btn-sm" style="flex:none" onclick="_protoTogglePaste()">${_protoPasteOpen?'Hide paste':'Paste list'}</button>
+      </div>`;
+  if(_protoPasteOpen){
+    h+=`<div style="margin-top:10px">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--sub);margin-bottom:6px">Paste from your notes</div>
+      <textarea id="proto-paste" oninput="_protoCapture()" placeholder="One per line:
+Magnesium glycinate | 400mg | evening | before bed
+Biocidin LSF | 5 drops | morning | start day 5" style="width:100%;min-height:96px;padding:11px;border:1.5px solid var(--border);border-radius:var(--rs);font-size:13px;background:var(--surface2);color:var(--text);font-family:var(--font-sans)">${_labEsc(_protoDraft._paste||'')}</textarea>
+      <div style="font-size:11px;color:var(--sub);margin:4px 0 8px">Name | dose | morning/midday/evening | note — anything after the name is optional.</div>
+      <button class="btn btn-s btn-sm btn-f" onclick="_protoImportPaste()">Import lines</button>
+    </div>`;
+  }
+  h+=`<div style="margin-top:16px">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--sub);margin-bottom:6px">Note for the client <span style="font-weight:400;text-transform:none">(optional)</span></div>
+      <textarea id="proto-note" oninput="_protoCapture()" placeholder="Start with magnesium alone for five days, then add the rest one at a time." style="width:100%;min-height:66px;padding:11px;border:1.5px solid var(--border);border-radius:var(--rs);font-size:13px;background:var(--surface2);color:var(--text);font-family:var(--font-sans)">${_labEsc(_protoDraft.note||'')}</textarea>
+    </div>
+    <div style="margin-top:14px">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--sub);margin-bottom:6px">Your reference label <span style="font-weight:400;text-transform:none">(optional)</span></div>
+      <input id="proto-label" class="fi" placeholder="e.g. JB · GI-MAP follow-up" value="${_labEsc(_protoDraft.label||'')}" oninput="_protoCapture()" style="font-size:13px;padding:10px 11px">
+      <div style="font-size:11px;color:var(--sub);margin-top:5px">Initials or a nickname — this is stored in the cloud, so keep names out of it.</div>
+    </div>
+    <label style="display:flex;gap:10px;align-items:flex-start;font-size:13px;margin:14px 0 0;line-height:1.45"><input type="checkbox" id="proto-single" ${_protoDraft.singleUse?'checked':''} onchange="_protoCapture()" style="width:20px;height:20px;flex:none;margin-top:1px"><span>Single use — the code stops working after it's redeemed once.</span></label>
+    </div>
+    <button class="btn btn-b btn-f" style="margin-top:16px" onclick="_protoIssue()">Generate protocol code</button>
+    ${_protoDraft.items.length?`<button class="btn btn-s btn-f" style="margin-top:8px" onclick="_protoClearDraft()">Clear</button>`:''}
+  </div>`;
+
+  // ── issued codes ──
+  h+=`<div class="ct" style="margin:16px 0 8px">Issued codes</div>`;
+  if(!_protoCodes.length){
+    h+=`<div class="card" style="color:var(--sub);font-size:13px">No codes yet. Build a protocol above and generate one.</div>`;
+  }else{
+    _protoCodes.forEach(p=>{
+      const st=_protoState(p);
+      const code=p.code||p.id;
+      const when=(p.createdAt&&p.createdAt.toDate)?p.createdAt.toDate().toLocaleDateString():(typeof p.createdAt==='string'?new Date(p.createdAt).toLocaleDateString():'just now');
+      h+=`<div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <b style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:16px;letter-spacing:.08em">${_labEsc(_protoPretty(code))}</b>
+          <span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;color:#fff;background:${st.color}">${st.label}</span>
+        </div>
+        <div style="font-size:12px;color:var(--sub);margin:5px 0">${(p.items||[]).length} item${(p.items||[]).length===1?'':'s'} · issued ${_labEsc(when)} · expires ${_labEsc(_protoDate(p.expiresAt))}${p.singleUse?' · single use':''}${p.label?' · '+_labEsc(p.label):''}</div>
+        <div style="font-size:12px;color:var(--sub)">${(p.items||[]).map(i=>_labEsc(i.name)+(i.dose?' ('+_labEsc(i.dose)+')':'')+' · '+_protoSlotLabel(_protoSlot(i.slot))).join('<br>')}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          <button onclick="_protoCopyCode('${code}')" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer">Copy code</button>
+          <button onclick="_protoCopyScript('${code}')" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer">Copy instructions</button>
+          <button onclick="_protoCopyOffline('${code}')" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer">Offline code</button>
+          <button onclick="_protoDuplicate('${code}')" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer">Reuse</button>
+          ${p.revoked?'':`<button onclick="_protoRevoke('${code}')" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer">Revoke</button>`}
+          <button onclick="_protoDelete('${code}')" style="background:rgba(196,112,112,.14);color:var(--red);border:none;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer">Delete</button>
+        </div>
+      </div>`;
+    });
+  }
+  h+=`<button onclick="goPage('supps')" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--rs);padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-top:6px;font-family:var(--font-sans)">← Back</button>`;
+  el.innerHTML=h;
+}
+/* ═══════════════════ END PRACTITIONER PROTOCOL CODES ═══════════════════ */
 
 // ── DATE NAV ──────────────────────────────────────────────────────────────────
 const _D=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -10369,6 +10842,18 @@ if('serviceWorker' in navigator){
   </div>
 </div>
 
+<!-- Practitioner Protocol Code Modal -->
+<div class="ov" id="proto-ov">
+  <div class="modal">
+    <div class="mh"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="mt2" style="margin-bottom:0">🔑 Protocol code</div>
+      <button onclick="closeProtoModal()" style="background:none;border:none;color:var(--sub);font-size:20px;cursor:pointer;padding:4px">✕</button>
+    </div>
+    <div id="proto-modal-body"></div>
+  </div>
+</div>
+
 <!-- Recipe Import Modal -->
 <div class="ov" id="recipe-ov">
   <div class="modal">
@@ -12086,6 +12571,8 @@ function startTitr(id){
 function rSupps(){
   const plan=_suppPlan();const taken=_suppTaken();const t=_titr();
   let h=_tabRoutineHTML('supps');
+  h+=_protoLastCardHTML();
+  h+=_protoEntryCardHTML();
   h+=_labEntryCardHTML();
   // Safety banner — reflects the user's health flags so gating is visible on this tab
   try{
