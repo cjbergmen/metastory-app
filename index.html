@@ -2286,7 +2286,15 @@ function addWoSet(idx){
   ex.sets.push({w:st.selW,r});
   putWL(wl);
   _woState[name].rep='';
+  const restSec=_woRestSecFor(name);
   rWorkout();
+  // Logging a set starts the rest clock — no second tap needed. Re-find the
+  // card by name first: rWorkout() rebuilds _woExList, so the index we were
+  // called with isn't guaranteed to still point at this exercise. Tapping the
+  // timer still stops it, and tapping again restarts it, exactly as before.
+  let tIdx=idx;
+  try{if(typeof _woExList!=='undefined'&&_woExList){const f=_woExList.indexOf(name);if(f>=0)tIdx=f;}}catch(e){}
+  cardTimerStart(tIdx,restSec);
 }
 
 // Mark an exercise done — collapse it and push to bottom
@@ -4253,6 +4261,9 @@ function rWorkout(){
     </div>`;
   }
   document.getElementById('page-workout').innerHTML=h;
+  // Cards can change position on any re-render (marking one done sinks it to the
+  // bottom), so re-key any running rest timer to where its exercise sits now.
+  _ctRemap();
 }
 
 // ── FOOD ──────────────────────────────────────────────────────────────────────
@@ -8385,17 +8396,18 @@ function _ctStop(idx,initSec){
   const el=document.getElementById('card-timer-'+idx);
   if(el){el.textContent=_fmtCT(initSec);el.className='card-timer-btn';}
 }
-function cardTimerClick(idx,initSec){
+// Start (or restart) a card's rest timer. Shared by the manual tap and by the
+// auto-start that fires when a set is logged — logging a set IS the start of
+// rest, so both go through here rather than duplicating the audio/notification
+// /persist plumbing.
+function cardTimerStart(idx,initSec){
   if(!_cardTimers[idx])_cardTimers[idx]={iv:null,sec:initSec,init:initSec,endMs:0,ex:''};
   const t=_cardTimers[idx];
-  // Refresh init whenever the timer isn't actively counting. The same idx can
-  // map to a different exercise after a swap/reorder/re-render, and without
-  // this the cached init from the first click would override the new rest
-  // value — making every timer fall back to whatever the original was
-  // (typically 2:00 since that's the most common rest in this plan).
-  const running=!!(t.iv&&t.endMs>Date.now());
-  if(!running)t.init=initSec;
-  if(running){_ctStop(idx,initSec);return;}
+  // Always take the caller's rest value. The same idx can map to a different
+  // exercise after a swap/reorder/re-render, and a cached init would override
+  // the new rest value — making every timer fall back to whatever the original
+  // was (typically 2:00 since that's the most common rest in this plan).
+  t.init=initSec;
   try{t.ex=(typeof _woExList!=='undefined'&&_woExList)?(_woExList[idx]||''):'';}catch(e){t.ex='';}
   t.endMs=Date.now()+t.init*1000;
   t.sec=t.init;
@@ -8411,6 +8423,61 @@ function cardTimerClick(idx,initSec){
       title:'⏱ Rest Over',body:"Time to get back to it!"});
   }
   _ctTick(idx);
+}
+function cardTimerClick(idx,initSec){
+  const t=_cardTimers[idx];
+  const running=!!(t&&t.iv&&t.endMs>Date.now());
+  if(running){_ctStop(idx,initSec);return;}
+  cardTimerStart(idx,initSec);
+}
+// The rest value the card's own timer button uses, looked up by exercise name so
+// an auto-start honours a per-exercise rest edit the same way a tap does.
+function _woRestSecFor(name){
+  try{
+    const wo=getWO();if(!wo)return 90;
+    const ex=[...(wo.ex||[]),...(wo.pm||[])].find(x=>x.n===name);
+    return _parseRestSec(ex?ex.rest:null);
+  }catch(e){return 90;}
+}
+// Rest timers are keyed by card index, but the cards re-sort — marking an
+// exercise done pushes it to the bottom. Without re-keying, a running timer
+// would go on painting whatever card inherited its old index. Called at the end
+// of every rWorkout(), once _woExList reflects the new order.
+function _ctRemap(){
+  try{
+    if(typeof _woExList==='undefined'||!_woExList||!_woExList.length)return;
+    const keys=Object.keys(_cardTimers);
+    if(!keys.length)return;
+    const moved={};
+    keys.forEach(function(k){
+      const t=_cardTimers[k];if(!t)return;
+      clearInterval(t.iv);t.iv=null;
+      // Only live timers are worth carrying. Idle entries get rebuilt from the
+      // exercise's own rest value on the next tap, so dropping them is free.
+      if(!(t.endMs&&t.endMs>Date.now()))return;
+      const ni=t.ex?_woExList.indexOf(t.ex):Number(k);
+      if(ni<0)return;   // exercise swapped out or removed — let its timer go
+      moved[ni]=t;
+    });
+    _cardTimers={};
+    Object.keys(moved).forEach(function(k){
+      const idx=Number(k);
+      _cardTimers[idx]=moved[k];
+      _cardTimers[idx].iv=setInterval(function(){_ctTick(idx);},250);
+      _ctTick(idx);
+    });
+    // Each card's class was baked in while the old keys were still in place, so
+    // whichever card inherited a running timer's index renders as if it were
+    // counting. Its label is its own rest value, so only the class needs
+    // clearing — and only where no live timer actually backs it. The 'cdone'
+    // flash is left alone.
+    for(let i=0;i<_woExList.length;i++){
+      if(_cardTimers[i]&&_cardTimers[i].endMs>Date.now())continue;
+      const el=document.getElementById('card-timer-'+i);
+      if(el&&el.className.indexOf('ctr')>=0)el.className='card-timer-btn';
+    }
+    _ctPersist();
+  }catch(e){}
 }
 // Re-attach any rest timer still running after a reload / PWA re-open. Scoped to
 // today and to the same exercise still sitting at that index, so a stale entry
