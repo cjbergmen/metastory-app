@@ -2301,12 +2301,25 @@ function addWoSet(idx){
 function exIsDone(name){const wl=getWL();const ex=wl.find(e=>e.ex===name);return !!(ex&&ex.done);}
 function markExDone(idx){
   const name=_woExList[idx];
+  // If this exercise's rest is still counting, hand it to whichever card takes
+  // its place in the list — once it's done, the rest you're serving belongs to
+  // the exercise you're moving to. Carry the original end time so the clock
+  // doesn't restart; only for this one round, since the label it resets to when
+  // it rings becomes the new exercise's own rest.
+  let carry=0;
+  const t=_cardTimers[idx];
+  if(t&&(!t.ex||t.ex===name)&&t.endMs>Date.now()){
+    carry=t.endMs;
+    clearInterval(t.iv);t.iv=null;
+    delete _cardTimers[idx];
+  }
   const wl=getWL();
   let ex=wl.find(e=>e.ex===name);
   if(!ex){ex={ex:name,sets:[],done:true};wl.push(ex);}
   else ex.done=true;
   putWL(wl);
   rWorkout();
+  if(carry)_ctCarryTo(idx,carry);
 }
 function markExUndone(idx){
   const name=_woExList[idx];
@@ -8438,6 +8451,31 @@ function _woRestSecFor(name){
     const ex=[...(wo.ex||[]),...(wo.pm||[])].find(x=>x.n===name);
     return _parseRestSec(ex?ex.rest:null);
   }catch(e){return 90;}
+}
+// Hand a still-running rest over to the card now sitting at `idx`, keeping the
+// original end time. Called after the re-render, so _woExList already reflects
+// the new order and `idx` is the slot the finished exercise vacated.
+function _ctCarryTo(idx,endMs){
+  try{
+    if(!(endMs>Date.now()))return;
+    if(typeof _woExList==='undefined'||!_woExList)return;
+    const name=_woExList[idx];
+    if(!name||exIsDone(name))return;   // nothing left to rest for
+    // If that card is already resting on its own account, leave it be — its own
+    // rest is the more relevant one.
+    const cur=_cardTimers[idx];
+    if(cur&&cur.endMs>Date.now())return;
+    const t=cur||{iv:null,sec:0,init:0,endMs:0,ex:''};
+    clearInterval(t.iv);
+    t.ex=name;
+    t.init=_woRestSecFor(name);        // what the button shows once it rings
+    t.endMs=endMs;
+    t.sec=Math.max(0,Math.ceil((endMs-Date.now())/1000));
+    _cardTimers[idx]=t;
+    t.iv=setInterval(function(){_ctTick(idx);},250);
+    _ctTick(idx);
+    _ctPersist();
+  }catch(e){}
 }
 // Rest timers are keyed by card index, but the cards re-sort — marking an
 // exercise done pushes it to the bottom. Without re-keying, a running timer
