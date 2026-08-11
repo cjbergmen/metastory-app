@@ -914,6 +914,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 </div>
 
 <script>
+// Which build of index.html is actually running. Shown in Settings → App, so
+// "is my app on the new code?" is a five-second check instead of a guess. Keep
+// this in step with VERSION in sw.js whenever you ship.
+const APP_BUILD='20260805-build-indicator';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -1110,7 +1114,10 @@ function rSettingsModal(){
     </div>
     <div class="card" style="margin-bottom:10px">
       <div class="ct">⚙️ App</div>
+      <div style="font-size:12px;color:var(--sub);margin-bottom:8px;line-height:1.5">Build <b style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">${APP_BUILD}</b></div>
       <button class="btn btn-s btn-sm btn-f" onclick="window.location.reload()">🔄 Reload App</button>
+      <button class="btn btn-s btn-sm btn-f" style="margin-top:6px;color:var(--blue)" onclick="forceUpdate()">⬇️ Force Update</button>
+      <div style="font-size:11px;color:var(--sub);margin-top:5px;line-height:1.4">Use Force Update if the app seems stuck on an old version — it clears the cache and re-downloads. Your data isn't touched.</div>
     </div>
     <details style="margin-bottom:10px">
       <summary style="font-size:12px;color:var(--sub);cursor:pointer;padding:6px 0;font-weight:600">Advanced options</summary>
@@ -10895,6 +10902,29 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message', e => {
     if(e.data && e.data.type==='RELOAD') window.location.reload();
   });
+}
+// Last resort when a device is stuck on an old build: drop the service worker
+// and every cache, then reload past the cache with a fresh query string. An
+// installed PWA can otherwise hold its old page indefinitely, since a plain
+// reload doesn't always re-fetch. Touches caches only — never app data.
+async function forceUpdate(){
+  try{showToast('Updating…');}catch(e){}
+  try{
+    if('serviceWorker' in navigator){
+      const regs=await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r=>r.unregister().catch(()=>{})));
+    }
+  }catch(e){}
+  try{
+    if(window.caches){
+      const keys=await caches.keys();
+      await Promise.all(keys.map(k=>caches.delete(k).catch(()=>{})));
+    }
+  }catch(e){}
+  try{
+    const u=location.pathname+'?u='+Date.now();
+    location.replace(u);
+  }catch(e){location.reload();}
 }
 </script>
 <div id="wiz-overlay" class="wiz-overlay">
