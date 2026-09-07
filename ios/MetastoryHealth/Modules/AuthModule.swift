@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import CryptoKit
+import Security
 import AuthenticationServices
 
 /// Sign-in, natively.

@@ -53,6 +53,12 @@ final class WebViewController: UIViewController {
         configuration.allowsAirPlayForMediaPlayback = true
         configuration.suppressesIncrementalRendering = false
 
+        // Appends to the system user agent rather than replacing it, so the
+        // page still sees a normal Safari string and can key off
+        // "MetastoryiOS" to tell it is running natively.
+        configuration.applicationNameForUserAgent =
+            "\(AppConfig.userAgentSuffix)/\(Bundle.main.shortVersion)"
+
         bridge = NativeBridge(host: self)
 
         let controller = configuration.userContentController
@@ -80,12 +86,6 @@ final class WebViewController: UIViewController {
         // `viewport-fit=cover` and env(safe-area-inset-*). Letting UIKit add
         // its own insets on top would double the padding.
         webView.scrollView.contentInsetAdjustmentBehavior = .never
-
-        if let agent = webView.value(forKey: "userAgent") as? String {
-            webView.customUserAgent = "\(agent) \(AppConfig.userAgentSuffix)/\(Bundle.main.shortVersion)"
-        } else {
-            webView.customUserAgent = "\(AppConfig.userAgentSuffix)/\(Bundle.main.shortVersion)"
-        }
 
         refreshControl.addTarget(self, action: #selector(handlePullToRefresh), for: .valueChanged)
         refreshControl.tintColor = UIColor(white: 0.45, alpha: 1)
@@ -152,16 +152,6 @@ final class WebViewController: UIViewController {
 
     func notifyDidBecomeActive() {
         emit(event: "resume")
-    }
-
-    /// Runs arbitrary JS in the page — used by sign-in to hand a credential to
-    /// the Firebase SDK that already lives there.
-    func evaluate(_ javaScript: String, completion: ((Result<Any?, Error>) -> Void)? = nil) {
-        DispatchQueue.main.async { [weak self] in
-            self?.webView.evaluateJavaScript(javaScript) { value, error in
-                if let error { completion?(.failure(error)) } else { completion?(.success(value)) }
-            }
-        }
     }
 
     // MARK: - External links
