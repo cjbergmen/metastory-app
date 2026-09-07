@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.developer.healthkit</key>
+	<true/>
+	<!-- Empty on purpose: this covers ordinary HealthKit data only. Adding
+	     "health-records" here would pull in clinical records and a much
+	     heavier review. -->
+	<key>com.apple.developer.healthkit.access</key>
+	<array/>
+
+	<!-- Required by App Review guideline 4.8 wherever Google sign-in is
+	     offered. -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+
+	<!-- Lets a rest-timer notification break through Focus. A bell that
+	     arrives after the rest is over is no bell at all. -->
+	<key>com.apple.developer.usernotifications.time-sensitive</key>
+	<true/>
+</dict>
+</plist>
