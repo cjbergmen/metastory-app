@@ -156,7 +156,10 @@ final class WebViewController: UIViewController {
 
     // MARK: - External links
 
-    fileprivate func openExternally(_ url: URL) {
+    /// Not `fileprivate`: the bridge's `app.openExternal` routes through here
+    /// too, so that a link opened from JavaScript gets the same treatment as
+    /// one the person tapped.
+    func openExternally(_ url: URL) {
         guard let scheme = url.scheme?.lowercased() else { return }
 
         if scheme == "http" || scheme == "https" {
@@ -165,7 +168,15 @@ final class WebViewController: UIViewController {
             // already have carries over.
             let safari = SFSafariViewController(url: url)
             safari.preferredControlTintColor = UIColor(hex: 0x2F6F4E)
-            present(safari, animated: true)
+            // Presenting on top of something already modal fails silently and
+            // the link would just do nothing; dismiss first.
+            if let presented = presentedViewController {
+                presented.dismiss(animated: true) { [weak self] in
+                    self?.present(safari, animated: true)
+                }
+            } else {
+                present(safari, animated: true)
+            }
         } else {
             // mailto:, tel:, maps: and friends belong to other apps.
             UIApplication.shared.open(url)
@@ -249,8 +260,13 @@ extension WebViewController: WKNavigationDelegate {
 
     /// The web content process can be killed under memory pressure; without
     /// this the app is left showing a permanently blank white view.
+    ///
+    /// Goes through our own `reload()` rather than `webView.reload()`: if the
+    /// process died before the first page ever committed, the web view has no
+    /// URL to reload and `webView.reload()` is a no-op, which would leave the
+    /// blank view this is here to prevent.
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        webView.reload()
+        reload()
     }
 }
 

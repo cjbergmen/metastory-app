@@ -132,7 +132,17 @@ final class AppModule: BridgeModule {
                 reply.failure("Not a valid URL.")
                 return
             }
-            UIApplication.shared.open(url)
+            // Only the schemes a link in the page could legitimately want.
+            // Without this, anything that manages to run script in the page
+            // could hand the system an arbitrary scheme to open.
+            let allowed: Set<String> = ["http", "https", "mailto", "tel", "sms"]
+            guard let scheme = url.scheme?.lowercased(), allowed.contains(scheme) else {
+                reply.failure("That kind of link can't be opened.")
+                return
+            }
+            // Same path as a tapped link, so http(s) gets the in-app Safari
+            // sheet rather than throwing the person out to another app.
+            host.openExternally(url)
             reply.success(true)
 
         default:

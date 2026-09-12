@@ -14271,8 +14271,12 @@ async function deleteAccount(){
     await fbDb.collection('users').doc(uid).delete();
 
     // Apple requires the token be revoked, not just the account dropped.
+    // Use the code from the re-authorization a moment ago, not the one saved
+    // at first sign-in: Apple's authorization codes are single-use and expire
+    // in five minutes, so the stored one is always dead by the time we get
+    // here and the revoke would silently do nothing.
     try{
-      var code = lsGet('_appleAuthCode','');
+      var code = res.authorizationCode || lsGet('_appleAuthCode','');
       if(code && provider === 'apple' && typeof fbAuth.revokeAccessToken === 'function'){
         await fbAuth.revokeAccessToken(code);
       }
