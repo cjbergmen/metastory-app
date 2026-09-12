@@ -9,9 +9,16 @@ policy URL on a health app more or less every time, and a 404 or a generic
 policy that never says the word "HealthKit" is a routine rejection under
 guideline 5.1.1(i) and 5.1.3.
 
-**Two things below need C.J. to fill in or decide** — they are marked
-`[FILL IN]`. Everything else is written from what the code actually does, and
-was checked against the source rather than assumed.
+**Two things below need C.J. to fill in** — the publication date and a postal
+address for Megaphone Functional Health, LLC. Both are marked `[FILL IN]`, and
+neither can be answered from the code. Everything else is written from what the
+code actually does, and was checked against the source rather than assumed.
+
+The lab-order disclosure that used to be a third gap is now written: the
+GI-MAP form posts the whole order — name, email, phone, date of birth, mailing
+address and the free-text concerns box — to the lab-orders Worker, which emails
+it to the practitioner. A real person does receive it, so it is disclosed under
+"Who we share it with" rather than left as a question.
 
 ---
 
@@ -119,10 +126,18 @@ written up here and in `STATE.md` rather than changed.
 >   your data.
 > - **Cloudflare** — serves the app and runs the workers described above.
 >
-> [FILL IN: if lab-order notifications via the lab-orders Worker send any
-> customer data to a lab or practitioner, name that here — the code at
-> `LAB_CONFIG.notifyEndpoint` posts order details to an endpoint, and if a real
-> person receives those, this policy should say so.]
+> - **Your practitioner at Megaphone Functional Health, via our lab-order
+>   Worker** — only if you submit a GI-MAP test order. Everything on that form
+>   — your name, email address, phone number, date of birth, mailing address,
+>   and whatever you write in the health-concerns box — is saved to Firestore
+>   and posted to a Cloudflare Worker, which emails it to the practitioner so
+>   the order can be placed. A real person reads it; that is the point of the
+>   form. The practitioner then enters the order with **Evexia Diagnostics**,
+>   the laboratory that bills you, ships the collection kit and processes your
+>   sample. Evexia handles your payment and your results under its own privacy
+>   policy, not this one. Nothing on that form leaves your device unless you
+>   submit it, and the confirmation screen has a "Delete my submitted data"
+>   link that removes the order again.
 >
 > We do not share information with anyone else unless you ask us to, or unless
 > we are legally required to.

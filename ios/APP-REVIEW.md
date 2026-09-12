@@ -131,13 +131,49 @@ it is worse than not claiming it.
 **Supplement and protocol content.** The app issues practitioner protocol codes
 and recommends supplements. Expect questions about whether this constitutes
 medical advice. The medical disclaimer needs to be visible in the app, not only
-in the policy. [FILL IN: confirm where the in-app disclaimer appears, and note
-it here so it can be pointed to.]
+in the policy.
+
+It is in the app, but only just. There is exactly one disclaimer string in
+`index.html` — "Metastory supports your own health habits. It is not medical
+advice, and it does not diagnose or treat any condition." — and it sits in the
+last card of the Settings modal, under the build number, appended by the
+`after('rSettingsModal', …)` hook. Two consequences worth knowing before
+someone points a reviewer at it:
+
+- It is **native-only**. That hook is part of the iOS bridge glue, so the
+  disclaimer does not render in the plain web app at all.
+- It is nowhere near the content it disclaims. Supplement recommendations, the
+  DRESS guidance and the practitioner protocol codes all live in other tabs,
+  and a reviewer reading those has no reason to open Settings.
+
+So it can be pointed to, at Settings → bottom card, if asked. Putting a line
+on the Supplements tab and on the protocol screens would be the stronger
+answer, and it is a text change rather than a structural one — but it is C.J.'s
+call whether to make it before submitting or wait to see if review asks.
 
 **Lab ordering.** `LAB_CONFIG` posts lab orders to a Worker. If a reviewer finds
 a path to order labs, that raises questions about regulated services and about
-who receives the order. Know in advance whether that flow is reachable by a
-fresh account, and if it is, be ready to explain it.
+who receives the order.
+
+Both questions now have answers. **The flow is reachable by a fresh account** —
+the GI-MAP entry card renders at the top of the Supplements tab for everyone,
+`goPage('labs')` opens the order form, and nothing gates it on being a client.
+Only the practitioner order queue is gated, on `LAB_CONFIG.adminEmails`. So a
+reviewer will find it, and the demo account will see it too.
+
+**Who receives it:** submitting saves the order to the `labOrders` Firestore
+collection and posts it to `metastory-lab-orders.cjbergmen.workers.dev`, which
+emails it to cj@metastoryhealth.com. The order carries name, email, phone, date
+of birth, full mailing address and a free-text health-concerns box. The
+practitioner then places the order with Evexia Diagnostics, who bill the
+customer directly, ship the kit and process the sample.
+
+Three consent checkboxes (payment, medical, privacy) are required before the
+form will submit, and NJ, NY and RI are blocked outright because Evexia cannot
+order there. That is the explanation to give if asked: Metastory collects the
+request and hands it to a licensed practitioner, it does not itself order or
+perform the test. Make sure the privacy policy is live first — it now discloses
+this sharing by name, and a reviewer who finds the form will check.
 
 **Sign in with Apple and account deletion.** Apple checks that an app offering
 Sign in with Apple also offers in-app account deletion, and that deletion
