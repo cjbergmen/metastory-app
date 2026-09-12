@@ -34,10 +34,14 @@ final class AudioModule: NSObject, BridgeModule {
     /// not duck or stop whatever the phone is already playing.
     static func configureSession() {
         do {
+            // A2DP is the stereo music profile. Deliberately *not*
+            // .allowBluetooth: that is the hands-free (HFP) profile meant for
+            // calls, and offering it lets iOS route the album to a mono,
+            // call-quality channel on some headsets.
             try AVAudioSession.sharedInstance().setCategory(
                 .playback,
                 mode: .default,
-                options: [.allowAirPlay, .allowBluetooth, .allowBluetoothA2DP]
+                options: [.allowAirPlay, .allowBluetoothA2DP]
             )
         } catch {
             NSLog("[Metastory] Could not set the audio category: \(error.localizedDescription)")
