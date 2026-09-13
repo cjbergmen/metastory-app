@@ -1,4 +1,4 @@
-const VERSION = '20260913-audit1';
+const VERSION = '20260913-audit3';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately

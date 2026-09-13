@@ -558,6 +558,41 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .tour-btn{border:none;border-radius:var(--rs);padding:10px 17px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:var(--font-sans);flex:none}
 .tour-next{background:var(--green);color:#fff}
 .tour-back{background:var(--surface2);color:var(--sub);padding:10px 13px}
+
+/* Interface icons — the app's own stroke vocabulary, drawn as CSS masks so
+   they take the colour of whatever they sit in. Replaces the emoji that were
+   standing in as iconography in headers and buttons. */
+[class^="i-"]{display:inline-block;width:1.05em;height:1.05em;vertical-align:-0.16em;background:currentColor;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;-webkit-mask-size:contain;mask-size:contain;flex-shrink:0;margin-right:.14em}
+.i-user{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='3.6'/%3E%3Cpath d='M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='3.6'/%3E%3Cpath d='M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4'/%3E%3C/svg%3E")}
+.i-pencil{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h4L19 9a2.5 2.5 0 0 0-3.5-3.5L4.5 16.5z'/%3E%3Cpath d='M14.5 6.5 17.5 9.5'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h4L19 9a2.5 2.5 0 0 0-3.5-3.5L4.5 16.5z'/%3E%3Cpath d='M14.5 6.5 17.5 9.5'/%3E%3C/svg%3E")}
+.i-pill{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='9' width='16' height='7' rx='3.5' transform='rotate(-35 12 12.5)'/%3E%3Cpath d='M9.5 9.5l5 5.5'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='9' width='16' height='7' rx='3.5' transform='rotate(-35 12 12.5)'/%3E%3Cpath d='M9.5 9.5l5 5.5'/%3E%3C/svg%3E")}
+.i-gear{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 7h9M17 7h3M4 17h3M11 17h9'/%3E%3Ccircle cx='15' cy='7' r='2.2'/%3E%3Ccircle cx='7' cy='17' r='2.2'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 7h9M17 7h3M4 17h3M11 17h9'/%3E%3Ccircle cx='15' cy='7' r='2.2'/%3E%3Ccircle cx='7' cy='17' r='2.2'/%3E%3C/svg%3E")}
+.i-phone{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='6.5' y='2.8' width='11' height='18.4' rx='2.6'/%3E%3Cpath d='M10.6 5.6h2.8'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='6.5' y='2.8' width='11' height='18.4' rx='2.6'/%3E%3Cpath d='M10.6 5.6h2.8'/%3E%3C/svg%3E")}
+.i-clock{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='8.4'/%3E%3Cpath d='M12 7v5.2l3.2 2.1'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='8.4'/%3E%3Cpath d='M12 7v5.2l3.2 2.1'/%3E%3C/svg%3E")}
+.i-pulse{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12h3.5l2.2-5 4 11 2.4-6h5.9'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12h3.5l2.2-5 4 11 2.4-6h5.9'/%3E%3C/svg%3E")}
+.i-compass{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='8.4'/%3E%3Cpath d='M15.2 8.8 13.6 13.6 8.8 15.2 10.4 10.4z'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='8.4'/%3E%3Cpath d='M15.2 8.8 13.6 13.6 8.8 15.2 10.4 10.4z'/%3E%3C/svg%3E")}
+.i-droplet{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.4c3.2 3.6 5.4 6.4 5.4 9.2A5.4 5.4 0 0 1 6.6 12.6c0-2.8 2.2-5.6 5.4-9.2z'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.4c3.2 3.6 5.4 6.4 5.4 9.2A5.4 5.4 0 0 1 6.6 12.6c0-2.8 2.2-5.6 5.4-9.2z'/%3E%3C/svg%3E")}
+.i-plate{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.2 3v5.2a2.3 2.3 0 0 0 4.6 0V3M8.5 10.6V21M16.4 3c2.1 1.7 2.6 4.2 2.6 6.6 0 1.5-1 2.2-2.6 2.2V21'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.2 3v5.2a2.3 2.3 0 0 0 4.6 0V3M8.5 10.6V21M16.4 3c2.1 1.7 2.6 4.2 2.6 6.6 0 1.5-1 2.2-2.6 2.2V21'/%3E%3C/svg%3E")}
+.i-dumbbell{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 9.8v4.4M6.4 7.2v9.6M17.6 7.2v9.6M21 9.8v4.4M6.4 12h11.2'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 9.8v4.4M6.4 7.2v9.6M17.6 7.2v9.6M21 9.8v4.4M6.4 12h11.2'/%3E%3C/svg%3E")}
+.i-phones{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 14v-2a7.5 7.5 0 0 1 15 0v2'/%3E%3Crect x='3' y='13.6' width='3.6' height='6' rx='1.6'/%3E%3Crect x='17.4' y='13.6' width='3.6' height='6' rx='1.6'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 14v-2a7.5 7.5 0 0 1 15 0v2'/%3E%3Crect x='3' y='13.6' width='3.6' height='6' rx='1.6'/%3E%3Crect x='17.4' y='13.6' width='3.6' height='6' rx='1.6'/%3E%3C/svg%3E")}
+.i-moon{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.5 13.4A8.4 8.4 0 1 1 10.6 3.5a6.9 6.9 0 0 0 9.9 9.9z'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.5 13.4A8.4 8.4 0 1 1 10.6 3.5a6.9 6.9 0 0 0 9.9 9.9z'/%3E%3C/svg%3E")}
+.i-trend{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 17.5 9 11.2l3.6 3.4 7.4-8'/%3E%3Cpath d='M15.6 6.6h4.6v4.6'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 17.5 9 11.2l3.6 3.4 7.4-8'/%3E%3Cpath d='M15.6 6.6h4.6v4.6'/%3E%3C/svg%3E")}
+.i-key{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='12' r='3.6'/%3E%3Cpath d='M11.6 12H20M17.4 12v3M14.6 12v2.2'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='12' r='3.6'/%3E%3Cpath d='M11.6 12H20M17.4 12v3M14.6 12v2.2'/%3E%3C/svg%3E")}
+.i-bell{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.6 10.4a5.4 5.4 0 0 1 10.8 0c0 4.2 1.4 5.6 1.4 5.6H5.2s1.4-1.4 1.4-5.6z'/%3E%3Cpath d='M10.4 19a2 2 0 0 0 3.2 0'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.6 10.4a5.4 5.4 0 0 1 10.8 0c0 4.2 1.4 5.6 1.4 5.6H5.2s1.4-1.4 1.4-5.6z'/%3E%3Cpath d='M10.4 19a2 2 0 0 0 3.2 0'/%3E%3C/svg%3E")}
+.i-camera{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.2' y='6.8' width='17.6' height='12.4' rx='2.6'/%3E%3Ccircle cx='12' cy='13' r='3.4'/%3E%3Cpath d='M8.6 6.8 10 4.6h4l1.4 2.2'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.2' y='6.8' width='17.6' height='12.4' rx='2.6'/%3E%3Ccircle cx='12' cy='13' r='3.4'/%3E%3Cpath d='M8.6 6.8 10 4.6h4l1.4 2.2'/%3E%3C/svg%3E")}
+.i-spark{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.4 13.7 9l5.6 1.7-5.6 1.7L12 18l-1.7-5.6L4.7 10.7 10.3 9z'/%3E%3Cpath d='M18.4 15.6l.7 2.1 2.1.7-2.1.7-.7 2.1-.7-2.1-2.1-.7 2.1-.7z'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.4 13.7 9l5.6 1.7-5.6 1.7L12 18l-1.7-5.6L4.7 10.7 10.3 9z'/%3E%3Cpath d='M18.4 15.6l.7 2.1 2.1.7-2.1.7-.7 2.1-.7-2.1-2.1-.7 2.1-.7z'/%3E%3C/svg%3E")}
+.i-note{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.4 3.6h8l4 4v12.8H6.4z'/%3E%3Cpath d='M14 3.6v4.2h4.2M9.4 12.4h5.2M9.4 15.8h5.2'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.4 3.6h8l4 4v12.8H6.4z'/%3E%3Cpath d='M14 3.6v4.2h4.2M9.4 12.4h5.2M9.4 15.8h5.2'/%3E%3C/svg%3E")}
+.i-blocks{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='4' width='7' height='7' rx='1.6'/%3E%3Crect x='13' y='4' width='7' height='7' rx='1.6'/%3E%3Crect x='4' y='13' width='7' height='7' rx='1.6'/%3E%3Crect x='13' y='13' width='7' height='7' rx='1.6'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='4' width='7' height='7' rx='1.6'/%3E%3Crect x='13' y='4' width='7' height='7' rx='1.6'/%3E%3Crect x='4' y='13' width='7' height='7' rx='1.6'/%3E%3Crect x='13' y='13' width='7' height='7' rx='1.6'/%3E%3C/svg%3E")}
+.i-save{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 4.6h11.2L19.4 8v11.4H5z'/%3E%3Cpath d='M8.4 4.6v4.6h6.2V4.6M8.4 19.4v-5h7.2v5'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 4.6h11.2L19.4 8v11.4H5z'/%3E%3Cpath d='M8.4 4.6v4.6h6.2V4.6M8.4 19.4v-5h7.2v5'/%3E%3C/svg%3E")}
+.i-books{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.4 5.2h5.2a2.4 2.4 0 0 1 2.4 2.4v11.2a2 2 0 0 0-2-2H4.4z'/%3E%3Cpath d='M19.6 5.2h-5.2a2.4 2.4 0 0 0-2.4 2.4v11.2a2 2 0 0 1 2-2h5.6z'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.4 5.2h5.2a2.4 2.4 0 0 1 2.4 2.4v11.2a2 2 0 0 0-2-2H4.4z'/%3E%3Cpath d='M19.6 5.2h-5.2a2.4 2.4 0 0 0-2.4 2.4v11.2a2 2 0 0 1 2-2h5.6z'/%3E%3C/svg%3E")}
+.i-refresh{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 12a8 8 0 1 1-2.6-5.9'/%3E%3Cpath d='M20.2 4.4v4.4h-4.4'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 12a8 8 0 1 1-2.6-5.9'/%3E%3Cpath d='M20.2 4.4v4.4h-4.4'/%3E%3C/svg%3E")}
+.i-search{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='6.4'/%3E%3Cpath d='M15.8 15.8 20.4 20.4'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='6.4'/%3E%3Cpath d='M15.8 15.8 20.4 20.4'/%3E%3C/svg%3E")}
+.i-trash{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.6 6.8h14.8M9.4 6.8V4.6h5.2v2.2M6.6 6.8 7.6 20h8.8l1-13.2'/%3E%3Cpath d='M10.4 10.4v6M13.6 10.4v6'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.6 6.8h14.8M9.4 6.8V4.6h5.2v2.2M6.6 6.8 7.6 20h8.8l1-13.2'/%3E%3Cpath d='M10.4 10.4v6M13.6 10.4v6'/%3E%3C/svg%3E")}
+.i-alert{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4.2 21 19.4H3z'/%3E%3Cpath d='M12 10v4M12 16.6v.1'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4.2 21 19.4H3z'/%3E%3Cpath d='M12 10v4M12 16.6v.1'/%3E%3C/svg%3E")}
+.i-check{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.6 12.6 9.6 17.4 19.4 6.8'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.6 12.6 9.6 17.4 19.4 6.8'/%3E%3C/svg%3E")}
+.i-scale{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4.6v14.8M5 8.6h14'/%3E%3Cpath d='M5 8.6 2.6 14a3.4 3.4 0 0 0 4.8 0z'/%3E%3Cpath d='M19 8.6 16.6 14a3.4 3.4 0 0 0 4.8 0z'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4.6v14.8M5 8.6h14'/%3E%3Cpath d='M5 8.6 2.6 14a3.4 3.4 0 0 0 4.8 0z'/%3E%3Cpath d='M19 8.6 16.6 14a3.4 3.4 0 0 0 4.8 0z'/%3E%3C/svg%3E")}
+.i-file{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.4 3.6h8l4 4v12.8H6.4z'/%3E%3Cpath d='M14 3.6v4.2h4.2'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.4 3.6h8l4 4v12.8H6.4z'/%3E%3Cpath d='M14 3.6v4.2h4.2'/%3E%3C/svg%3E")}
+.i-target{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='8.2'/%3E%3Ccircle cx='12' cy='12' r='4.4'/%3E%3Ccircle cx='12' cy='12' r='1'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='8.2'/%3E%3Ccircle cx='12' cy='12' r='4.4'/%3E%3Ccircle cx='12' cy='12' r='1'/%3E%3C/svg%3E")}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -684,13 +719,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       <input type="file" accept="image/*" id="fi-ai-photo" style="display:none" onchange="addAIPhoto(this)" multiple>
       <textarea id="ai-scan-ctx" class="fi" rows="3" placeholder="Describe your meal — e.g. &quot;grilled chicken breast, roasted sweet potato, side salad&quot; — or add a photo below" style="margin-bottom:8px;font-size:16px;resize:none" oninput="aiScanCtxChanged()"></textarea>
       <div id="ai-photo-strip" class="ai-photo-strip" style="display:none"></div>
-      <button class="btn btn-s btn-f btn-sm" style="width:100%;margin-bottom:7px;font-size:12px;color:var(--sub)" id="ai-add-btn" onclick="document.getElementById('fi-ai-photo').click()">📸 Add Photo (optional)</button>
-      <button class="btn btn-g btn-f btn-sm" style="width:100%;margin-bottom:7px" id="ai-analyze-btn" onclick="runAIScan()">✨ Analyze Meal</button>
+      <button class="btn btn-s btn-f btn-sm" style="width:100%;margin-bottom:7px;font-size:12px;color:var(--sub)" id="ai-add-btn" onclick="document.getElementById('fi-ai-photo').click()"><span class=i-camera></span> Add Photo (optional)</button>
+      <button class="btn btn-g btn-f btn-sm" style="width:100%;margin-bottom:7px" id="ai-analyze-btn" onclick="runAIScan()"><span class=i-spark></span> Analyze Meal</button>
       <div id="ai-scan-status" style="font-size:12px;color:var(--sub);margin-top:4px;text-align:center;display:none"></div>
     </div>
     <div class="mode-toggle">
-      <button class="mode-btn active" id="mode-single-btn" onclick="setMealMode('single')">📝 Single Item</button>
-      <button class="mode-btn" id="mode-builder-btn" onclick="setMealMode('builder')">🧩 Build a Meal</button>
+      <button class="mode-btn active" id="mode-single-btn" onclick="setMealMode('single')"><span class=i-note></span> Single Item</button>
+      <button class="mode-btn" id="mode-builder-btn" onclick="setMealMode('builder')"><span class=i-blocks></span> Build a Meal</button>
     </div>
     <div id="food-single-wrap">
       <div class="fg">
@@ -1023,22 +1058,22 @@ function rSettingsModal(){
   const _who = fbUser ? (fbUser.displayName || fbUser.email || 'your account') : '';
   h.innerHTML = `
     <div class="card" id="set-account" style="margin-bottom:10px">
-      <div class="ct">👤 Account</div>
+      <div class="ct"><span class=i-user></span>Account</div>
       <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Signing in keeps your logs, plan and reflections on every device you use.</div>
       <div id="settings-sync-status" style="font-size:13px;font-weight:600;margin-bottom:10px;color:${fbUser?'var(--green)':'var(--sub)'}">
         ${fbUser ? '✅ Signed in as '+_who : '⚪ Not signed in'}
       </div>
       <div id="set-account-native"></div>
-      <button id="settings-auth-btn" class="btn ${fbUser?'btn-s':'btn-g'} btn-sm btn-f" onclick="handleUserMenuAuth()">${fbUser?'Sign Out':'🔑 Sign In with Google'}</button>
+      <button id="settings-auth-btn" class="btn ${fbUser?'btn-s':'btn-g'} btn-sm btn-f" onclick="handleUserMenuAuth()">${fbUser?'Sign Out':'<span class=i-key></span> Sign In with Google'}</button>
     </div>
 
     <div class="card" style="margin-bottom:10px">
-      <div class="ct">✏️ My plan</div>
+      <div class="ct"><span class=i-pencil></span>My plan</div>
       <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Rebuild your workout plan and nutrition targets, or walk through the app again.</div>
-      <button class="btn btn-s btn-sm btn-f" style="color:var(--purple)" onclick="closeSettings();showWizard(true)">✏️ Rebuild my plan</button>
-      <button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--green)" onclick="closeSettings();setTimeout(function(){startTour();},260)">🧭 Replay the walkthrough</button>
+      <button class="btn btn-s btn-sm btn-f" style="color:var(--purple)" onclick="closeSettings();showWizard(true)"><span class=i-pencil></span> Rebuild my plan</button>
+      <button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--green)" onclick="closeSettings();setTimeout(function(){startTour();},260)"><span class=i-compass></span> Replay the walkthrough</button>
       <details style="margin-top:10px">
-        <summary style="font-size:12px;color:var(--sub);cursor:pointer;padding:6px 0;font-weight:600">🎯 Edit my nutrition targets</summary>
+        <summary style="font-size:12px;color:var(--sub);cursor:pointer;padding:6px 0;font-weight:600"><span class=i-target></span> Edit my nutrition targets</summary>
         ${(()=>{
           let t={train:{p:150,c:200,f:65,k:2100,w:90},rest:{p:125,c:160,f:55,k:1750,w:75}};
           try{const s=lsGet('_userTargets','');if(s){const u=JSON.parse(s);if(u&&u.train&&u.rest)t=u;}}catch(e){}
@@ -1052,7 +1087,7 @@ function rSettingsModal(){
           return `
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0 12px">
             <div>
-              <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🏋️ Training day</div>
+              <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px"><span class=i-dumbbell></span> Training day</div>
               ${row('Protein','nt-tr-p',t.train.p,'g')}
               ${row('Carbs','nt-tr-c',t.train.c,'g')}
               ${row('Fat','nt-tr-f',t.train.f,'g')}
@@ -1069,7 +1104,7 @@ function rSettingsModal(){
             </div>
           </div>
           <div id="nt-save-msg" style="font-size:12px;color:var(--green);font-weight:600;min-height:18px;margin-bottom:6px;text-align:center"></div>
-          <button class="btn btn-g btn-sm btn-f" onclick="saveNutritionTargets()">💾 Save targets</button>
+          <button class="btn btn-g btn-sm btn-f" onclick="saveNutritionTargets()"><span class=i-save></span> Save targets</button>
           <button class="btn btn-s btn-sm btn-f" style="color:var(--sub);margin-top:8px" onclick="recalcTargetsFromProfile()">Recalculate from my profile</button>
           <div style="font-size:11px;color:var(--sub);line-height:1.5;margin-top:8px">These are a starting point. Let how you feel 90 minutes to 2 hours after eating be the real guide — steady means the ratio fits; foggy or hungry means adjust.</div>`;
         })()}
@@ -1087,10 +1122,10 @@ function rSettingsModal(){
     </div>
 
     <div class="card" style="margin-bottom:10px">
-      <div class="ct">💊 Supplements</div>
+      <div class="ct"><span class=i-pill></span>Supplements</div>
       <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Add supplements from Fullscript or anywhere else, then track them on the Today tab.</div>
       ${(()=>{const s=_suppPlan();return s.length?`<div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:8px">${s.length} supplement${s.length===1?'':'s'} configured</div>`:'';})()}
-      <button class="btn btn-s btn-sm btn-f" style="color:var(--blue)" onclick="closeSettings();openSuppModal()">💊 Manage supplements</button>
+      <button class="btn btn-s btn-sm btn-f" style="color:var(--blue)" onclick="closeSettings();openSuppModal()"><span class=i-pill></span> Manage supplements</button>
       <details style="margin-top:10px">
         <summary style="font-size:12px;color:var(--sub);cursor:pointer;padding:6px 0;font-weight:600">🩺 I have a report code from my practitioner</summary>
         ${lsGet('_practitionerReport',null) ? `<div style="font-size:12px;font-weight:600;color:var(--green);margin:8px 0">✅ Report imported — ${lsGet('_practitionerReport',{}).sessionDate||'date unknown'}</div>` : ''}
@@ -1100,7 +1135,7 @@ function rSettingsModal(){
     </div>
 
     <div class="card" style="margin-bottom:10px">
-      <div class="ct">⚙️ App &amp; data</div>
+      <div class="ct"><span class=i-gear></span>App &amp; data</div>
       <div style="font-size:12px;color:var(--sub);margin-bottom:8px;line-height:1.5">Build <b style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">${APP_BUILD}</b></div>
       <button class="btn btn-s btn-sm btn-f" style="color:var(--blue)" onclick="forceUpdate()">⬇️ Force update</button>
       <div style="font-size:11px;color:var(--sub);margin-top:5px;line-height:1.4">Use this if the app seems stuck on an old version — it clears the cache and re-downloads. Your data isn't touched.</div>
@@ -1111,13 +1146,13 @@ function rSettingsModal(){
           <label class="btn btn-s btn-sm" style="flex:1;cursor:pointer;text-align:center">⬇️ Import<input type="file" accept=".json" style="display:none" onchange="importData(this)"></label>
         </div>
         <div style="font-size:11px;color:var(--sub);margin-bottom:10px;line-height:1.4">Save your logs to a file, or restore one.</div>
-        <button class="btn btn-s btn-sm btn-f" style="color:var(--purple)" onclick="const n=importHistoryToLib();alert(n>0?n+' food item'+(n===1?'':'s')+' added to your library!':'All logged foods are already in your library.')">📚 Import foods from history</button>
-        ${fbUser ? '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--blue)" onclick="manualCloudSync()">🔄 Force sync now</button>' : ''}
-        <button class="btn btn-s btn-sm btn-f" style="color:var(--green);margin-top:8px" onclick="runRecovery()">🔍 Recover missing data</button>
+        <button class="btn btn-s btn-sm btn-f" style="color:var(--purple)" onclick="const n=importHistoryToLib();alert(n>0?n+' food item'+(n===1?'':'s')+' added to your library!':'All logged foods are already in your library.')"><span class=i-books></span> Import foods from history</button>
+        ${fbUser ? '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--blue)" onclick="manualCloudSync()"><span class=i-refresh></span> Force sync now</button>' : ''}
+        <button class="btn btn-s btn-sm btn-f" style="color:var(--green);margin-top:8px" onclick="runRecovery()"><span class=i-search></span> Recover missing data</button>
         <div style="font-size:11px;color:var(--sub);margin-top:5px;margin-bottom:10px;line-height:1.4">Scans for entries misplaced by a timezone change.</div>
         <button class="btn btn-s btn-sm btn-f" style="color:var(--sub)" onclick="resetWorkoutPlan()">↩️ Reset to default plan</button>
-        ${fbUser ? '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--red);opacity:0.8" onclick="clearFoodLibrary()">🗑️ Reset food library</button>' : ''}
-        ${fbUser ? '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--red);opacity:0.8" onclick="resetAccountData()">⚠️ Reset my account data</button><div style="font-size:11px;color:var(--sub);margin-top:4px;line-height:1.4">Clears your profile, plan and targets — locally and in the cloud — and re-runs setup.</div>' : ''}
+        ${fbUser ? '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--red);opacity:0.8" onclick="clearFoodLibrary()"><span class=i-trash></span> Reset food library</button>' : ''}
+        ${fbUser ? '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--red);opacity:0.8" onclick="resetAccountData()"><span class=i-alert></span> Reset my account data</button><div style="font-size:11px;color:var(--sub);margin-top:4px;line-height:1.4">Clears your profile, plan and targets — locally and in the cloud — and re-runs setup.</div>' : ''}
       </details>
     </div>
 
@@ -1155,7 +1190,7 @@ function updateAuthUI(){
     const sp = document.getElementById('settings-sync-status');
     if(sp) sp.innerHTML = '⚪ Not signed in';
     const sfb = document.getElementById('settings-auth-btn');
-    if(sfb){ sfb.textContent = '🔑 Sign In with Google'; sfb.className = 'btn btn-g btn-sm btn-f'; }
+    if(sfb){ sfb.innerHTML = '<span class=i-key></span> Sign In with Google'; sfb.className = 'btn btn-g btn-sm btn-f'; }
   }
 }
 
@@ -2858,7 +2893,7 @@ function askAIForSwaps(){
   const name=_woExList[_swapModalIdx]||'';
   const group=_swapMuscleFilter;
   const aiBtn=document.getElementById('swap-ai-btn');
-  if(aiBtn){aiBtn.textContent='✨ Thinking…';aiBtn.disabled=true;}
+  if(aiBtn){aiBtn.innerHTML='<span class=i-spark></span> Thinking…';aiBtn.disabled=true;}
   const prompt=`I need 3 dumbbell-only alternative exercises for "${name}" (muscle group: ${group}). The user has 10-30 lb dumbbells only. Reply with ONLY a JSON array of 3 objects, each with keys: n (string name), tag (string like "3 x 10-12"), i (string 1-sentence cue), rest (string like "90 sec"), muscles (string like "Chest · triceps"). No markdown, no explanation.`;
   fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`,{
     method:'POST',headers:{'Content-Type':'application/json'},
@@ -2881,9 +2916,9 @@ function askAIForSwaps(){
       </div>`;
     });
     if(list)list.insertAdjacentHTML('beforeend',extra);
-    if(aiBtn){aiBtn.textContent='✨ Ask AI for more options';aiBtn.disabled=false;}
+    if(aiBtn){aiBtn.innerHTML='<span class=i-spark></span> Ask AI for more options';aiBtn.disabled=false;}
   }).catch(function(){
-    if(aiBtn){aiBtn.textContent='✨ Ask AI for more options';aiBtn.disabled=false;}
+    if(aiBtn){aiBtn.innerHTML='<span class=i-spark></span> Ask AI for more options';aiBtn.disabled=false;}
     showToast('AI error — please try again');
   });
 }
@@ -4343,7 +4378,7 @@ function _practicesListHTML(){
           <button class="btn btn-s btn-sm" style="flex:1;color:var(--blue)" onclick="openTimer('Cold Plunge',${tr?390:540})">⏱ Start Timer (${tr?'6.5':'9'} min)</button>
         </div>`;
         if(tr){
-          h += `<div style="margin-top:6px;font-size:11px;color:var(--red);font-weight:600">⚠️ Training day: do NOT cold plunge within 4–6 hours after lifting</div>`;
+          h += `<div style="margin-top:6px;font-size:11px;color:var(--red);font-weight:600"><span class=i-alert></span> Training day: do NOT cold plunge within 4–6 hours after lifting</div>`;
         }
       }
       if(act.id==='sauna'){
@@ -6347,7 +6382,7 @@ function rFoodLibHTML(){
     return (b.updated||0)-(a.updated||0);
   });
 
-  let h=`<input id="lib-si" class="lib-search" placeholder="🔍 Search library…" value="${_libSearch.replace(/"/g,'&quot;')}" oninput="_libSearch=this.value;rFoodLib()">`;
+  let h=`<input id="lib-si" class="lib-search" placeholder="Search library…" value="${_libSearch.replace(/"/g,'&quot;')}" oninput="_libSearch=this.value;rFoodLib()">`;
   h+=`<div class="lib-cats">`;
   cats.forEach(c=>{h+=`<div class="lib-cat${_libCat===c?' active':''}" onclick="_libCat='${c}';rFoodLib()">${catEmoji[c]||c}</div>`;});
   h+=`</div>`;
@@ -6364,7 +6399,7 @@ function rFoodLibHTML(){
       : `Re-run auto-categorize to fix any miscategorized items`;
     h+=`<div style="background:rgba(122,154,171,.12);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px">
       <div style="font-size:12px;color:var(--sub);line-height:1.4">${label}</div>
-      <button onclick="autoCategorizeLib()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:7px 13px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">✨ Auto-Categorize</button>
+      <button onclick="autoCategorizeLib()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:7px 13px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap"><span class=i-spark></span> Auto-Categorize</button>
     </div>`;
   }
 
@@ -6416,7 +6451,7 @@ function rFoodLibHTML(){
           <button class="btn btn-g btn-f" onclick="libLogGrams('${item.id}')">Log It</button>
           <div style="display:flex;gap:9px;margin-top:9px">
             <button class="btn btn-s btn-sm" style="flex:1;font-size:12px" onclick="libSavePerGramName('${item.id}')">Save name</button>
-            <button class="btn btn-s btn-sm" style="flex:1;font-size:12px;color:var(--sub)" onclick="libTogglePerGram('${item.id}')">⚙️ Edit macros</button>
+            <button class="btn btn-s btn-sm" style="flex:1;font-size:12px;color:var(--sub)" onclick="libTogglePerGram('${item.id}')"><span class=i-gear></span> Edit macros</button>
           </div>`;
         }else{
           // ── Weight-scaling shortcut ───────────────────────────
@@ -6453,9 +6488,9 @@ function rFoodLibHTML(){
             <button class="btn btn-s btn-sm" style="flex:1;font-size:12px" onclick="libSave('${item.id}')">Save</button>
             <button class="btn btn-g btn-sm" style="flex:1;font-size:12px" onclick="libSaveAsNew('${item.id}')">Save as New</button>
           </div>
-          <button class="lib-mode-link" onclick="libTogglePerGram('${item.id}')">⚖️ Switch to weigh-by-gram mode</button>`;
+          <button class="lib-mode-link" onclick="libTogglePerGram('${item.id}')"><span class=i-scale></span> Switch to weigh-by-gram mode</button>`;
         }
-        h+=`<button onclick="libDelete('${item.id}')" style="margin-top:4px;width:100%;padding:7px;background:none;border:none;color:var(--sub);font-size:11px;cursor:pointer">🗑 Remove from library</button>
+        h+=`<button onclick="libDelete('${item.id}')" style="margin-top:4px;width:100%;padding:7px;background:none;border:none;color:var(--sub);font-size:11px;cursor:pointer"><span class=i-trash></span> Remove from library</button>
         </div>`;
       }
       h+=`</div>`;
@@ -6960,7 +6995,7 @@ function _flogRender(){
   }
   var note='';
   if(_flog.mode==='wt'&&!it.perGram&&!it.servG) note='<div style="font-size:11px;color:var(--sub,#999);margin-top:7px;line-height:1.45">Scaled as if the saved macros are per 100g. Set a serving size below for exact weight scaling.</div>';
-  var refbox='<div style="margin-top:16px"><button onclick="_flogToggleRef()" style="background:none;border:none;color:var(--sub,#888);font-size:12px;font-weight:600;cursor:pointer;padding:0">⚙️ Set serving size</button>'
+  var refbox='<div style="margin-top:16px"><button onclick="_flogToggleRef()" style="background:none;border:none;color:var(--sub,#888);font-size:12px;font-weight:600;cursor:pointer;padding:0"><span class=i-gear></span> Set serving size</button>'
     +'<div id="flog-refbox" style="display:none;margin-top:9px;padding:13px;background:var(--surface2,#f4f4f0);border-radius:10px">'
     +'<div style="font-size:11px;color:var(--sub,#888);margin-bottom:9px;line-height:1.5">Tell the app what one saved serving equals — then you can log this item by weight or by piece. Leave a field blank if it doesn\'t apply.</div>'
     +'<div style="display:flex;gap:9px;margin-bottom:9px">'
@@ -7136,7 +7171,7 @@ async function runAIScan(){
   const btn=document.getElementById('ai-analyze-btn');
   const addBtn=document.getElementById('ai-add-btn');
   status.style.display='block';
-  status.textContent=hasPhotos?`✨ Analyzing ${_aiPhotos.length} photo${_aiPhotos.length>1?'s':''}…`:'✨ Estimating macros from your description…';
+  status.innerHTML=hasPhotos?`✨ Analyzing ${_aiPhotos.length} photo${_aiPhotos.length>1?'s':''}…`:'<span class=i-spark></span> Estimating macros from your description…';
   btn.disabled=true;btn.textContent='Analyzing…';
   addBtn.disabled=true;
   try{
@@ -7371,7 +7406,7 @@ Output ONLY this JSON (no markdown, no commentary). The "components" array drive
     status.textContent='❌ '+(err.message||'Analysis failed. Try again.');
     console.error(err);
   }
-  btn.disabled=false;btn.textContent='✨ Analyze Meal';
+  btn.disabled=false;btn.innerHTML='<span class=i-spark></span> Analyze Meal';
   addBtn.disabled=false;
 }
 
@@ -7598,7 +7633,7 @@ async function saveFood(){
   if(!name){
     if(nameEl){nameEl.style.borderColor='var(--red)';setTimeout(()=>{nameEl.style.borderColor='';},1500);}
     const st=document.getElementById('ai-scan-status');
-    if(st){st.style.display='block';st.textContent='⚠️ Add a meal name first.';}
+    if(st){st.style.display='block';st.innerHTML='<span class=i-alert></span> Add a meal name first.';}
     return;
   }
   try {
@@ -8410,7 +8445,7 @@ function rSuppModal(){
     <div style="margin-bottom:16px">
       ${_suppScanPhoto?`<img src="${_suppScanPhoto.dataUrl}" style="width:100%;max-height:140px;object-fit:cover;border-radius:var(--rs);margin-bottom:10px;display:block">`:'' }
       <button type="button" class="btn btn-g btn-f btn-sm" onclick="document.getElementById('supp-scan-input').click()" style="margin-bottom:6px">
-        📸 Scan Supplement Label
+        <span class=i-camera></span> Scan Supplement Label
       </button>
       <div id="supp-scan-status" style="font-size:12px;color:var(--sub);text-align:center;display:none;margin-top:4px"></div>
       <div style="text-align:center;font-size:11px;color:var(--sub);margin-top:5px">Photo your bottle or label — AI fills in the details</div>
@@ -8444,7 +8479,7 @@ function rSuppModal(){
       <input id="supp-notes" class="fi" placeholder="e.g. Take with food" value="${editing?editing.notes||'':''}">
     </div>
     <button class="btn btn-b btn-f" onclick="saveSupplement()" style="margin-bottom:10px">${editing?'Update Supplement':'Add Supplement'}</button>
-    ${editing?`<button class="btn btn-s btn-f" onclick="delSupplement('${editing.id}')" style="color:var(--red)">🗑 Remove</button>`:''}
+    ${editing?`<button class="btn btn-s btn-f" onclick="delSupplement('${editing.id}')" style="color:var(--red)"><span class=i-trash></span> Remove</button>`:''}
     ${supps.length?`<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--sub);margin-bottom:10px">My Supplements</div>
       ${supps.map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 11px;background:var(--surface2);border-radius:var(--rs);margin-bottom:6px">
@@ -8546,7 +8581,7 @@ If this is genuinely not a supplement at all: {"error":"not a supplement"}`;
 async function runSuppScan(){
   if(!_suppScanPhoto)return;
   const status=document.getElementById('supp-scan-status');
-  if(status){status.style.display='block';status.textContent='✨ Reading label…';}
+  if(status){status.style.display='block';status.innerHTML='<span class=i-spark></span> Reading label…';}
   const scanBtn=document.querySelector('#supp-modal-body button[onclick*="supp-scan-input"]');
   if(scanBtn){scanBtn.disabled=true;scanBtn.textContent='Scanning…';}
   try{
@@ -8602,7 +8637,7 @@ async function runSuppScan(){
     if(status)status.textContent='❌ '+(err.message||'Scan failed. Try a clearer photo of the label.');
     console.error('Supp scan error:',err);
   }
-  if(scanBtn){scanBtn.disabled=false;scanBtn.textContent='📸 Scan Another Label';}
+  if(scanBtn){scanBtn.disabled=false;scanBtn.innerHTML='<span class=i-camera></span> Scan Another Label';}
 }
 
 // ── PRACTITIONER REPORT IMPORT ────────────────────────────────────────────────
@@ -8689,7 +8724,7 @@ async function manualCloudSync(){
     await fbPullAll();
     alert('✅ Cloud sync complete! '+count+' items synced.');
   }catch(e){alert('Sync failed: '+e.message);}
-  btn.disabled=false;btn.textContent='🔄 Force Sync Now';
+  btn.disabled=false;btn.innerHTML='<span class=i-refresh></span> Force Sync Now';
 }
 
 // ── WORKOUT PLAN MIGRATION ────────────────────────────────────────────────────
@@ -10504,7 +10539,7 @@ async function forceUpdate(){
   <div class="lib-pk-sheet" onclick="event.stopPropagation()">
     <div class="lib-pk-head">
       <button class="lib-pk-x" onclick="closeLibPicker()">✕</button>
-      <input class="lib-pk-q" id="lib-pk-q" placeholder="🔍 Search your library…" oninput="rLibPicker()" autocomplete="off">
+      <input class="lib-pk-q" id="lib-pk-q" placeholder="Search your library…" oninput="rLibPicker()" autocomplete="off">
     </div>
     <div class="lib-pk-list" id="lib-pk-list"></div>
   </div>
@@ -10512,7 +10547,7 @@ async function forceUpdate(){
 <div class="ov" id="key-ov">
   <div class="modal">
     <div class="mh"></div>
-    <div class="mt2">🔑 Gemini API Key</div>
+    <div class="mt2"><span class=i-key></span> Gemini API Key</div>
     <p style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:4px">Required for AI features (photo scan, food search, meal planner). Get a <strong>free key</strong> at:</p>
     <p style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:14px;text-align:center">aistudio.google.com → Get API Key</p>
     <input class="fi" id="key-input" type="text" placeholder="Paste your AIzaSy… key here" autocomplete="off" spellcheck="false">
@@ -10528,7 +10563,7 @@ async function forceUpdate(){
   <div class="modal">
     <div class="mh"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <div class="mt2" style="margin-bottom:0">⚙️ Settings</div>
+      <div class="mt2" style="margin-bottom:0"><span class=i-gear></span> Settings</div>
       <button onclick="closeSettings()" style="background:none;border:none;color:var(--sub);font-size:20px;cursor:pointer;padding:4px">✕</button>
     </div>
     <div id="settings-body"></div>
@@ -10540,7 +10575,7 @@ async function forceUpdate(){
   <div class="modal">
     <div class="mh"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <div class="mt2" style="margin-bottom:0">💊 Supplements</div>
+      <div class="mt2" style="margin-bottom:0"><span class=i-pill></span> Supplements</div>
       <button onclick="closeSuppModal()" style="background:none;border:none;color:var(--sub);font-size:20px;cursor:pointer;padding:4px">✕</button>
     </div>
     <div id="supp-modal-body"></div>
@@ -10552,7 +10587,7 @@ async function forceUpdate(){
   <div class="modal">
     <div class="mh"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <div class="mt2" style="margin-bottom:0">🔑 Protocol code</div>
+      <div class="mt2" style="margin-bottom:0"><span class=i-key></span> Protocol code</div>
       <button onclick="closeProtoModal()" style="background:none;border:none;color:var(--sub);font-size:20px;cursor:pointer;padding:4px">✕</button>
     </div>
     <div id="proto-modal-body"></div>
@@ -10572,12 +10607,12 @@ async function forceUpdate(){
       <div style="display:flex;gap:0;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);overflow:hidden">
         <button id="rtab-text" class="food-tab active" onclick="setRecipeTab('text')">Paste</button>
         <button id="rtab-photo" class="food-tab" onclick="setRecipeTab('photo')">Photo</button>
-        <button id="rtab-file" class="food-tab" onclick="setRecipeTab('file')">📄 File</button>
+        <button id="rtab-file" class="food-tab" onclick="setRecipeTab('file')"><span class=i-file></span> File</button>
       </div>
       <div id="recipe-text-input">
         <label class="fl">Paste your recipe</label>
         <textarea class="fi" id="recipe-paste" rows="7" placeholder="Paste ingredients and instructions here…" style="resize:none;line-height:1.5"></textarea>
-        <button class="btn btn-g btn-f" style="margin-top:10px" onclick="importRecipeFromText()">✨ Calculate Macros</button>
+        <button class="btn btn-g btn-f" style="margin-top:10px" onclick="importRecipeFromText()"><span class=i-spark></span> Calculate Macros</button>
       </div>
       <div id="recipe-photo-input" style="display:none">
         <label class="fl">Upload a photo of your recipe or food</label>
@@ -10586,18 +10621,18 @@ async function forceUpdate(){
           <input type="file" id="recipe-photo-file" accept="image/*" style="display:none" onchange="previewRecipePhoto(this)">
         </label>
         <div id="recipe-photo-preview" style="margin-bottom:10px;text-align:center"></div>
-        <button class="btn btn-g btn-f" onclick="importRecipeFromPhoto()">✨ Calculate Macros</button>
+        <button class="btn btn-g btn-f" onclick="importRecipeFromPhoto()"><span class=i-spark></span> Calculate Macros</button>
       </div>
       <div id="recipe-file-input" style="display:none">
         <label class="fl">Upload a recipe file (.txt or image)</label>
         <label class="btn btn-s btn-f" style="cursor:pointer;text-align:center;margin-bottom:8px">
-          📄 Choose File
+          <span class=i-file></span> Choose File
           <input type="file" id="recipe-file-file" accept=".txt,image/*" style="display:none" onchange="previewRecipeFile(this)">
         </label>
         <div id="recipe-file-preview" style="font-size:13px;color:var(--sub);margin-bottom:10px"></div>
-        <button class="btn btn-g btn-f" onclick="importRecipeFromFile()">✨ Calculate Macros</button>
+        <button class="btn btn-g btn-f" onclick="importRecipeFromFile()"><span class=i-spark></span> Calculate Macros</button>
       </div>
-      <div id="recipe-ai-status" style="display:none;text-align:center;padding:20px 0;color:var(--sub);font-size:13px">✨ Analyzing recipe…</div>
+      <div id="recipe-ai-status" style="display:none;text-align:center;padding:20px 0;color:var(--sub);font-size:13px"><span class=i-spark></span> Analyzing recipe…</div>
     </div>
     <div id="recipe-confirm-body" style="display:none">
       <div style="font-size:13px;color:var(--green);font-weight:600;margin-bottom:14px">✅ Macros calculated! Review and save.</div>
@@ -10614,7 +10649,7 @@ async function forceUpdate(){
         <select class="fi" id="recipe-cat" style="font-size:16px;padding:8px 10px">
           <option value="breakfast">🌅 Breakfast</option>
           <option value="lunch">☀️ Lunch</option>
-          <option value="dinner" selected>🌙 Dinner</option>
+          <option value="dinner" selected><span class=i-moon></span> Dinner</option>
           <option value="snacks">🍎 Snacks</option>
           <option value="drinks">🥤 Drinks</option>
           <option value="custom">⭐ My Items</option>
@@ -14095,19 +14130,19 @@ function notifSheetHTML(){
 
   h += '<div class="card" style="margin-bottom:10px">' +
     '<div class="ct">Daily</div>' +
-    toggle('checkin', it.checkin.on, '🫀 Nervous-system check-in', 'One question about where your state is today.') +
-    toggle('routine', it.routine.on, '🧭 My routine steps', 'Each step of your own routine, at the time you set for it.') +
-    toggle('supps', it.supps.on, '💊 Supplements', 'One reminder per slot you actually have supplements in.') +
-    toggle('water', it.water.on, '💧 Water', 'A few nudges spread through the day.') +
-    toggle('meals', it.meals.on, '🍽 Log meals', 'Catch the meal while you remember what was in it.') +
+    toggle('checkin', it.checkin.on, '<span class=i-pulse></span> Nervous-system check-in', 'One question about where your state is today.') +
+    toggle('routine', it.routine.on, '<span class=i-compass></span> My routine steps', 'Each step of your own routine, at the time you set for it.') +
+    toggle('supps', it.supps.on, '<span class=i-pill></span> Supplements', 'One reminder per slot you actually have supplements in.') +
+    toggle('water', it.water.on, '<span class=i-droplet></span> Water', 'A few nudges spread through the day.') +
+    toggle('meals', it.meals.on, '<span class=i-plate></span> Log meals', 'Catch the meal while you remember what was in it.') +
     '</div>';
 
   h += '<div class="card" style="margin-bottom:10px">' +
     '<div class="ct">Around your plan</div>' +
-    toggle('workout', it.workout.on, '🏋️ Training days', 'Only on the days your plan has a session.') +
-    toggle('listening', it.listening.on, '🎧 Listening session', 'A prompt to sit with Safe Inside.') +
-    toggle('winddown', it.winddown.on, '🌙 Wind down', 'The hour before bed is where sleep is won or lost.') +
-    toggle('weekly', it.weekly.on, '📈 Weekly review', 'One summary, once a week.') +
+    toggle('workout', it.workout.on, '<span class=i-dumbbell></span> Training days', 'Only on the days your plan has a session.') +
+    toggle('listening', it.listening.on, '<span class=i-phones></span> Listening session', 'A prompt to sit with Safe Inside.') +
+    toggle('winddown', it.winddown.on, '<span class=i-moon></span> Wind down', 'The hour before bed is where sleep is won or lost.') +
+    toggle('weekly', it.weekly.on, '<span class=i-trend></span> Weekly review', 'One summary, once a week.') +
     '</div>';
 
   h += '<div class="card" style="margin-bottom:10px">' +
@@ -14228,7 +14263,7 @@ function notifRender(){
   var body = document.getElementById('notif-body');
   if(body) body.innerHTML = (_notifMode === 'onboard') ? notifOnboardHTML() : notifSheetHTML();
   var title = document.getElementById('notif-title');
-  if(title) title.textContent = (_notifMode === 'onboard') ? '🔔 What should we nudge you about?' : '🔔 Notifications';
+  if(title) title.innerHTML = (_notifMode === 'onboard') ? '<span class=i-bell></span> What should we nudge you about?' : '<span class=i-bell></span> Notifications';
 }
 
 var _notifMode = 'prefs';
@@ -14243,7 +14278,7 @@ function openNotifPrefs(mode){
     ov.innerHTML = '<div class="modal">' +
       '<div class="mh"></div>' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
-        '<div class="mt2" id="notif-title" style="margin-bottom:0">🔔 Notifications</div>' +
+        '<div class="mt2" id="notif-title" style="margin-bottom:0"><span class=i-bell></span> Notifications</div>' +
         '<button onclick="closeNotifPrefs()" style="background:none;border:none;color:var(--sub);font-size:20px;cursor:pointer;padding:4px">✕</button>' +
       '</div>' +
       '<div id="notif-body"></div>' +
@@ -14659,9 +14694,9 @@ after('rSettingsModal', function(){
 
   var html =
     '<div class="card" style="margin-bottom:10px" id="native-settings-card">' +
-      '<div class="ct">📱 On this iPhone</div>' +
+      '<div class="ct"><span class=i-phone></span>On this iPhone</div>' +
 
-      '<div style="font-size:13px;font-weight:600;margin-bottom:4px">❤️ Apple Health</div>' +
+      '<div style="font-size:13px;font-weight:600;margin-bottom:4px"><span class=i-pulse></span> Apple Health</div>' +
       '<div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">' +
         (health
           ? 'Workouts you finish are saved to Apple Health, and your weight is read back from it. That weight is part of the profile your personalized guidance is generated from.'
@@ -14675,7 +14710,7 @@ after('rSettingsModal', function(){
 
       '<div style="height:1px;background:var(--border);margin:14px 0"></div>' +
 
-      '<div style="font-size:13px;font-weight:600;margin-bottom:4px">🔔 Notifications</div>' +
+      '<div style="font-size:13px;font-weight:600;margin-bottom:4px"><span class=i-bell></span> Notifications</div>' +
       '<div style="font-size:12px;color:var(--sub);margin-bottom:8px;line-height:1.5">' +
         'Rest timers ring on the lock screen, even with Metastory closed.' +
       '</div>' +
