@@ -1,4 +1,4 @@
-const VERSION = '20260912-ios-app';
+const VERSION = '20260913-signin-link';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately

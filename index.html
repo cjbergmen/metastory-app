@@ -917,7 +917,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260912-ios-app';
+const APP_BUILD='20260913-signin-link';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -14370,6 +14370,17 @@ after('rSettingsModal', function(){
     '</div>' +
 
     (fbUser
+      ? '<div class="card" style="margin-bottom:10px" id="native-signin-methods">' +
+          '<div class="ct">🔑 Ways to sign in</div>' +
+          '<div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">' +
+            'Connect both and either button signs you into this same account, ' +
+            'with all of your logs and plans.' +
+          '</div>' +
+          _nativeSignInMethodsBody() +
+        '</div>'
+      : '') +
+
+    (fbUser
       ? '<div class="card" style="margin-bottom:10px">' +
           '<div class="ct" style="color:var(--red)">Delete my account</div>' +
           '<div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">' +
@@ -14403,6 +14414,82 @@ after('rSettingsModal', function(){
     }
   }).catch(function(){});
 });
+
+/* ── Ways to sign in ──────────────────────────────────────────────────────
+   Apple and Google are separate identities to Firebase unless they are
+   linked. Same-email auto-linking covers the simple case, but Apple's
+   "Hide My Email" hands over a private relay address, which never matches.
+   Linking the credential to the account you are already signed into works
+   whatever address Apple gives. */
+
+function nativeLinkedProviders(){
+  var ids = {};
+  try{
+    (fbUser && fbUser.providerData || []).forEach(function(p){
+      if(p && p.providerId) ids[p.providerId] = true;
+    });
+  }catch(e){}
+  return ids;
+}
+
+function _nativeSignInMethodsBody(){
+  var have = nativeLinkedProviders();
+  var row = function(on, label){
+    return '<div style="font-size:13px;margin-bottom:6px;color:' +
+      (on ? 'var(--green)' : 'var(--sub)') + '">' +
+      (on ? '✅ ' : '⚪️ ') + label + (on ? '' : ' — not connected') + '</div>';
+  };
+  var html = row(!!have['apple.com'], 'Apple') + row(!!have['google.com'], 'Google');
+  if(!have['apple.com']){
+    html += '<button class="btn btn-s btn-sm btn-f" style="margin-top:6px" ' +
+            'onclick="_nativeLinkProvider(\'apple\')">Connect Apple sign-in</button>';
+  }
+  if(!have['google.com']){
+    html += '<button class="btn btn-s btn-sm btn-f" style="margin-top:6px" ' +
+            'onclick="_nativeLinkProvider(\'google\')">Connect Google sign-in</button>';
+  }
+  return html;
+}
+
+function nativeLinkProvider(provider){
+  if(!fbUser){ toast('Sign in first'); return; }
+  var request = (provider === 'apple') ? N.auth.apple() : N.auth.google();
+
+  request.then(function(res){
+    if(provider === 'apple' && res.authorizationCode){
+      lsSet('_appleAuthCode', res.authorizationCode);
+    }
+    return fbUser.linkWithCredential(nativeCredential(res));
+  }).then(function(){
+    N.haptics.notify('success');
+    toast('Connected ✓ — either button signs you in now', 3500);
+    var card = document.getElementById('native-signin-methods');
+    if(card){
+      card.innerHTML = '<div class="ct">🔑 Ways to sign in</div>' +
+        '<div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">' +
+        'Connect both and either button signs you into this same account, ' +
+        'with all of your logs and plans.</div>' + _nativeSignInMethodsBody();
+    }
+  }).catch(function(err){
+    var code = (err && err.code) ? err.code : '';
+    var message = (err && err.message) ? err.message : String(err);
+    if(message === 'cancelled') return;
+    N.haptics.notify('error');
+    if(code === 'auth/credential-already-in-use' || code === 'auth/email-already-in-use'){
+      toast('That login already belongs to a different Metastory account. ' +
+            'Sign in with it and delete that account first, then connect it here.', 6000);
+      return;
+    }
+    if(code === 'auth/provider-already-linked'){
+      toast('Already connected ✓');
+      return;
+    }
+    toast('Couldn\'t connect — ' + message, 4000);
+  });
+}
+
+window._nativeLinkProvider = nativeLinkProvider;
+window._nativeSignInMethodsBody = _nativeSignInMethodsBody;
 
 window._nativeConnectHealth = connectHealth;
 window._nativeDisconnectHealth = disconnectHealth;
