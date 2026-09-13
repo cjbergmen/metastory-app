@@ -917,7 +917,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260913-signin-link';
+const APP_BUILD='20260913-settings-trim';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -1020,18 +1020,62 @@ function closeSettings(){
 function rSettingsModal(){
   const h = document.getElementById('settings-body');
   if(!h) return;
+  const _who = fbUser ? (fbUser.displayName || fbUser.email || 'your account') : '';
   h.innerHTML = `
-    <div class="card" style="margin-bottom:10px">
-      <div class="ct">☁️ Cloud Sync</div>
-      <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Sign in with Google to sync your food logs, water, and workouts across all devices.</div>
+    <div class="card" id="set-account" style="margin-bottom:10px">
+      <div class="ct">👤 Account</div>
+      <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Signing in keeps your logs, plan and reflections on every device you use.</div>
       <div id="settings-sync-status" style="font-size:13px;font-weight:600;margin-bottom:10px;color:${fbUser?'var(--green)':'var(--sub)'}">
-        ${fbUser ? '✅ Signed in as '+fbUser.displayName : '⚪ Not signed in'}
+        ${fbUser ? '✅ Signed in as '+_who : '⚪ Not signed in'}
       </div>
+      <div id="set-account-native"></div>
       <button id="settings-auth-btn" class="btn ${fbUser?'btn-s':'btn-g'} btn-sm btn-f" onclick="handleUserMenuAuth()">${fbUser?'Sign Out':'🔑 Sign In with Google'}</button>
-      ${fbUser ? '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--blue)" onclick="manualCloudSync()">🔄 Force Sync Now</button>' : ''}
-      ${fbUser ? '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--red);opacity:0.8" onclick="clearFoodLibrary()">🗑️ Reset Food Library</button><div style="font-size:11px;color:var(--sub);margin-top:4px;line-height:1.4">Clears your food library and rebuilds from defaults. Use this if your library shows someone else\'s meals.</div>' : ''}
-      ${fbUser ? '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--red);opacity:0.8" onclick="resetAccountData()">⚠️ Reset My Account Data</button><div style="font-size:11px;color:var(--sub);margin-top:4px;line-height:1.4">Clears your profile, plan, and targets — both locally and in the cloud — and re-runs setup. Use this if your account shows someone else\'s data.</div>' : ''}
     </div>
+
+    <div class="card" style="margin-bottom:10px">
+      <div class="ct">✏️ My plan</div>
+      <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Rebuild your workout plan and nutrition targets, or walk through the app again.</div>
+      <button class="btn btn-s btn-sm btn-f" style="color:var(--purple)" onclick="closeSettings();showWizard(true)">✏️ Rebuild my plan</button>
+      <button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--green)" onclick="closeSettings();setTimeout(function(){startTour();},260)">🧭 Replay the walkthrough</button>
+      <details style="margin-top:10px">
+        <summary style="font-size:12px;color:var(--sub);cursor:pointer;padding:6px 0;font-weight:600">🎯 Edit my nutrition targets</summary>
+        ${(()=>{
+          let t={train:{p:150,c:200,f:65,k:2100,w:90},rest:{p:125,c:160,f:55,k:1750,w:75}};
+          try{const s=lsGet('_userTargets','');if(s){const u=JSON.parse(s);if(u&&u.train&&u.rest)t=u;}}catch(e){}
+          const row=(label,id,val,unit)=>`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
+            <span style="font-size:13px;color:var(--sub);min-width:80px">${label}</span>
+            <div style="display:flex;align-items:center;gap:5px">
+              <input id="${id}" type="number" inputmode="decimal" class="fi" value="${val}" style="width:80px;padding:7px 10px;font-size:16px;text-align:center">
+              <span style="font-size:12px;color:var(--sub);min-width:20px">${unit}</span>
+            </div>
+          </div>`;
+          return `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0 12px">
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🏋️ Training day</div>
+              ${row('Protein','nt-tr-p',t.train.p,'g')}
+              ${row('Carbs','nt-tr-c',t.train.c,'g')}
+              ${row('Fat','nt-tr-f',t.train.f,'g')}
+              ${row('Calories','nt-tr-k',t.train.k,'kcal')}
+              ${row('Water','nt-tr-w',t.train.w,'oz')}
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">😴 Rest day</div>
+              ${row('Protein','nt-rs-p',t.rest.p,'g')}
+              ${row('Carbs','nt-rs-c',t.rest.c,'g')}
+              ${row('Fat','nt-rs-f',t.rest.f,'g')}
+              ${row('Calories','nt-rs-k',t.rest.k,'kcal')}
+              ${row('Water','nt-rs-w',t.rest.w,'oz')}
+            </div>
+          </div>
+          <div id="nt-save-msg" style="font-size:12px;color:var(--green);font-weight:600;min-height:18px;margin-bottom:6px;text-align:center"></div>
+          <button class="btn btn-g btn-sm btn-f" onclick="saveNutritionTargets()">💾 Save targets</button>
+          <button class="btn btn-s btn-sm btn-f" style="color:var(--sub);margin-top:8px" onclick="recalcTargetsFromProfile()">Recalculate from my profile</button>
+          <div style="font-size:11px;color:var(--sub);line-height:1.5;margin-top:8px">These are a starting point. Let how you feel 90 minutes to 2 hours after eating be the real guide — steady means the ratio fits; foggy or hungry means adjust.</div>`;
+        })()}
+      </details>
+    </div>
+
     <div class="card" style="margin-bottom:10px">
       <div class="ct">Health &amp; safety flags</div>
       <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">These let the Health Detective and supplement guidance keep your practitioner in the loop where it matters. Private to your account — tap any that apply to you.</div>
@@ -1041,98 +1085,43 @@ function rSettingsModal(){
         return '<div style="display:flex;flex-wrap:wrap;gap:7px">'+opts.map(([k,l])=>{const on=f.includes(k);return '<button onclick="toggleDetFlag(\''+k+'\')" style="font-size:12px;font-weight:600;padding:8px 12px;border-radius:999px;border:1.5px solid '+(on?'var(--green)':'var(--border)')+';background:'+(on?'rgba(171,108,82,.12)':'var(--surface2)')+';color:'+(on?'var(--green)':'var(--sub)')+';cursor:pointer">'+l+'</button>';}).join('')+'</div>';
       })()}
     </div>
+
     <div class="card" style="margin-bottom:10px">
-      <div class="ct">📦 Data Backup</div>
-      <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Export your logs to a file you can save, or import a backup to restore data.</div>
-      <div style="display:flex;gap:8px;margin-bottom:8px">
-        <button class="btn btn-s btn-sm" style="flex:1" onclick="exportData()">⬆️ Export</button>
-        <label class="btn btn-s btn-sm" style="flex:1;cursor:pointer;text-align:center">⬇️ Import<input type="file" accept=".json" style="display:none" onchange="importData(this)"></label>
-      </div>
-      <button class="btn btn-s btn-sm btn-f" style="color:var(--purple);margin-top:2px" onclick="const n=importHistoryToLib();alert(n>0?n+' food item'+(n===1?'':'s')+' added to your library!':'All logged foods are already in your library.')">📚 Import Foods from History</button>
-    </div>
-    <div class="card" style="margin-bottom:10px">
-      <div class="ct">✏️ My Plan</div>
-      <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Re-run the setup wizard to rebuild your workout plan and nutrition targets.</div>
-      <button class="btn btn-s btn-sm btn-f" style="color:var(--purple)" onclick="closeSettings();showWizard(true)">✏️ Rebuild My Plan</button>
-      <button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--green)" onclick="closeSettings();setTimeout(function(){startTour();},260)">🧭 Replay the walkthrough</button>
-      <div style="font-size:11px;color:var(--sub);line-height:1.5;margin-top:4px">The DRESS model and a guided tour of every tab.</div>
-      <button class="btn btn-s btn-sm btn-f" style="color:var(--sub);margin-top:8px" onclick="resetWorkoutPlan()">↩️ Reset to Default Plan</button>
-    </div>
-    <div class="card" style="margin-bottom:10px">
-      <div class="ct">🎯 Nutrition Targets</div>
-      ${(()=>{
-        let t={train:{p:150,c:200,f:65,k:2100,w:90},rest:{p:125,c:160,f:55,k:1750,w:75}};
-        try{const s=lsGet('_userTargets','');if(s){const u=JSON.parse(s);if(u&&u.train&&u.rest)t=u;}}catch(e){}
-        const row=(label,id,val,unit)=>`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
-          <span style="font-size:13px;color:var(--sub);min-width:80px">${label}</span>
-          <div style="display:flex;align-items:center;gap:5px">
-            <input id="${id}" type="number" inputmode="decimal" class="fi" value="${val}" style="width:80px;padding:7px 10px;font-size:16px;text-align:center">
-            <span style="font-size:12px;color:var(--sub);min-width:20px">${unit}</span>
-          </div>
-        </div>`;
-        return `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-          <div>
-            <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🏋️ Training Day</div>
-            ${row('Protein','nt-tr-p',t.train.p,'g')}
-            ${row('Carbs','nt-tr-c',t.train.c,'g')}
-            ${row('Fat','nt-tr-f',t.train.f,'g')}
-            ${row('Calories','nt-tr-k',t.train.k,'kcal')}
-            ${row('Water','nt-tr-w',t.train.w,'oz')}
-          </div>
-          <div>
-            <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">😴 Rest Day</div>
-            ${row('Protein','nt-rs-p',t.rest.p,'g')}
-            ${row('Carbs','nt-rs-c',t.rest.c,'g')}
-            ${row('Fat','nt-rs-f',t.rest.f,'g')}
-            ${row('Calories','nt-rs-k',t.rest.k,'kcal')}
-            ${row('Water','nt-rs-w',t.rest.w,'oz')}
-          </div>
-        </div>
-        <div id="nt-save-msg" style="font-size:12px;color:var(--green);font-weight:600;min-height:18px;margin-bottom:6px;text-align:center"></div>
-        <button class="btn btn-g btn-sm btn-f" onclick="saveNutritionTargets()">💾 Save Targets</button>
-        <button class="btn btn-s btn-sm btn-f" style="color:var(--sub);margin-top:8px" onclick="recalcTargetsFromProfile()">Recalculate from my profile</button>
-        <div style="font-size:11px;color:var(--sub);line-height:1.5;margin-top:8px">These are a starting point. Let how you feel 90 minutes to 2 hours after eating be the real guide — steady means the ratio fits; foggy or hungry means adjust.</div>`;
-      })()}
-    </div>
-    <div class="card" style="margin-bottom:10px">
-      <div class="ct">🩺 Practitioner Report</div>
-      <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Received a report code from your Metastory Health practitioner? Paste it below to import their recommendations into your app.</div>
-      ${lsGet('_practitionerReport',null) ? `<div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:8px">✅ Report imported — ${lsGet('_practitionerReport',{}).sessionDate||'date unknown'}</div>` : ''}
-      <textarea id="pract-code-input" class="fi" rows="2" placeholder="Paste your MSH-RPT-... code here" style="margin-bottom:8px;font-size:16px;font-family:monospace;resize:none"></textarea>
-      <button class="btn btn-g btn-sm btn-f" onclick="importPractitionerReport()">Import Report</button>
-    </div>
-    <div class="card" style="margin-bottom:10px">
-      <div class="ct">💊 My Supplements</div>
-      <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Add supplements from Fullscript or any other source. Track daily intake on the Today tab.</div>
+      <div class="ct">💊 Supplements</div>
+      <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Add supplements from Fullscript or anywhere else, then track them on the Today tab.</div>
       ${(()=>{const s=_suppPlan();return s.length?`<div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:8px">${s.length} supplement${s.length===1?'':'s'} configured</div>`:'';})()}
-      <button class="btn btn-s btn-sm btn-f" style="color:var(--blue)" onclick="closeSettings();openSuppModal()">💊 Manage Supplements</button>
+      <button class="btn btn-s btn-sm btn-f" style="color:var(--blue)" onclick="closeSettings();openSuppModal()">💊 Manage supplements</button>
+      <details style="margin-top:10px">
+        <summary style="font-size:12px;color:var(--sub);cursor:pointer;padding:6px 0;font-weight:600">🩺 I have a report code from my practitioner</summary>
+        ${lsGet('_practitionerReport',null) ? `<div style="font-size:12px;font-weight:600;color:var(--green);margin:8px 0">✅ Report imported — ${lsGet('_practitionerReport',{}).sessionDate||'date unknown'}</div>` : ''}
+        <textarea id="pract-code-input" class="fi" rows="2" placeholder="Paste your MSH-RPT-… code here" style="margin:8px 0;font-size:16px;font-family:monospace;resize:none"></textarea>
+        <button class="btn btn-g btn-sm btn-f" onclick="importPractitionerReport()">Import report</button>
+      </details>
     </div>
+
     <div class="card" style="margin-bottom:10px">
-      <div class="ct">✨ AI Features</div>
-      <div style="font-size:12px;color:var(--sub);line-height:1.5">AI is built in — no API key needed. Photo scanning, food search, recipe import, and personalized workouts are ready to use.</div>
-    </div>
-    <div class="card" style="margin-bottom:10px">
-      <div class="ct">⚙️ App</div>
+      <div class="ct">⚙️ App &amp; data</div>
       <div style="font-size:12px;color:var(--sub);margin-bottom:8px;line-height:1.5">Build <b style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">${APP_BUILD}</b></div>
-      <button class="btn btn-s btn-sm btn-f" onclick="window.location.reload()">🔄 Reload App</button>
-      <button class="btn btn-s btn-sm btn-f" style="margin-top:6px;color:var(--blue)" onclick="forceUpdate()">⬇️ Force Update</button>
-      <div style="font-size:11px;color:var(--sub);margin-top:5px;line-height:1.4">Use Force Update if the app seems stuck on an old version — it clears the cache and re-downloads. Your data isn't touched.</div>
+      <button class="btn btn-s btn-sm btn-f" style="color:var(--blue)" onclick="forceUpdate()">⬇️ Force update</button>
+      <div style="font-size:11px;color:var(--sub);margin-top:5px;line-height:1.4">Use this if the app seems stuck on an old version — it clears the cache and re-downloads. Your data isn't touched.</div>
+      <details style="margin-top:10px">
+        <summary style="font-size:12px;color:var(--sub);cursor:pointer;padding:6px 0;font-weight:600">Advanced</summary>
+        <div style="display:flex;gap:8px;margin:8px 0">
+          <button class="btn btn-s btn-sm" style="flex:1" onclick="exportData()">⬆️ Export</button>
+          <label class="btn btn-s btn-sm" style="flex:1;cursor:pointer;text-align:center">⬇️ Import<input type="file" accept=".json" style="display:none" onchange="importData(this)"></label>
+        </div>
+        <div style="font-size:11px;color:var(--sub);margin-bottom:10px;line-height:1.4">Save your logs to a file, or restore one.</div>
+        <button class="btn btn-s btn-sm btn-f" style="color:var(--purple)" onclick="const n=importHistoryToLib();alert(n>0?n+' food item'+(n===1?'':'s')+' added to your library!':'All logged foods are already in your library.')">📚 Import foods from history</button>
+        ${fbUser ? '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--blue)" onclick="manualCloudSync()">🔄 Force sync now</button>' : ''}
+        <button class="btn btn-s btn-sm btn-f" style="color:var(--green);margin-top:8px" onclick="runRecovery()">🔍 Recover missing data</button>
+        <div style="font-size:11px;color:var(--sub);margin-top:5px;margin-bottom:10px;line-height:1.4">Scans for entries misplaced by a timezone change.</div>
+        <button class="btn btn-s btn-sm btn-f" style="color:var(--sub)" onclick="resetWorkoutPlan()">↩️ Reset to default plan</button>
+        ${fbUser ? '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--red);opacity:0.8" onclick="clearFoodLibrary()">🗑️ Reset food library</button>' : ''}
+        ${fbUser ? '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--red);opacity:0.8" onclick="resetAccountData()">⚠️ Reset my account data</button><div style="font-size:11px;color:var(--sub);margin-top:4px;line-height:1.4">Clears your profile, plan and targets — locally and in the cloud — and re-runs setup.</div>' : ''}
+      </details>
     </div>
-    <details style="margin-bottom:10px">
-      <summary style="font-size:12px;color:var(--sub);cursor:pointer;padding:6px 0;font-weight:600">Advanced options</summary>
-      <div class="card" style="margin-top:8px">
-        <button class="btn btn-s btn-sm btn-f" onclick="restoreFromSheets()">📥 Restore from Google Sheets</button>
-        <div style="font-size:11px;color:var(--sub);margin-top:5px;margin-bottom:8px;line-height:1.4">Pulls food log data from Google Sheets. Use if you lose local data.</div>
-        <button class="btn btn-s btn-sm btn-f" style="color:var(--green);margin-top:2px" onclick="runRecovery()">🔍 Recover Missing Data</button>
-        <div style="font-size:11px;color:var(--sub);margin-top:5px;margin-bottom:8px;line-height:1.4">Scans for entries misplaced due to timezone issues.</div>
-        <button class="btn btn-s btn-sm btn-f" style="color:var(--blue);margin-top:2px" onclick="syncAllHistory()">☁️ Sync All to Google Sheets</button>
-      </div>
-    </details>
-    <div class="card" style="margin-bottom:10px">
-      <div class="ct">Acknowledgements</div>
-      <div style="font-size:11.5px;color:var(--sub);line-height:1.55">Metastory Health is built on the <b>D.R.E.S.S. for Health Success&reg;</b> framework. <b>D.R.E.S.S. for Health Success&reg;</b> and <b>Metabolic Chaos&reg;</b> are registered trademarks of <b>Functional Diagnostic Nutrition&reg;</b> (FDN), developed by Reed Davis. This app applies these principles for personal education and self-care. It is not affiliated with or endorsed by FDN, and does not diagnose, treat, or replace care from a qualified practitioner.</div>
-    </div>
+
+    <div style="font-size:11px;color:var(--sub);line-height:1.55;padding:4px 2px 10px">Metastory Health is built on the <b>D.R.E.S.S. for Health Success&reg;</b> framework. <b>D.R.E.S.S. for Health Success&reg;</b> and <b>Metabolic Chaos&reg;</b> are registered trademarks of <b>Functional Diagnostic Nutrition&reg;</b> (FDN), developed by Reed Davis. This app applies these principles for personal education and self-care. It is not affiliated with or endorsed by FDN, and does not diagnose, treat, or replace care from a qualified practitioner.</div>
   `;
 }
 
@@ -2018,81 +2007,7 @@ function recoverMisplacedData(){
 }
 const GEMINI_WORKER_URL = 'https://metastory-ai.cjbergmen.workers.dev/gemini';
 function getGeminiKey(){return lsGet('_geminiKey','')||'worker';}
-async function restoreFromSheets(){
-  const btn=document.getElementById('restore-btn');
-  if(btn){btn.disabled=true;btn.textContent='Restoring…';}
-  try{
-    const payload=encodeURIComponent(JSON.stringify({action:'read'}));
-    const r=await fetch(GS_URL+'?d='+payload);
-    const data=await r.json();
-    if(!data.ok)throw new Error('Could not read from Sheets');
-    const dates=Object.keys(data.data);
-    let count=0;
-    dates.forEach(rawDate=>{
-      // Normalize whatever date format Sheets returns → YYYY-MM-DD
-      let dateKey=rawDate;
-      if(!/^\d{4}-\d{2}-\d{2}$/.test(rawDate)){
-        const d=new Date(rawDate);
-        if(!isNaN(d))dateKey=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-      }
-      const day=data.data[rawDate];
-      if(day.entries&&day.entries.length>0){
-        // Deduplicate: for same name+time, keep entry with highest calories
-        const seen={};
-        day.entries.forEach(e=>{
-          if(!e.name||e.name.trim()==='')return; // skip blank rows
-          const key=e.name+'|'+e.t;
-          if(!seen[key]||e.k>seen[key].k)seen[key]=e;
-        });
-        const unique=Object.values(seen).filter(e=>e.k>0||e.p>0||e.c>0||e.f>0).map(e=>{
-          // If calories missing but macros exist, calculate from macros
-          if((!e.k||e.k===0)&&(e.p||e.c||e.f)){
-            e.k=Math.round((Number(e.p)||0)*4+(Number(e.c)||0)*4+(Number(e.f)||0)*9);
-          }
-          return e;
-        });
-        lsSet('fl_'+dateKey,JSON.stringify(unique));
-        count+=unique.length;
-      }
-      if(day.water>0)lsSet('wa_'+dateKey,String(day.water));
-    });
-    alert('✅ Restored '+count+' food entries across '+dates.length+' days!');
-    if(curPage==='today')rToday();
-    else if(curPage==='food')rFood();
-  }catch(err){
-    alert('❌ Restore failed: '+(err.message||'Check your connection'));
-  }
-  if(btn){btn.disabled=false;btn.textContent='📥 Restore from Google Sheets';}
-}
 
-async function autoRestoreIfEmpty(){
-  if(!fbUser)return; // Only restore for authenticated user — never sync CJ's sheet to other accounts
-  if(!GS_URL)return;
-  let hasData=false;
-  for(let i=0;i<7;i++){
-    const d=new Date();d.setDate(d.getDate()-i);
-    const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-    try{if(JSON.parse(lsGet('fl_'+ds,'[]')).length>0){hasData=true;break;}}catch(e){}
-  }
-  if(hasData)return;
-  try{
-    const payload=encodeURIComponent(JSON.stringify({action:'read'}));
-    const r=await fetch(GS_URL+'?d='+payload);
-    const data=await r.json();
-    if(!data.ok||!Object.keys(data.data).length)return;
-    Object.keys(data.data).forEach(rawDate=>{
-      let dateKey=rawDate;
-      if(!/^\d{4}-\d{2}-\d{2}$/.test(rawDate)){
-        const d=new Date(rawDate);
-        if(!isNaN(d))dateKey=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-      }
-      const day=data.data[rawDate];
-      if(day.entries&&day.entries.length>0)lsSet('fl_'+dateKey,JSON.stringify(day.entries));
-      if(day.water>0)lsSet('wa_'+dateKey,String(day.water));
-    });
-    rToday();
-  }catch(e){}
-}
 
 function runRecovery(){
   const n=recoverMisplacedData();
@@ -2126,38 +2041,9 @@ function getWeekData(){
 }
 function viewDay(key){viewDate=key;renderHeader();goPage('today');}
 function getLog(){try{return JSON.parse(lsGet('fl_'+viewDate,'[]'))}catch(e){return[]}}
-const GS_URL='https://script.google.com/macros/s/AKfycbzjygyvNepVgyzzbVJtCnpLY_oP4Jo0AaxdignTtj_KrT3Xfok5D4O5ab3uP5gXbX2U/exec';
-function syncToSheets(log,water){
-  if(!GS_URL)return;
-  try{
-    const payload=encodeURIComponent(JSON.stringify({action:'sync',date:viewDate,entries:log,water:water!==undefined?water:getWater()}));
-    fetch(GS_URL+'?d='+payload).catch(()=>{});
-  }catch(e){}
-}
-function syncAllHistory(){
-  if(!GS_URL){alert('No sync URL configured.');return;}
-  let count=0;
-  const keys=new Set();
-  try{Object.keys(localStorage).filter(k=>k.startsWith('fl_')).forEach(k=>keys.add(k.slice(3)))}catch(e){}
-  Object.keys(MEM).filter(k=>k.startsWith('fl_')).forEach(k=>keys.add(k.slice(3)));
-  keys.forEach(date=>{
-    try{
-      const log=JSON.parse(lsGet('fl_'+date,'[]'));
-      const water=parseFloat(lsGet('wa_'+date,'0'));
-      if(log.length||water){
-        setTimeout(()=>{
-          const payload=encodeURIComponent(JSON.stringify({action:'sync',date,entries:log,water}));
-          fetch(GS_URL+'?d='+payload).catch(()=>{});
-        },count*400);
-        count++;
-      }
-    }catch(e){}
-  });
-  setTimeout(()=>alert(`✅ Synced ${count} day${count!==1?'s':''} to Google Sheets!`),count*400+600);
-}
-function putLog(l){const ok=lsSet('fl_'+viewDate,JSON.stringify(l));syncToSheets(l);fbSyncFoodLog(viewDate,l);return ok;}
+function putLog(l){const ok=lsSet('fl_'+viewDate,JSON.stringify(l));fbSyncFoodLog(viewDate,l);return ok;}
 function getWater(){return parseFloat(lsGet('wa_'+viewDate,'0'))}
-function putWater(v){lsSet('wa_'+viewDate,v.toString());syncToSheets(getLog(),parseFloat(v));fbSyncWater(viewDate,parseFloat(v));}
+function putWater(v){lsSet('wa_'+viewDate,v.toString());fbSyncWater(viewDate,parseFloat(v));}
 
 // ── WORKOUT LOG ───────────────────────────────────────────────────────────────
 let _woExList=[];  // maps index → exercise name; rebuilt each rWorkout call
@@ -2170,7 +2056,7 @@ let _swapCandidates=[]; // current list of swap options shown in modal
 let _preChoice=null; // tracks warmup choice for the current day view
 
 function getWL(date){try{return JSON.parse(lsGet('wl_'+(date||viewDate),'[]'))}catch(e){return[]}}
-function putWL(data){lsSet('wl_'+viewDate,JSON.stringify(data));syncWorkoutToSheets(data);fbSyncWorkoutLog(viewDate,data);}
+function putWL(data){lsSet('wl_'+viewDate,JSON.stringify(data));fbSyncWorkoutLog(viewDate,data);}
 
 function getUsername(){return lsGet('_username','')}
 function saveUsername(){
@@ -2181,14 +2067,6 @@ function saveUsername(){
   fbSyncSettings();
 }
 
-function syncWorkoutToSheets(wlData){
-  if(!GS_URL)return;
-  const user=getUsername()||(fbUser?fbUser.email:'User');
-  try{
-    const payload=encodeURIComponent(JSON.stringify({action:'syncWorkout',user,date:viewDate,exercises:wlData}));
-    fetch(GS_URL+'?d='+payload).catch(()=>{});
-  }catch(e){}
-}
 
 function getLastSession(exName){
   for(let i=1;i<=90;i++){
@@ -9130,7 +9008,6 @@ try{initLib();}catch(e){}
 // NOT auto-run anymore. The library is whatever the cloud holds; it changes
 // only on explicit user edits. (Functions kept for manual/legacy use.)
 // importHistoryToLib();  migrateLibCategories();  restoreLibCategories();
-try{autoRestoreIfEmpty();}catch(e){}
 // Only check onboarding at startup if Firebase isn't configured — otherwise
 // the onAuthStateChanged handler calls checkOnboarding() after fbPullAll() finishes,
 // ensuring _onboardDone is already loaded before we decide to show the wizard.
@@ -10690,7 +10567,6 @@ async function logMealBuilder(){
     showToast('Storage full — couldn\'t save');
     return;
   }
-  try{syncToSheets(log);}catch(e){}
   try{fbSyncFoodLog(today,log);}catch(e){}
   saveToLib({n:name,e:'🥗',cat:guessFoodCat(name,new Date().getHours()),p:Math.round(t.p*10)/10,c:Math.round(t.c*10)/10,f:Math.round(t.f*10)/10,k:Math.round(t.k),source:'builder'});
   viewDate=today;
@@ -14347,9 +14223,22 @@ after('rSettingsModal', function(){
 
   var health = healthOn();
 
+  // Ways to sign in + account deletion belong with the rest of the account,
+  // not in a card of their own at the bottom of the screen.
+  var account = document.getElementById('set-account-native');
+  if(account && fbUser){
+    account.innerHTML =
+      '<div style="font-size:12px;color:var(--sub);margin-bottom:6px;line-height:1.5">Ways to sign in</div>' +
+      _nativeSignInMethodsBody() +
+      '<button class="btn btn-s btn-sm btn-f" style="margin:12px 0 10px;color:var(--red)" onclick="deleteAccount()">Delete my account</button>' +
+      '<div style="font-size:11px;color:var(--sub);margin-bottom:12px;line-height:1.4">Permanently erases your account and every log, plan and reflection stored with it. This cannot be undone.</div>';
+  }
+
   var html =
     '<div class="card" style="margin-bottom:10px" id="native-settings-card">' +
-      '<div class="ct">❤️ Apple Health</div>' +
+      '<div class="ct">📱 On this iPhone</div>' +
+
+      '<div style="font-size:13px;font-weight:600;margin-bottom:4px">❤️ Apple Health</div>' +
       '<div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">' +
         (health
           ? 'Workouts you finish are saved to Apple Health, and your weight is read back from it.'
@@ -14358,45 +14247,19 @@ after('rSettingsModal', function(){
       (health
         ? '<button class="btn btn-s btn-sm btn-f" style="color:var(--red);opacity:.85" onclick="_nativeDisconnectHealth()">Stop syncing with Health</button>'
         : '<button class="btn btn-g btn-sm btn-f" onclick="_nativeConnectHealth()">Connect Apple Health</button>') +
-    '</div>' +
 
-    '<div class="card" style="margin-bottom:10px">' +
-      '<div class="ct">🔔 Notifications</div>' +
-      '<div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">' +
+      '<div style="height:1px;background:var(--border);margin:14px 0"></div>' +
+
+      '<div style="font-size:13px;font-weight:600;margin-bottom:4px">🔔 Notifications</div>' +
+      '<div style="font-size:12px;color:var(--sub);margin-bottom:8px;line-height:1.5">' +
         'Rest timers ring on the lock screen, even with Metastory closed.' +
       '</div>' +
       '<div id="native-notif-status" style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--sub)">Checking…</div>' +
       '<button class="btn btn-s btn-sm btn-f" onclick="Metastory.app.openSettings()">Open iPhone Settings</button>' +
     '</div>' +
 
-    (fbUser
-      ? '<div class="card" style="margin-bottom:10px" id="native-signin-methods">' +
-          '<div class="ct">🔑 Ways to sign in</div>' +
-          '<div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">' +
-            'Connect both and either button signs you into this same account, ' +
-            'with all of your logs and plans.' +
-          '</div>' +
-          _nativeSignInMethodsBody() +
-        '</div>'
-      : '') +
-
-    (fbUser
-      ? '<div class="card" style="margin-bottom:10px">' +
-          '<div class="ct" style="color:var(--red)">Delete my account</div>' +
-          '<div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">' +
-            'Permanently erases your account and every log, plan and reflection stored with it. ' +
-            'This cannot be undone.' +
-          '</div>' +
-          '<button class="btn btn-s btn-sm btn-f" style="color:var(--red)" onclick="deleteAccount()">Delete my account</button>' +
-        '</div>'
-      : '') +
-
-    '<div class="card" style="margin-bottom:10px">' +
-      '<div style="font-size:11px;color:var(--sub);line-height:1.5;text-align:center">' +
-        'Metastory for iPhone ' + N.version + ' (' + N.build + ')<br>' +
-        'Metastory supports your own health habits. It is not medical advice, ' +
-        'and it does not diagnose or treat any condition.' +
-      '</div>' +
+    '<div style="font-size:11px;color:var(--sub);line-height:1.5;text-align:center;padding:0 2px 10px">' +
+      'Metastory for iPhone ' + N.version + ' (' + N.build + ')' +
     '</div>';
 
   body.insertAdjacentHTML('beforeend', html);
@@ -14463,13 +14326,7 @@ function nativeLinkProvider(provider){
   }).then(function(){
     N.haptics.notify('success');
     toast('Connected ✓ — either button signs you in now', 3500);
-    var card = document.getElementById('native-signin-methods');
-    if(card){
-      card.innerHTML = '<div class="ct">🔑 Ways to sign in</div>' +
-        '<div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">' +
-        'Connect both and either button signs you into this same account, ' +
-        'with all of your logs and plans.</div>' + _nativeSignInMethodsBody();
-    }
+    try{ rSettingsModal(); }catch(e){}
   }).catch(function(err){
     var code = (err && err.code) ? err.code : '';
     var message = (err && err.message) ? err.message : String(err);
