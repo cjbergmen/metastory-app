@@ -14048,7 +14048,7 @@ window.deleteAccount = deleteAccount;
 var HEALTH_SCOPE_V = '2';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0913-6';
+var WEB_BUILD = '0913-7';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
@@ -14431,14 +14431,14 @@ function notifSetTime(path, value){
   if(parts.length === 2) target[parts[1]] = value;
   if(parts.length === 3) target[parts[1]][+parts[2]] = value;
   notifSave(prefs);
-  notifRender();
+  notifRenderIdle();
 }
 
 function notifSetLead(minutes){
   var prefs = notifPrefs();
   prefs.items.routine.lead = minutes;
   notifSave(prefs);
-  notifRender();
+  notifRenderIdle();
 }
 
 function notifSetQuiet(){
@@ -14448,8 +14448,27 @@ function notifSetQuiet(){
   prefs.quietFrom = from ? from.value : '';
   prefs.quietTo = to ? to.value : '';
   notifSave(prefs);
+  notifRenderIdle();
+}
+
+/* Re-rendering the sheet replaces its inputs. Do that while the iOS time
+   picker is open — and `change` fires the moment the wheel settles, so it is
+   always open — and the input the picker is attached to is destroyed under it,
+   which iOS answers by dismissing the picker. To the person it looks like the
+   time control closes itself the instant they stop scrolling. So the refresh
+   waits until nothing in the sheet is focused. */
+function notifRenderIdle(){
+  var body = document.getElementById('notif-body');
+  var active = document.activeElement;
+  if(body && active && body.contains(active) &&
+     active.matches && active.matches('input,select,textarea')){
+    clearTimeout(notifRenderIdle._t);
+    notifRenderIdle._t = setTimeout(notifRenderIdle, 500);
+    return;
+  }
   notifRender();
 }
+window.notifRenderIdle = notifRenderIdle;
 
 function notifRender(){
   var body = document.getElementById('notif-body');
