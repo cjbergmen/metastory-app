@@ -917,7 +917,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260913-notifs';
+const APP_BUILD='20260913-notifs2';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -14626,10 +14626,15 @@ function notifSetQuiet(){
 
 function notifRender(){
   var body = document.getElementById('notif-body');
-  if(body) body.innerHTML = notifSheetHTML();
+  if(body) body.innerHTML = (_notifMode === 'onboard') ? notifOnboardHTML() : notifSheetHTML();
+  var title = document.getElementById('notif-title');
+  if(title) title.textContent = (_notifMode === 'onboard') ? '🔔 What should we nudge you about?' : '🔔 Notifications';
 }
 
-function openNotifPrefs(){
+var _notifMode = 'prefs';
+
+function openNotifPrefs(mode){
+  _notifMode = mode || 'prefs';
   var ov = document.getElementById('notif-ov');
   if(!ov){
     ov = document.createElement('div');
@@ -14638,7 +14643,7 @@ function openNotifPrefs(){
     ov.innerHTML = '<div class="modal">' +
       '<div class="mh"></div>' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
-        '<div class="mt2" style="margin-bottom:0">🔔 Notifications</div>' +
+        '<div class="mt2" id="notif-title" style="margin-bottom:0">🔔 Notifications</div>' +
         '<button onclick="closeNotifPrefs()" style="background:none;border:none;color:var(--sub);font-size:20px;cursor:pointer;padding:4px">✕</button>' +
       '</div>' +
       '<div id="notif-body"></div>' +
@@ -14649,9 +14654,11 @@ function openNotifPrefs(){
   }
   notifRender();
   ov.classList.add('open');
-  // Anything that changed elsewhere — a new supplement, a moved training day —
-  // should be reflected in what is actually scheduled.
-  notifReconcile().then(function(){ notifRender(); });
+  if(_notifMode !== 'onboard'){
+    // Anything that changed elsewhere — a new supplement, a moved training day
+    // — should be reflected in what is actually scheduled.
+    notifReconcile().then(function(){ notifRender(); });
+  }
 }
 
 function closeNotifPrefs(){
@@ -14671,6 +14678,160 @@ window.notifSetQuiet = notifSetQuiet;
 after('saveRoutineData', function(){ notifReconcile(); });
 after('_suppSave', function(){ notifReconcile(); });
 setTimeout(function(){ notifReconcile(); }, 2500);
+
+/* ── The first-run pass ───────────────────────────────────────────────────
+   A preferences screen nobody opens is the same as no reminders at all, and
+   an app that asks for notification permission at launch — before it has
+   shown anyone why — gets declined once and never asked again. So the choice
+   is offered right after setup, in the person's own words, with times taken
+   from the day they just described in the wizard. */
+
+function notifTimeShift(hhmm, minutes){
+  var at = _notifMinutes(hhmm);
+  if(at === null) return null;
+  at = (at + minutes + 24 * 60) % (24 * 60);
+  return String(Math.floor(at / 60)).padStart(2,'0') + ':' + String(at % 60).padStart(2,'0');
+}
+
+/* Their day, as they described it in setup. Anything missing falls back to
+   the generic default rather than guessing. */
+function notifTimesFromProfile(){
+  var t = {};
+  try{ t = (JSON.parse(lsGet('_userProfile','{}')) || {}).times || {}; }catch(e){}
+  var d = NOTIF_DEFAULTS.items;
+  return {
+    checkin:   notifTimeShift(t.wake, 30) || d.checkin.time,
+    winddown:  notifTimeShift(t.bed, -45) || d.winddown.time,
+    workout:   t.workout || d.workout.time,
+    breakfast: t.breakfast || d.meals.times[0],
+    lunch:     t.lunch || d.meals.times[1],
+    dinner:    t.dinner || d.meals.times[2],
+    water:     [notifTimeShift(t.wake, 180) || d.water.times[0],
+                notifTimeShift(t.lunch, 120) || d.water.times[1],
+                notifTimeShift(t.dinner, -90) || d.water.times[2]]
+  };
+}
+
+var NOTIF_PRESETS = {
+  full: {
+    label: 'Keep me on track',
+    detail: 'Check-in, supplements, meals, water, training days and a wind-down — each at your times.',
+    on: ['checkin','supps','meals','water','workout','winddown']
+  },
+  light: {
+    label: 'Just the essentials',
+    detail: 'A morning check-in and a nightly wind-down. Nothing else.',
+    on: ['checkin','winddown']
+  },
+  none: {
+    label: 'Only the rest-timer bell',
+    detail: 'No reminders at all. You can turn any of them on later in Settings.',
+    on: []
+  }
+};
+
+function notifApplyPreset(name){
+  var preset = NOTIF_PRESETS[name];
+  if(!preset) return;
+
+  var prefs = notifPrefs();
+  var times = notifTimesFromProfile();
+
+  for(var key in prefs.items) prefs.items[key].on = false;
+
+  prefs.items.checkin.time = times.checkin;
+  prefs.items.winddown.time = times.winddown;
+  prefs.items.workout.time = times.workout;
+  prefs.items.meals.times = [times.breakfast, times.lunch, times.dinner];
+  prefs.items.water.times = times.water;
+  prefs.items.supps.morning = times.breakfast;
+  prefs.items.supps.evening = times.dinner;
+
+  preset.on.forEach(function(key){ if(prefs.items[key]) prefs.items[key].on = true; });
+
+  lsSet('_notifOnboarded','1');
+
+  if(!preset.on.length){
+    notifSave(prefs);
+    closeNotifPrefs();
+    toast('No reminders — you can add them any time in Settings', 3500);
+    return;
+  }
+
+  notifEnsurePermission().then(function(granted){
+    if(!granted){
+      for(var key in prefs.items) prefs.items[key].on = false;
+      notifSave(prefs);
+      closeNotifPrefs();
+      toast('Notifications are off for Metastory — turn them on in iPhone Settings, then pick your reminders', 5000);
+      return;
+    }
+    notifSave(prefs);
+    _notifMode = 'prefs';
+    notifRender();
+    N.haptics.notify('success');
+    toast('Set — tap any of these to change the time', 3500);
+  });
+}
+
+function notifOnboardHTML(){
+  var times = notifTimesFromProfile();
+
+  var h = '<div style="font-size:13px;color:var(--sub);line-height:1.55;margin-bottom:16px">' +
+    'Metastory can nudge you at the points in the day where these habits actually happen. ' +
+    'Pick a starting point — every one of these is adjustable, and you can turn the lot off in a tap.' +
+    '</div>';
+
+  ['full','light','none'].forEach(function(key){
+    var preset = NOTIF_PRESETS[key];
+    h += '<button onclick="notifApplyPreset(\'' + key + '\')" class="card" style="display:block;width:100%;text-align:left;margin-bottom:10px;cursor:pointer;border:1.5px solid ' + (key === 'full' ? 'var(--green)' : 'var(--border)') + '">' +
+      '<div style="font-size:15px;font-weight:700;margin-bottom:3px">' + preset.label + '</div>' +
+      '<div style="font-size:12px;color:var(--sub);line-height:1.45">' + preset.detail + '</div>' +
+      '</button>';
+  });
+
+  h += '<div style="font-size:11.5px;color:var(--sub);line-height:1.5;margin:14px 0 10px;text-align:center">' +
+    'Using your own day: check-in ' + times.checkin + ', wind-down ' + times.winddown + '.' +
+    '</div>';
+
+  h += '<button class="btn btn-s btn-sm btn-f" onclick="notifOpenDetail()">Let me pick each one</button>';
+
+  return h;
+}
+
+function notifOpenDetail(){
+  lsSet('_notifOnboarded','1');
+  _notifMode = 'prefs';
+  notifRender();
+}
+
+/* Offered once: after setup for a new person, and on launch for anyone who
+   was already using Metastory before reminders existed. */
+var _notifOnboardTries = 0;
+
+function notifOnboardIfNeeded(){
+  if(!N.timers || !N.timers.replaceReminders) return;
+  if(lsGet('_notifOnboarded','')) return;
+  if(!lsGet('_onboardDone','')) return;
+
+  // Never stack this on top of whatever else is asking for attention — the
+  // name prompt, the sign-in sheet, a modal the person opened. Wait for a
+  // clear screen instead of giving up, or it never gets offered at all.
+  if(document.querySelector('.ov.open') || document.hidden){
+    if(++_notifOnboardTries <= 12) setTimeout(notifOnboardIfNeeded, 12000);
+    return;
+  }
+
+  openNotifPrefs('onboard');
+}
+
+after('closeWizard', function(){ setTimeout(notifOnboardIfNeeded, 1200); });
+after('saveUsername', function(){ setTimeout(notifOnboardIfNeeded, 1200); });
+setTimeout(notifOnboardIfNeeded, 4000);
+
+window.notifApplyPreset = notifApplyPreset;
+window.notifOpenDetail = notifOpenDetail;
+window.notifOnboardIfNeeded = notifOnboardIfNeeded;
 
 /* ── Signals from Apple Health ────────────────────────────────────────────
    Metastory doesn't integrate with Oura, WHOOP, Garmin, Polar, Fitbit or the

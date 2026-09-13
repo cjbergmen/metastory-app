@@ -1,4 +1,4 @@
-const VERSION = '20260913-notifs';
+const VERSION = '20260913-notifs2';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
