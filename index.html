@@ -2979,6 +2979,7 @@ function saveNutritionTargets(){
     train:{p:g('nt-tr-p'),c:g('nt-tr-c'),f:g('nt-tr-f'),k:g('nt-tr-k'),w:g('nt-tr-w')},
     rest: {p:g('nt-rs-p'),c:g('nt-rs-c'),f:g('nt-rs-f'),k:g('nt-rs-k'),w:g('nt-rs-w')}
   };
+  nt.manual=true;   // hand-set numbers are never overwritten by the auto re-check
   lsSet('_userTargets',JSON.stringify(nt));
   fbSyncSettings();
   refresh();
@@ -8958,11 +8959,11 @@ const WIZ_STEPS=[
   ]},
   // 10: Food \u2014 preference and restrictions
   {type:'group',parts:[
-    {type:'tiles',key:'diet',title:'Any diet preference?',sub:'This shapes your macro targets.',
+    {type:'tiles',key:'diet',title:'Any diet preference?',sub:'This changes your protein and carb targets, and the foods we suggest.',
      tiles:[
       {val:'balanced',label:'Balanced',sub:'No restriction'},
-      {val:'high_protein',label:'High Protein',sub:'160g+ per day'},
-      {val:'low_carb',label:'Low Carb',sub:'Under 100g carbs'},
+      {val:'high_protein',label:'High Protein',sub:'~25% more protein'},
+      {val:'low_carb',label:'Low Carb',sub:'Carbs capped, fat raised'},
       {val:'plant_based',label:'Plant-Based',sub:'Minimal meat'},
     ]},
     {type:'allergens',key:'allergens',title:'Any allergens or dietary restrictions?',sub:'Optional \u2014 we will keep these out of your food recommendations.'}
@@ -9579,7 +9580,8 @@ function buildPersonalizedPlan(p){
   const workouts={};
   typeOrder.forEach((type,i)=>{
     const day=daySlots[i];
-    if(!day)return;
+    if(day===undefined||day===null)return;   // day 0 is Sunday, not "no day"
+
     if(type==='strength'){
       if(strengthPool[sIdx])workouts[day]={...strengthPool[sIdx++]};
     }else{
@@ -9746,21 +9748,45 @@ function buildWorkoutFromLibrary(p){
   if(lvl.rest)mainRest=lvl.rest;
   if(lvl.pmRest)pmRest=lvl.pmRest;
 
-  function _filteredGroup(group){
+  // Round-robin the allowed equipment classes so every kind the user owns shows
+  // up near the front of the list. Without this the library's ordering (44 DB
+  // entries before 10 barbell) means a barbell owner never sees a barbell.
+  function _byEquip(exs,rotation){
+    const buckets={};
+    exs.forEach(e=>{const k=e.eq||'db';(buckets[k]=buckets[k]||[]).push(e);});
+    const order=rotation.filter(k=>buckets[k]&&buckets[k].length);
+    Object.keys(buckets).forEach(k=>{if(!order.includes(k))order.push(k);});
+    // Bodyweight is the fallback, not a peer: if the person owns any loadable
+    // equipment, that gets used first and push-ups fill in behind it.
+    const loaded=order.filter(k=>k!=='bw');
+    const cycle=loaded.length?loaded:order;
+    const tail=loaded.length?order.filter(k=>k==='bw'):[];
+    const out=[];
+    for(let i=0;;i++){
+      let added=false;
+      for(const k of cycle){ if(buckets[k][i]){out.push(buckets[k][i]);added=true;} }
+      if(!added)break;
+    }
+    tail.forEach(k=>buckets[k].forEach(e=>out.push(e)));
+    return out;
+  }
+  const MAIN_ROT=['bb','machine','db','cable','bw'];   // compounds: bar first, bodyweight last
+  const PM_ROT  =['db','cable','machine','bb','bw'];   // accessories: isolation first
+  function _filteredGroup(group,rotation){
     let exs=(EX_LIBRARY[group]||[]).filter(e=>allowedEq.includes(e.eq||'db'));
     exs=_injuryFilter(exs,injuries);
-    return exs;
+    return _byEquip(exs,rotation||MAIN_ROT);
   }
   function pick(group,n,skip=0){
     const off=skip+exOffset;
-    const grp=_filteredGroup(group);
+    const grp=_filteredGroup(group,MAIN_ROT);
     // Wrap around if offset pushes past available exercises
     const start=off%Math.max(1,grp.length);
     return grp.slice(start,start+n).concat(start+n>grp.length?grp.slice(0,(start+n)-grp.length):[]).slice(0,n).map(e=>({n:e.n,tag:mainTag,i:e.i,rest:mainRest}));
   }
   function pickPm(group,n,skip=0){
     const off=skip+exOffset;
-    const grp=_filteredGroup(group);
+    const grp=_filteredGroup(group,PM_ROT);
     const start=off%Math.max(1,grp.length);
     return grp.slice(start,start+n).concat(start+n>grp.length?grp.slice(0,(start+n)-grp.length):[]).slice(0,n).map(e=>({n:e.n,tag:pmTag,i:e.i,rest:pmRest}));
   }
@@ -9873,7 +9899,12 @@ function wizComputeTargets(p){
   }
   const leanLb=wt*(1-bf/100), leanKg=leanLb*0.453592;
   // Protein — FDN anchor: ~1 g per lb of LEAN mass, held constant train & rest.
-  const prot=Math.round(leanLb*1.0);
+  // Diet preference moves the anchor: a high-protein plan asks for more, and a
+  // plant-based one needs a little more to land the same amount of usable
+  // protein (lower digestibility and leucine content per gram).
+  const diet=p.diet||'balanced';
+  const PROT_MULT={high_protein:1.25, plant_based:1.10, low_carb:1.15, balanced:1.0};
+  const prot=Math.round(leanLb*(PROT_MULT[diet]||1.0));
   // BMR — Mifflin-St Jeor (weight, height, age, sex) averaged with
   // Katch-McArdle (lean mass) for robustness.
   const bmrMifflin=10*kg+6.25*cm-5*age+(sex==='male'?5:-161);
@@ -9897,15 +9928,33 @@ function wizComputeTargets(p){
   }catch(e){}
   if(depleted && k<tdee) k=Math.round(tdee);
   // Fat floor — protect hormones: max(0.35 g/lb, 28% of calories).
-  const fat=Math.round(Math.max(wt*0.35, k*0.28/9));
+  let fat=Math.round(Math.max(wt*0.35, k*0.28/9));
   // Carbs fill the remainder.
   let carb=Math.round((k-prot*4-fat*9)/4);
   if(carb<20)carb=20;
-  // Train vs rest — protein & fat constant; rest day trims ~220 kcal of carbs.
-  const restCut=220, restCarb=Math.max(20,carb-Math.round(restCut/4));
+
+  // ── Diet preference actually moves the macros ────────────────────────────
+  // Protein was already raised above for high_protein / plant_based. Low carb
+  // caps the carbohydrate and hands the calories to fat, so total intake and
+  // protein are untouched — only the split changes.
+  if(diet==='low_carb'){
+    // ~100 g for a normal intake, scaling up a little for very large eaters so
+    // the fat number stays physiologically sane.
+    const cap=Math.max(100, Math.round(k*0.12/4));
+    if(carb>cap){
+      const moved=(carb-cap)*4;      // kcal freed by the carbs we removed
+      carb=cap;
+      fat=Math.round(fat+moved/9);
+    }
+  }
+
+  // Train vs rest — protein & fat constant; the rest-day trim scales with the
+  // person's intake instead of taking a flat 220 kcal off everyone.
+  const restCut=Math.min(350,Math.max(120,Math.round(k*0.06)));
+  const restCarb=Math.max(20,carb-Math.round(restCut/4));
   return{
     _meta:{bf:Math.round(bf),leanLb:Math.round(leanLb),bmr,tdee:Math.round(tdee),
-           activity:p.activity||'moderate',mult,goal,depleted,computedAt:Date.now()},
+           activity:p.activity||'moderate',mult,goal,diet,depleted,computedAt:Date.now()},
     train:{p:prot,c:carb,f:fat,k:k,w:Math.round(wt*0.67)},
     rest:{p:prot,c:restCarb,f:fat,k:Math.max(1000,k-restCut),w:Math.round(wt*0.55)}
   };
@@ -10093,6 +10142,85 @@ Make the routines specific and personal — reference their goal, body type, die
   _wiz.step=WIZ_STEPS.findIndex(x=>x.type==='done');
   renderWiz();
 }
+
+
+/* ── The recovery gate, re-read ───────────────────────────────────────────
+   Targets are computed once, at plan build, from the stress and sleep a
+   person reported that day. When either was bad we hold their calories at
+   maintenance rather than dieting a depleted body — which is right, but it
+   used to be permanent: three weeks of good sleep later, nothing recomputed
+   and they sat at maintenance wondering why nothing moved.
+
+   So once a day we re-read the same question from what they have actually
+   logged since, and move the target when the answer has changed. Only ever
+   the deficit gate — never a number they set by hand. */
+
+function _recoveryRead(){
+  var nights=0, hrs=0, checks=0, dysreg=0;
+  for(var i=1;i<=14;i++){
+    var dt=new Date(); dt.setDate(dt.getDate()-i);
+    var k=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+    try{ var r=JSON.parse(lsGet('rest_'+k,'null')); if(r&&r.h){nights++;hrs+=r.h;} }catch(e){}
+    var sv=lsGet('stress_'+k,'');
+    if(sv){ checks++; if(PV_STATES[sv]&&PV_STATES[sv].zone==='dysreg')dysreg++; }
+  }
+  var avgSleep = nights ? hrs/nights : null;
+  var dysregPct = checks ? dysreg/checks : null;
+  // Not enough logged to overrule what they told us at setup.
+  if(nights<5 && checks<5) return null;
+  var sleepState = avgSleep==null ? null : (avgSleep<6.2?'poor':(avgSleep<7?'fair':'great'));
+  var stressState = dysregPct==null ? null : (dysregPct>=0.5?'high':(dysregPct>=0.25?'moderate':'low'));
+  return {nights:nights,checks:checks,avgSleep:avgSleep?Math.round(avgSleep*10)/10:null,
+          dysregPct:dysregPct,sleep:sleepState,stress:stressState};
+}
+
+function targetsRecheck(){
+  try{
+    if(Date.now() - (+lsGet('_targetsRecheckAt','0')||0) < 20*60*60*1000) return;
+
+    var cur=null; try{ cur=JSON.parse(lsGet('_userTargets','null')); }catch(e){}
+    if(!cur||!cur.train) return;
+    if(cur.manual) return;                       // they set these themselves
+
+    var prof={}; try{ prof=JSON.parse(lsGet('_userProfile','{}'))||{}; }catch(e){}
+    if(!prof.weight) return;
+
+    var read=_recoveryRead();
+    if(!read) return;
+    lsSet('_targetsRecheckAt', String(Date.now()));
+
+    // Recompute with what they have lived, not what they typed at setup.
+    var live=Object.assign({},prof);
+    if(read.sleep) live.sleep=read.sleep;
+    if(read.stress) live.stress=read.stress;
+
+    var next=wizComputeTargets(live);
+    var wasHeld=!!(cur._meta&&cur._meta.depleted);
+    var nowHeld=!!next._meta.depleted;
+    if(wasHeld===nowHeld) return;                // nothing to say
+    if(Math.abs(next.train.k-cur.train.k)<50) return;
+
+    next.manual=false;
+    lsSet('_userTargets',JSON.stringify(next));
+    try{ lsSet('_macroProfile',JSON.stringify(Object.assign({},next._meta,{recheckedAt:Date.now(),recheckRead:read}))); }catch(e){}
+    try{ fbSyncSettings(); }catch(e){}
+    try{ refresh(); }catch(e){}
+
+    var why=[];
+    if(read.nights>=5) why.push('sleep averaging '+read.avgSleep+'h');
+    if(read.checks>=5) why.push(Math.round((1-read.dysregPct)*100)+'% of your check-ins in a settled state');
+    var reason=why.length?(' — '+why.join(' and ')):'';
+    if(wasHeld&&!nowHeld){
+      toast('Your recovery has come up'+reason+'. Calories moved to '+next.train.k+'/day so your goal can actually progress.', 7000);
+    }else{
+      toast('Recovery is running low'+reason+'. Calories held at maintenance ('+next.train.k+'/day) until it comes back up.', 7000);
+    }
+  }catch(e){}
+}
+
+window.targetsRecheck=targetsRecheck;
+window._recoveryRead=_recoveryRead;
+setTimeout(targetsRecheck, 6000);
 
 function wizApply(){
   const plan=_wiz.profile._generatedPlan||{};
