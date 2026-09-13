@@ -917,7 +917,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260913-sheet-swipe';
+const APP_BUILD='20260913-privacy';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -14227,6 +14227,22 @@ async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
   if(!available){ toast('Apple Health isn\'t available on this device'); return; }
 
+  // Apple's guideline 5.1.3 allows HealthKit data to be used for health
+  // management but not disclosed to a third party without consent, and the
+  // weight read here becomes part of the profile the AI guidance is built
+  // from. So the consent is asked for here, in plain words, before the
+  // HealthKit prompt rather than buried in the privacy policy.
+  var consent = confirm(
+    'Connect Apple Health?\n\n' +
+    'Metastory will save the workouts you finish to Apple Health, and read ' +
+    'your weight and step count back from it.\n\n' +
+    'Your weight becomes part of the profile used to generate your ' +
+    'personalized guidance, which is produced by Google Gemini. It is never ' +
+    'used for advertising, never sold, and never used to train models.\n\n' +
+    'You can turn this off any time in Settings.'
+  );
+  if(!consent) return;
+
   try{
     await N.health.requestAuthorization();
     lsSet('_healthOn','1');
@@ -14285,7 +14301,7 @@ after('rSettingsModal', function(){
       '<div style="font-size:13px;font-weight:600;margin-bottom:4px">❤️ Apple Health</div>' +
       '<div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">' +
         (health
-          ? 'Workouts you finish are saved to Apple Health, and your weight is read back from it.'
+          ? 'Workouts you finish are saved to Apple Health, and your weight is read back from it. That weight is part of the profile your personalized guidance is generated from.'
           : 'Save the workouts you finish to Apple Health, and let Metastory read your weight instead of asking you to type it.') +
       '</div>' +
       (health

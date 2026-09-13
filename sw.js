@@ -1,4 +1,4 @@
-const VERSION = '20260913-sheet-swipe';
+const VERSION = '20260913-privacy';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — Metastory Health</title>
+<style>
+  :root{ --bg:#f1ede5; --surface:#fbf9f5; --text:#2f2b28; --sub:#6b635b; --accent:#ab6c52; --border:#e2dbd0; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+       -webkit-text-size-adjust:100%;}
+  .wrap{max-width:720px;margin:0 auto;padding:48px 22px 72px}
+  header{border-bottom:1px solid var(--border);padding-bottom:22px;margin-bottom:30px}
+  h1{font-size:30px;line-height:1.2;margin:0 0 8px;letter-spacing:-.01em}
+  .updated{color:var(--sub);font-size:14px;margin:0}
+  h2{font-size:19px;margin:36px 0 10px;letter-spacing:-.01em}
+  p{margin:0 0 14px}
+  strong{font-weight:650}
+  a{color:var(--accent)}
+  .lead{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin:0 0 8px}
+  footer{margin-top:46px;padding-top:20px;border-top:1px solid var(--border);color:var(--sub);font-size:14px}
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#1b1917; --surface:#232020; --text:#ece7e0; --sub:#a49a90; --border:#37322e; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Metastory Health — Privacy Policy</h1>
+  <p class="updated">Last updated: September 13, 2026</p>
+</header>
+
+<p>Metastory Health (&ldquo;Metastory&rdquo;, &ldquo;we&rdquo;) is operated by Megaphone Functional Health, LLC. This policy covers the Metastory web app at app.metastoryhealth.com and the Metastory app for iPhone.</p>
+
+<h2>The short version</h2>
+<p class="lead">We collect what you put into Metastory so the app can do its job, and so your data follows you between devices. We do not sell it, we do not use it for advertising, and we do not use it to train AI models. You can delete all of it from inside the app.</p>
+
+<h2>What we collect</h2>
+<p><strong>Your account</strong> — your name and email address, from Sign in with Apple or Sign in with Google. We never see or store your password.</p>
+<p><strong>What you log</strong> — food, water, workouts, sleep, supplements, reflections, assessment answers, and the plan and targets you set.</p>
+<p><strong>Your profile</strong> — the details you enter during setup, including your weight, and the health and safety flags you tap in Settings.</p>
+<p><strong>Apple Health data, only if you connect it</strong> — see the section below.</p>
+<p>We do not collect location, contacts, photos other than the food photos you choose to scan, or any advertising identifier. There is no ad SDK, and no analytics SDK that tracks you across other apps or websites.</p>
+
+<h2>Apple Health (HealthKit)</h2>
+<p>Connecting Apple Health is optional, and off until you turn it on in Settings.</p>
+<p>When it is on, Metastory <strong>writes</strong> the workouts you finish to Apple Health, and <strong>reads</strong> your body weight and step count back from it.</p>
+<p>Before you connect it, Metastory tells you — and you have to agree — that the weight it reads becomes part of the profile used to generate your personalized guidance, which is produced by Google Gemini (see <em>Who else sees your data</em>). Health data is never used for advertising, never sold, and never used to train models. You can disconnect at any time in Settings, and you can revoke Metastory&rsquo;s access entirely in the Health app under Sharing &rsaquo; Apps &rsaquo; Metastory.</p>
+
+<h2>Who else sees your data</h2>
+<p><strong>Google Firebase</strong> (Authentication, Cloud Firestore) — stores your account and your logged data so it syncs across your devices.</p>
+<p><strong>Google Gemini, through our own Cloudflare Worker</strong> — when Metastory generates personalized guidance, the relevant parts of your profile and recent logs are sent to Google&rsquo;s Gemini model to produce it. If you have connected Apple Health, the weight read from Health forms part of that profile. This is used only to generate your recommendations: not for advertising, and not to train models on your data.</p>
+<p><strong>Cloudflare</strong> — serves the app and runs the workers described here.</p>
+<p><strong>If you order a lab test through the app</strong> — the order details you enter are sent to Metastory so we can place the order, emailed to us through Resend, and the test itself is ordered and run through Evexia Diagnostics. If you book a results review or follow-up, that appointment is scheduled through Practice Better. Each of these receives only what it needs to provide that service.</p>
+<p>We do not share your information with anyone else unless you ask us to, or unless we are legally required to.</p>
+
+<h2>Sign in with Apple</h2>
+<p>If you sign in with Apple you may choose to hide your email address, in which case we receive only Apple&rsquo;s private relay address and can reach you only through it. Apple sends us your name only the first time you authorize, so we save it to your profile then — there is no second chance to ask.</p>
+
+<h2>Deleting your account</h2>
+<p>Settings &rsaquo; Delete my account erases your profile, plan and all of your logs from our database, deletes your sign-in account, and — if you signed in with Apple — revokes Metastory&rsquo;s Sign in with Apple token. This is immediate and cannot be undone.</p>
+<p>Deleting your Metastory account does <strong>not</strong> delete data Metastory previously wrote into Apple Health, because that data belongs to you and lives on your device, not on our servers. You can remove it in the Health app under Browse &rsaquo; Workouts, or under Sharing &rsaquo; Apps &rsaquo; Metastory &rsaquo; Delete All Data.</p>
+
+<h2>Where your data lives, and for how long</h2>
+<p>Your data is stored by Google Firebase in the United States, and is kept for as long as your account exists. Data read from Apple Health is held only as part of your Metastory profile, and is removed when you delete your account.</p>
+
+<h2>Children</h2>
+<p>Metastory is not directed to children under 13, and we do not knowingly collect information from them.</p>
+
+<h2>Medical disclaimer</h2>
+<p>Metastory is a wellness and education tool. It is not a medical device, it does not diagnose or treat any condition, and nothing in it is a substitute for advice from a qualified clinician.</p>
+
+<h2>Changes</h2>
+<p>If this policy changes materially, we will update the date at the top and note the change in the app.</p>
+
+<h2>Contact</h2>
+<p><a href="mailto:support@metastoryhealth.com">support@metastoryhealth.com</a></p>
+
+<footer>Metastory Health is operated by Megaphone Functional Health, LLC.</footer>
+</div>
+</body>
+</html>
