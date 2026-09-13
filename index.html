@@ -16,7 +16,7 @@
 :root {
   --bg:#f1ede5; --surface:#faf7f3; --surface2:#f0ece4; --surface3:#e8e2d8;
   --green:#ab6c52; --blue:#7a9aab; --purple:#b7baa7; --orange:#c4855f; --red:#c47070;
-  --text:#424c57; --sub:#8a9299; --border:#ddd8d0;
+  --text:#424c57; --sub:#636a70; --border:#ddd8d0;
   --r:16px; --rs:10px;
   --st:env(safe-area-inset-top,0px); --sb:env(safe-area-inset-bottom,0px);
   --card-shadow:0 1px 8px rgba(66,76,87,0.07);
@@ -96,10 +96,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .re-act{flex:1;padding:8px 9px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--text);font-size:16px;outline:none;font-family:var(--font-sans)}
 .re-clock{flex:none;padding:8px 7px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--text);font-size:14px;font-weight:600;outline:none;font-family:var(--font-sans)}
 .re-time:focus,.re-act:focus,.re-clock:focus{border-color:var(--green)}
-.re-del{width:30px;height:30px;background:none;border:1.5px solid var(--border);border-radius:8px;color:var(--sub);font-size:14px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.re-del{width:44px;height:44px;background:none;border:1.5px solid var(--border);border-radius:8px;color:var(--sub);font-size:14px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 18px;border-radius:var(--rs);border:none;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s}
 .btn:active{opacity:.7}
-.btn-g{background:var(--green);color:var(--text)}
+.btn-g{background:var(--green);color:#fff}
 .btn-s{background:var(--surface2);color:var(--text)}
 .btn-o{background:transparent;color:var(--green);border:1.5px solid var(--green)}
 .btn-b{background:var(--blue);color:var(--text)}
@@ -160,7 +160,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .ai-photo-strip::-webkit-scrollbar{display:none}
 .ai-thumb-wrap{position:relative;flex-shrink:0;width:80px;height:80px;border-radius:8px;overflow:hidden;border:1.5px solid var(--border)}
 .ai-thumb-wrap img{width:100%;height:100%;object-fit:cover;display:block}
-.ai-thumb-rm{position:absolute;top:3px;right:3px;background:rgba(0,0,0,.65);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
+.ai-thumb-rm{position:absolute;top:3px;right:3px;background:rgba(0,0,0,.65);color:#fff;border:none;border-radius:50%;width:28px;height:28px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
 .ai-add-btn{width:80px;height:80px;flex-shrink:0;border-radius:8px;border:1.5px dashed var(--border);background:var(--surface2);color:var(--sub);font-size:26px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .sr-list{margin-top:8px;display:flex;flex-direction:column;gap:5px}
 .sr-item{padding:10px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rs);cursor:pointer;transition:border-color .15s}
@@ -228,7 +228,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .swap-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:12px auto 0}
 .swap-header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px 0}
 .swap-title{font-size:14px;font-weight:600;color:var(--text);font-family:var(--font-sans);flex:1;padding-right:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.swap-close{background:var(--surface2);border:none;color:var(--sub);width:26px;height:26px;border-radius:50%;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.swap-close{background:var(--surface2);border:none;color:var(--sub);width:34px;height:34px;border-radius:50%;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .swap-divider{height:0.5px;background:var(--border);margin:10px 16px 0}
 .swap-tabs{display:flex;align-items:center;gap:10px;padding:14px 16px 14px;overflow-x:auto;scrollbar-width:none}
 .swap-tabs::-webkit-scrollbar{display:none}
@@ -375,18 +375,18 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .comp-ml{font-size:11px;color:var(--sub);margin-top:1px}
 .comp-g{width:100%;padding:5px 3px;background:var(--surface);border:1.5px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;font-weight:700;text-align:center;outline:none;-webkit-appearance:none}
 .comp-g:focus{border-color:var(--green)}
-.comp-x{width:22px;height:22px;border:none;background:none;color:var(--sub);font-size:15px;cursor:pointer;padding:0;line-height:1}
+.comp-x{width:34px;height:34px;border:none;background:none;color:var(--sub);font-size:15px;cursor:pointer;padding:0;line-height:1}
 .comp-tot{background:var(--surface2);border-radius:var(--rs);padding:9px 8px;display:flex;gap:4px;justify-content:space-around;margin:6px 0 10px;text-align:center}
 .comp-tv{font-size:15px;font-weight:700;color:var(--text)}
 .comp-tl{font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;margin-top:1px}
-.comp-ctx{width:100%;padding:9px 11px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--text);font-size:13px;resize:none;outline:none;box-sizing:border-box;margin-bottom:8px;line-height:1.4}
+.comp-ctx{width:100%;padding:9px 11px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--text);font-size:16px;resize:none;outline:none;box-sizing:border-box;margin-bottom:8px;line-height:1.4}
 .comp-ctx:focus{border-color:var(--purple)}
 .lib-pk-ov{position:fixed;inset:0;z-index:300;display:flex;flex-direction:column;justify-content:flex-end;background:rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:.2s}
 .lib-pk-ov.open{opacity:1;pointer-events:all}
 .lib-pk-sheet{background:var(--surface);border-radius:18px 18px 0 0;padding:14px 0 32px;max-height:72vh;display:flex;flex-direction:column}
 .lib-pk-head{padding:0 16px 10px;display:flex;align-items:center;gap:8px;flex-shrink:0}
 .lib-pk-x{background:none;border:none;color:var(--sub);font-size:22px;cursor:pointer;padding:0;line-height:1;flex-shrink:0}
-.lib-pk-q{flex:1;padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--text);font-size:14px;outline:none}
+.lib-pk-q{flex:1;padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--text);font-size:16px;outline:none}
 .lib-pk-q:focus{border-color:var(--green)}
 .lib-pk-list{overflow-y:auto;flex:1;padding:0 16px}
 .lib-pk-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer}
@@ -432,7 +432,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .wk-bars .d{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px}
 .wk-bars .b{width:100%;border-radius:6px 6px 3px 3px;background:var(--purple);min-height:5px}
 .wk-bars .b.low{background:#d9b4a3}
-.wk-bars small{font-size:9px;color:var(--sub);font-weight:600}
+.wk-bars small{font-size:11px;color:var(--sub);font-weight:600}
 .titr-card{background:rgba(196,133,95,.16);border:1px solid #d8b2a0;border-radius:16px;padding:13px 14px;font-size:12.5px;line-height:1.5;color:#6e5145;margin-bottom:12px}
 .titr-card b{color:var(--text)}
 .titr-card .acts{display:flex;gap:8px;margin-top:11px}
@@ -454,7 +454,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .dr-i:active{background:var(--surface2)}
 .dr-i .ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none;background:var(--surface2)}
 .dr-i small{display:block;font-size:10.5px;color:var(--sub);font-weight:500;margin-top:1px}
-.dr-i .tag{margin-left:auto;font-size:9px;font-weight:800;color:#fff;background:var(--green);padding:3px 7px;border-radius:999px}
+.dr-i .tag{margin-left:auto;font-size:11px;font-weight:800;color:#fff;background:var(--green);padding:3px 7px;border-radius:999px}
 .dr-foot{margin-top:auto;padding:14px 22px calc(var(--sb) + 18px);border-top:1px solid var(--border);font-size:12.5px;color:var(--sub);font-weight:600}
 .dr-scroll{overflow-y:auto;flex:1;display:flex;flex-direction:column}
 
@@ -491,7 +491,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .mk-ring{width:124px;height:124px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center}
 .mk-ring-in{width:96px;height:96px;border-radius:50%;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center}
 .mk-ring-in b{font-size:26px;font-family:var(--font-serif);font-weight:500;line-height:1}
-.mk-ring-in small{font-size:9.5px;color:var(--sub);letter-spacing:.07em;margin-top:3px}
+.mk-ring-in small{font-size:11px;color:var(--sub);letter-spacing:.07em;margin-top:3px}
 .mk-macro{margin-bottom:11px}
 .mk-macro:last-child{margin-bottom:0}
 .mk-macro .r{display:flex;justify-content:space-between;font-size:12.5px;font-weight:600;margin-bottom:5px}
@@ -917,7 +917,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260913-notifs2';
+const APP_BUILD='20260913-audit1';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -1225,20 +1225,16 @@ async function fbPullAll(){
     foodSnap.forEach(doc => {
       const d = doc.data();
       const date = doc.id;
-      if(d.entries && d.entries.length) {
+      // A day this device edited more recently than the cloud copy stays as it
+      // is — including a day the person emptied out.
+      if(d.entries && !(_touchedAt('fl_'+date) > (d.updated || 0))) {
         const existing = [];
         try { existing.push(...JSON.parse(lsGet('fl_'+date,'[]'))); } catch(e){}
-        // Merge: cloud entries win if local is empty, otherwise keep union
-        if(!existing.length) {
+        if(!existing.length || d.entries.length > existing.length) {
           lsSet('fl_'+date, JSON.stringify(d.entries));
-        } else {
-          // Deduplicate by name+time if possible, else just use longer list
-          if(d.entries.length > existing.length) {
-            lsSet('fl_'+date, JSON.stringify(d.entries));
-          }
         }
       }
-      if(d.water !== undefined && d.water > 0) {
+      if(d.water !== undefined && !(_touchedAt('wa_'+date) > (d.updated || 0))) {
         const localWater = parseFloat(lsGet('wa_'+date,'0'));
         if(d.water > localWater) lsSet('wa_'+date, String(d.water));
       }
@@ -1258,7 +1254,17 @@ async function fbPullAll(){
       const jSnap = await fbDb.collection('users').doc(uid).collection('journal').get();
       if(jSnap && !jSnap.empty){
         const byId={}; _journalAll().forEach(e=>{ if(e&&e.id) byId[e.id]=e; });
-        jSnap.forEach(doc=>{ const d=doc.data(); if(d&&d.id&&!byId[d.id]) byId[d.id]=d; });
+        const gone=_journalTomb();
+        jSnap.forEach(doc=>{
+          const d=doc.data();
+          if(!d || !d.id) return;
+          if(gone.indexOf(d.id) >= 0){
+            // Deleted here; make sure it is deleted there too, then stay gone.
+            try{ fbDb.collection('users').doc(uid).collection('journal').doc(d.id).delete().catch(()=>{}); }catch(e){}
+            return;
+          }
+          if(!byId[d.id]) byId[d.id]=d;
+        });
         const merged=Object.keys(byId).map(k=>byId[k]).sort((a,b)=>(a.ts||0)-(b.ts||0));
         _journalSaveLocal(merged);
       }
@@ -1268,7 +1274,7 @@ async function fbPullAll(){
     woSnap.forEach(doc => {
       const d = doc.data();
       const date = doc.id;
-      if(d.exercises && d.exercises.length) {
+      if(d.exercises && !(_touchedAt('wl_'+date) > (d.updated || 0))) {
         const existing = [];
         try { existing.push(...JSON.parse(lsGet('wl_'+date,'[]'))); } catch(e){}
         if(!existing.length || d.exercises.length > existing.length) {
@@ -1298,7 +1304,7 @@ async function fbPullAll(){
         if(s.qmOverrides) lsSet('_qmIng', JSON.stringify(s.qmOverrides));
         if(s.qmFreq) lsSet('_qmFreq', JSON.stringify(s.qmFreq));
         // Restore supplement plan (Supps tab) from cloud — cloud wins if local is empty
-        if(s.suppsPlan && s.suppsPlan.length){ let _lp=[]; try{_lp=JSON.parse(lsGet('_supps_plan','[]'))||[];}catch(e){} if(!_lp.length) lsSet('_supps_plan', JSON.stringify(s.suppsPlan)); }
+        if(s.suppsPlan && s.suppsPlan.length && !(_touchedAt('_supps_plan') > (userDoc.data().updated || 0))){ let _lp=[]; try{_lp=JSON.parse(lsGet('_supps_plan','[]'))||[];}catch(e){} if(!_lp.length) lsSet('_supps_plan', JSON.stringify(s.suppsPlan)); }
         // Restore supplements — cloud wins if local is empty
         if(s.supps && s.supps.length) {
           const localSupps = getSupps();
@@ -1890,13 +1896,6 @@ function getNSActIcon(id){
   return `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 }
 
-function getTodayActivity(){
-  const d = new Date();
-  // Use local calendar date so the activity changes at local midnight, not UTC midnight
-  const seed = d.getFullYear() * 10000 + (d.getMonth()+1) * 100 + d.getDate();
-  return NS_ACT[seed % NS_ACT.length];
-}
-
 // ── STATE ─────────────────────────────────────────────────────────────────────
 function dk(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 let viewDate=dk();
@@ -1905,6 +1904,37 @@ let viewDate=dk();
    Stored locally in _journal (array) and mirrored per-entry to Firestore
    collection 'journal' so entries persist and follow the user across devices. */
 function _journalAll(){try{const a=JSON.parse(lsGet('_journal','[]'));return Array.isArray(a)?a:[];}catch(e){return [];}}
+/* When this device last changed a given day's data.
+
+   The pull used to settle conflicts with "whichever list is longer wins",
+   which quietly resurrects anything you delete: until the delete reaches
+   Firestore the cloud copy is still the longer one, so the next sync — which
+   runs on every launch — puts the deleted entry straight back. A timestamp per
+   key settles it honestly: the most recent edit wins, and a deletion is an
+   edit like any other. */
+function _touch(key){
+  try{
+    var m = JSON.parse(lsGet('_editStamps','{}')) || {};
+    m[key] = Date.now();
+    var keys = Object.keys(m);
+    if(keys.length > 400){
+      keys.sort(function(a,b){ return m[a]-m[b]; }).slice(0, keys.length-400)
+          .forEach(function(k){ delete m[k]; });
+    }
+    lsSet('_editStamps', JSON.stringify(m));
+  }catch(e){}
+}
+function _touchedAt(key){
+  try{ return (JSON.parse(lsGet('_editStamps','{}')) || {})[key] || 0; }catch(e){ return 0; }
+}
+/* Deleting a reflection has to be remembered, or the cloud copy walks back in
+   on the next pull whether or not the delete ever landed. */
+function _journalTomb(){ try{ return JSON.parse(lsGet('_journalDeleted','[]')) || []; }catch(e){ return []; } }
+function _journalTombAdd(id){
+  var t = _journalTomb();
+  if(t.indexOf(id) < 0){ t.push(id); if(t.length > 500) t = t.slice(-500); lsSet('_journalDeleted', JSON.stringify(t)); }
+}
+
 function _journalSaveLocal(arr){lsSet('_journal',JSON.stringify(arr));}
 function journalAdd(slot,mode,text){
   text=String(text||'').trim(); if(!text) return null;
@@ -1916,6 +1946,7 @@ function journalAdd(slot,mode,text){
 }
 function journalDelete(id){
   const arr=_journalAll().filter(e=>e.id!==id); _journalSaveLocal(arr);
+  _journalTombAdd(id);
   try{ if(fbUser&&fbDb) fbDb.collection('users').doc(fbUser.uid).collection('journal').doc(id).delete().catch(()=>{}); }catch(e){}
   try{ if(curPage==='journal') rJournal(); }catch(e){}
 }
@@ -2023,29 +2054,10 @@ function runRecovery(){
 
 /* Weekly history helpers */
 function localKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
-function getWeekData(){
-  const result=[],today=new Date();
-  for(let i=6;i>=0;i--){
-    const d=new Date(today);d.setDate(d.getDate()-i);
-    const key=localKey(d);
-    let log=[];try{log=JSON.parse(lsGet('fl_'+key,'[]'))}catch(e){}
-    const water=parseFloat(lsGet('wa_'+key,'0'));
-    const p=log.reduce((s,e)=>s+(+e.p||0),0);
-    const k=log.reduce((s,e)=>s+(+e.k||0),0);
-    const isTr=_trainDaySet(_dkOf(d)).includes(d.getDay());
-    const _tgt=_tgtFor(isTr);
-    result.push({key,label:['Su','Mo','Tu','We','Th','Fr','Sa'][d.getDay()],
-      p:Math.round(p),k:Math.round(k),water,
-      tgtP:_tgt.p,tgtK:_tgt.k,
-      isToday:key===dk(),hasData:log.length>0});
-  }
-  return result;
-}
-function viewDay(key){viewDate=key;renderHeader();goPage('today');}
 function getLog(){try{return JSON.parse(lsGet('fl_'+viewDate,'[]'))}catch(e){return[]}}
-function putLog(l){const ok=lsSet('fl_'+viewDate,JSON.stringify(l));fbSyncFoodLog(viewDate,l);return ok;}
+function putLog(l){const ok=lsSet('fl_'+viewDate,JSON.stringify(l));_touch('fl_'+viewDate);fbSyncFoodLog(viewDate,l);return ok;}
 function getWater(){return parseFloat(lsGet('wa_'+viewDate,'0'))}
-function putWater(v){lsSet('wa_'+viewDate,v.toString());fbSyncWater(viewDate,parseFloat(v));}
+function putWater(v){lsSet('wa_'+viewDate,v.toString());_touch('wa_'+viewDate);fbSyncWater(viewDate,parseFloat(v));}
 
 // ── WORKOUT LOG ───────────────────────────────────────────────────────────────
 let _woExList=[];  // maps index → exercise name; rebuilt each rWorkout call
@@ -2058,7 +2070,7 @@ let _swapCandidates=[]; // current list of swap options shown in modal
 let _preChoice=null; // tracks warmup choice for the current day view
 
 function getWL(date){try{return JSON.parse(lsGet('wl_'+(date||viewDate),'[]'))}catch(e){return[]}}
-function putWL(data){lsSet('wl_'+viewDate,JSON.stringify(data));fbSyncWorkoutLog(viewDate,data);}
+function putWL(data){lsSet('wl_'+viewDate,JSON.stringify(data));_touch('wl_'+viewDate);fbSyncWorkoutLog(viewDate,data);}
 
 function getUsername(){return lsGet('_username','')}
 function saveUsername(){
@@ -2577,21 +2589,13 @@ function _applySwapEquip(){ var list=document.getElementById('swap-list'); if(!l
 function _setSwapEquip(m){ window._swapEquip=m; var bar=document.getElementById('swap-equip-bar');
   if(bar){[].forEach.call(bar.querySelectorAll('button'),function(b){var a=b.getAttribute('data-eq')===m;b.style.background=a?'var(--blue,#424c57)':'transparent';b.style.color=a?'#fff':'var(--sub,#777)';});}
   _applySwapEquip(); }
-function _ensureSwapEquipBar(){ var list=document.getElementById('swap-list'); if(!list||document.getElementById('swap-equip-bar')) return;
-  if(window._swapEquip===undefined) window._swapEquip='all';
-  var bar=document.createElement('div'); bar.id='swap-equip-bar'; bar.style.cssText='display:flex;gap:8px;margin:0 0 10px';
-  var modes=[['all','All'],['dumbbell','Dumbbell'],['bodyweight','Bodyweight']];
-  bar.innerHTML=modes.map(function(m){var a=(window._swapEquip||'all')===m[0];
-    return "<button data-eq='"+m[0]+"' onclick=\"_setSwapEquip('"+m[0]+"')\" style=\"flex:1;padding:7px;border-radius:8px;border:1px solid var(--border,#ccc);font-size:12px;font-weight:600;cursor:pointer;background:"+(a?'var(--blue,#424c57)':'transparent')+";color:"+(a?'#fff':'var(--sub,#777)')+"\">"+m[1]+"</button>";
-  }).join('');
-  list.parentNode.insertBefore(bar,list); }
 function _renderSwapListOrig(){
   const wo=getWO(); if(!wo)return;
   const currentName=_woExList[_swapModalIdx]||'';
   const items=EX_LIBRARY[_swapMuscleFilter]||[];
   _swapCandidates=items.slice();
   let h='';
-  h+='<div class="swap-item" style="border-color:var(--green)"><div style="display:flex;gap:8px;align-items:center"><input id="swap-manual" placeholder="Type your own exercise…" style="flex:1;border:1px solid var(--border);border-radius:8px;padding:7px 9px;font-size:13px" onclick="event.stopPropagation()"><button class="btn btn-b btn-sm" style="white-space:nowrap" onclick="event.stopPropagation();applyManualSwap()">Use this</button></div></div>';
+  h+='<div class="swap-item" style="border-color:var(--green)"><div style="display:flex;gap:8px;align-items:center"><input id="swap-manual" placeholder="Type your own exercise…" style="flex:1;border:1px solid var(--border);border-radius:8px;padding:7px 9px;font-size:16px" onclick="event.stopPropagation()"><button class="btn btn-b btn-sm" style="white-space:nowrap" onclick="event.stopPropagation();applyManualSwap()">Use this</button></div></div>';
   items.forEach((ex,ci)=>{
     const isCurrent=ex.n===currentName;
     const border=isCurrent?'border-color:var(--sub);opacity:.45;':'';
@@ -3584,14 +3588,14 @@ function _protoRowHTML(it,i){
   const slotOpts=PROTO_SLOT_OPTS.map(([k,l])=>`<option value="${k}" ${_protoSlot(it.slot)===k?'selected':''}>${l}</option>`).join('');
   return `<div data-prow="${i}" style="border:1px solid var(--border);border-radius:var(--rs);padding:10px;margin-bottom:8px;background:var(--surface2)">
     <div style="display:flex;gap:8px;align-items:center">
-      <input class="fi" data-pf="name" placeholder="Supplement name" value="${_labEsc(it.name)}" oninput="_protoCapture()" style="flex:1;font-size:14px;padding:9px 11px;background:var(--surface)">
+      <input class="fi" data-pf="name" placeholder="Supplement name" value="${_labEsc(it.name)}" oninput="_protoCapture()" style="flex:1;font-size:16px;padding:9px 11px;background:var(--surface)">
       <button onclick="_protoDelRow(${i})" title="Remove" style="flex:none;background:none;border:none;color:var(--red);font-size:17px;cursor:pointer;padding:2px 4px">✕</button>
     </div>
     <div style="display:flex;gap:8px;margin-top:8px">
-      <input class="fi" data-pf="dose" placeholder="Dose (e.g. 2 caps, 400mg)" value="${_labEsc(it.dose)}" oninput="_protoCapture()" style="flex:1;font-size:13px;padding:9px 11px;background:var(--surface)">
+      <input class="fi" data-pf="dose" placeholder="Dose (e.g. 2 caps, 400mg)" value="${_labEsc(it.dose)}" oninput="_protoCapture()" style="flex:1;font-size:16px;padding:9px 11px;background:var(--surface)">
       <select data-pf="slot" onchange="_protoCapture()" style="flex:none;width:110px;padding:9px;border:1.5px solid var(--border);border-radius:var(--rs);font-size:13px;background:var(--surface);color:var(--text);font-family:var(--font-sans)">${slotOpts}</select>
     </div>
-    <input class="fi" data-pf="notes" placeholder="Note for them (e.g. with food, start day 5)" value="${_labEsc(it.notes)}" oninput="_protoCapture()" style="margin-top:8px;font-size:13px;padding:9px 11px;background:var(--surface)">
+    <input class="fi" data-pf="notes" placeholder="Note for them (e.g. with food, start day 5)" value="${_labEsc(it.notes)}" oninput="_protoCapture()" style="margin-top:8px;font-size:16px;padding:9px 11px;background:var(--surface)">
   </div>`;
 }
 function rProtoAdmin(){
@@ -3638,18 +3642,18 @@ function rProtoAdmin(){
       <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--sub);margin-bottom:6px">Paste from your notes</div>
       <textarea id="proto-paste" oninput="_protoCapture()" placeholder="One per line:
 Magnesium glycinate | 400mg | evening | before bed
-Biocidin LSF | 5 drops | morning | start day 5" style="width:100%;min-height:96px;padding:11px;border:1.5px solid var(--border);border-radius:var(--rs);font-size:13px;background:var(--surface2);color:var(--text);font-family:var(--font-sans)">${_labEsc(_protoDraft._paste||'')}</textarea>
+Biocidin LSF | 5 drops | morning | start day 5" style="width:100%;min-height:96px;padding:11px;border:1.5px solid var(--border);border-radius:var(--rs);font-size:16px;background:var(--surface2);color:var(--text);font-family:var(--font-sans)">${_labEsc(_protoDraft._paste||'')}</textarea>
       <div style="font-size:11px;color:var(--sub);margin:4px 0 8px">Name | dose | morning/midday/evening | note — anything after the name is optional.</div>
       <button class="btn btn-s btn-sm btn-f" onclick="_protoImportPaste()">Import lines</button>
     </div>`;
   }
   h+=`<div style="margin-top:16px">
       <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--sub);margin-bottom:6px">Note for the client <span style="font-weight:400;text-transform:none">(optional)</span></div>
-      <textarea id="proto-note" oninput="_protoCapture()" placeholder="Start with magnesium alone for five days, then add the rest one at a time." style="width:100%;min-height:66px;padding:11px;border:1.5px solid var(--border);border-radius:var(--rs);font-size:13px;background:var(--surface2);color:var(--text);font-family:var(--font-sans)">${_labEsc(_protoDraft.note||'')}</textarea>
+      <textarea id="proto-note" oninput="_protoCapture()" placeholder="Start with magnesium alone for five days, then add the rest one at a time." style="width:100%;min-height:66px;padding:11px;border:1.5px solid var(--border);border-radius:var(--rs);font-size:16px;background:var(--surface2);color:var(--text);font-family:var(--font-sans)">${_labEsc(_protoDraft.note||'')}</textarea>
     </div>
     <div style="margin-top:14px">
       <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--sub);margin-bottom:6px">Your reference label <span style="font-weight:400;text-transform:none">(optional)</span></div>
-      <input id="proto-label" class="fi" placeholder="e.g. JB · GI-MAP follow-up" value="${_labEsc(_protoDraft.label||'')}" oninput="_protoCapture()" style="font-size:13px;padding:10px 11px">
+      <input id="proto-label" class="fi" placeholder="e.g. JB · GI-MAP follow-up" value="${_labEsc(_protoDraft.label||'')}" oninput="_protoCapture()" style="font-size:16px;padding:10px 11px">
       <div style="font-size:11px;color:var(--sub);margin-top:5px">Initials or a nickname — this is stored in the cloud, so keep names out of it.</div>
     </div>
     <label style="display:flex;gap:10px;align-items:flex-start;font-size:13px;margin:14px 0 0;line-height:1.45"><input type="checkbox" id="proto-single" ${_protoDraft.singleUse?'checked':''} onchange="_protoCapture()" style="width:20px;height:20px;flex:none;margin-top:1px"><span>Single use — the code stops working after it's redeemed once.</span></label>
@@ -3695,7 +3699,7 @@ const _D=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'
 const _M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function shiftDate(n){
   const d=vdDate();d.setDate(d.getDate()+n);
-  viewDate=d.toISOString().slice(0,10);
+  viewDate=localKey(d);
   renderHeader();refresh();
 }
 function goToday(){
@@ -4357,43 +4361,6 @@ function _practicesListHTML(){
   return h;
 }
 
-function _stressAssessCardsHTML(){
-  const nsResult=_parseAssessResult(lsGet('_assess_ns_result',null));
-  const gutResult=_parseAssessResult(lsGet('_assess_gut_result',null));
-  const aaResult=_parseAssessResult(lsGet('_assess_aa_result',null));
-  const anyDone=nsResult||gutResult||aaResult;
-  function card(assess,result){
-    const done=!!result;
-    return `<div class="card" style="margin-bottom:12px">
-      <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px">
-        <div style="width:36px;height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${assess.icon}</svg></div>
-        <div style="flex:1">
-          <div style="font-size:15px;font-weight:700;margin-bottom:3px">${assess.title}</div>
-          <div style="font-size:12px;color:var(--sub);line-height:1.45">${assess.sub}</div>
-        </div>
-      </div>
-      ${done?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${renderAssessScoreBadges(assess.id,result)}</div>
-        <div style="font-size:11px;color:var(--sub);margin-bottom:10px">Completed ${result.date||'previously'}</div>`:''}
-      <button class="btn ${done?'btn-s':'btn-g'} btn-sm btn-f" onclick="stressStartAssess('${assess.id}')">${done?'&#8617; Retake':'Start Assessment &#8594;'}</button>
-    </div>`;
-  }
-  let h='';
-  if(anyDone){
-    h+=`<div style="background:var(--surface);border:1px solid var(--green);border-radius:var(--r);padding:14px;margin-bottom:14px;cursor:pointer" onclick="stressOpenInsights()">
-      <div style="display:flex;align-items:center;justify-content:space-between">
-        <div>
-          <div style="font-size:15px;font-weight:700;margin-bottom:3px">Assessment Insights</div>
-          <div style="font-size:12px;color:var(--sub)">Your NS profile, protocol recommendations &amp; AI plan review</div>
-        </div>
-        <div style="font-size:20px;color:var(--green)">&#8594;</div>
-      </div></div>`;
-  }
-  const pairs=[[ASSESS_NS,nsResult],[ASSESS_GUT,gutResult],[ASSESS_AA,aaResult]];
-  h+=pairs.filter(pr=>pr[1]).map(pr=>card(pr[0],pr[1])).join('');
-  const todo=pairs.filter(pr=>!pr[1]).map(pr=>card(pr[0],pr[1])).join('');
-  if(todo)h+=`<div style="font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:16px;padding:12px;background:var(--surface);border-radius:var(--rs);border:1px solid var(--border)">These assessments build your health profile. Your scores inform your recommendations, recovery activities, and practitioner reports. Retake any assessment when you notice changes.</div>`+todo;
-  return h;
-}
 function stressStartAssess(id){_assessPage=id;_assessAnswers={};_assessSection=0;goPage('assess');}
 function stressOpenInsights(){_assessPage='insights';goPage('assess');}
 
@@ -4564,7 +4531,6 @@ function _stressDomains(dat){
   const order=['physical','nutritional','exercise','mental','emotional','relational'];
   return order.map(id=>D.find(d=>d.id===id));
 }
-function _wordNum(n){return ({2:'two',3:'three',4:'four',5:'five',6:'six'})[n]||String(n);}
 function _joinPhrases(arr){
   if(arr.length===1)return arr[0];
   if(arr.length===2)return arr[0]+' and '+arr[1];
@@ -4961,7 +4927,6 @@ let _aiPlanLoading = false;
 
 // ── ASSESSMENT FUNCTIONS ──────────────────────────────────────────────────────
 function rAssess(){
-  if(_assessPage === 'progress') return rProgressPage();
   if(_assessPage === 'hub') return rAssessHub();
   if(_assessPage === 'ns') return rAssessForm(ASSESS_NS);
   if(_assessPage === 'gut') return rAssessForm(ASSESS_GUT);
@@ -4969,18 +4934,6 @@ function rAssess(){
   if(_assessPage === 'insights') return rAssessInsights();
   return rAssessHub();
 }
-function rProgressPage(){
-  try{setTimeout(maybeAutoWeekly,400);}catch(e){}
-  return `<div style="padding:0 0 20px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-      <button onclick="goPage('today')" style="background:none;border:none;color:var(--sub);font-size:22px;cursor:pointer;padding:0;line-height:1">←</button>
-      <div style="font-size:16px;font-weight:700">Progress &amp; Weekly Review</div>
-    </div>
-    ${rProgressCard()}
-    ${rAIWeeklyCard()}
-  </div>`;
-}
-
 // ── PROGRESS DASHBOARD v3 (adherence + trend + feature-availability windows) ──
 // Principles: score behaviors the user controls, as done÷planned ratios.
 // A category only counts days since the user FIRST used that feature, so new
@@ -5374,7 +5327,7 @@ function rAssessHub(){
         <div style="flex:1">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
             <div style="font-size:15px;font-weight:700">Order Labs</div>
-            <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:2px 7px;border-radius:10px;background:var(--surface2);color:var(--sub);border:1px solid var(--border)">Coming Soon</span>
+            <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:2px 7px;border-radius:10px;background:var(--surface2);color:var(--sub);border:1px solid var(--border)">Coming Soon</span>
           </div>
           <div style="font-size:12px;color:var(--sub);line-height:1.45">Order functional labs and book a 90-minute Results &amp; Review session with a Metastory Health practitioner. You can order multiple labs and combine them into a single session.</div>
         </div>
@@ -5466,7 +5419,7 @@ function rAssessForm(assess){
       h += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);padding:14px;margin-bottom:10px">
         <div style="font-size:13px;line-height:1.5;margin-bottom:10px">${q}</div>
         <div style="display:flex;gap:4px;flex-wrap:wrap">
-          ${[0,1,2,3,4,5,6,7,8,9,10].map(n=>`<button onclick="setAssessAnswer('${key}',${n})" style="width:36px;height:36px;border-radius:8px;border:1.5px solid ${val===n?'var(--green)':'var(--border)'};background:${val===n?'rgba(171,108,82,.25)':'var(--surface2)'};color:${val===n?'var(--green)':'var(--sub)'};font-size:13px;font-weight:${val===n?'700':'400'};cursor:pointer">${n}</button>`).join('')}
+          ${[0,1,2,3,4,5,6,7,8,9,10].map(n=>`<button onclick="setAssessAnswer('${key}',${n})" style="min-width:38px;height:44px;flex:1;border-radius:8px;border:1.5px solid ${val===n?'var(--green)':'var(--border)'};background:${val===n?'rgba(171,108,82,.25)':'var(--surface2)'};color:${val===n?'var(--green)':'var(--text)'};font-size:14px;font-weight:${val===n?'700':'500'};cursor:pointer">${n}</button>`).join('')}
         </div>
       </div>`;
     } else {
@@ -5688,13 +5641,13 @@ function rAssessInsights(){
   if(nsResult){
     const p = NS_PROFILES[nsResult.pattern];
     h += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);padding:11px;text-align:center">
-      <div style="font-size:9px;color:var(--sub);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Nervous System</div>
+      <div style="font-size:11px;color:var(--sub);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Nervous System</div>
       <div style="font-size:11px;font-weight:700;color:${p?p.color:'var(--green)'};line-height:1.3">${nsResult.pattern}</div>
-      <div style="font-size:9px;color:var(--sub);margin-top:3px">Total ${nsResult.total||'—'}/80</div>
+      <div style="font-size:11px;color:var(--sub);margin-top:3px">Total ${nsResult.total||'—'}/80</div>
     </div>`;
   } else {
     h += `<div style="background:var(--surface2);border:1px dashed var(--border);border-radius:var(--rs);padding:11px;text-align:center">
-      <div style="font-size:9px;color:var(--sub);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Nervous System</div>
+      <div style="font-size:11px;color:var(--sub);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Nervous System</div>
       <div style="font-size:11px;color:var(--sub)">Not taken</div>
       <button class="btn btn-g" style="margin-top:6px;padding:5px 9px;font-size:10px" onclick="startAssess('ns')">Take →</button>
     </div>`;
@@ -5702,26 +5655,26 @@ function rAssessInsights(){
   if(gutResult){
     const sevColor = gutResult.severity==='Low'?'var(--green)':gutResult.severity==='Moderate'?'var(--orange)':'var(--red)';
     h += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);padding:11px;text-align:center">
-      <div style="font-size:9px;color:var(--sub);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Gut Health</div>
+      <div style="font-size:11px;color:var(--sub);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Gut Health</div>
       <div style="font-size:17px;font-weight:800;color:${sevColor}">${gutResult.total||0}/140</div>
-      <div style="font-size:9px;color:${sevColor};font-weight:700;margin-top:1px">${gutResult.severity||'—'}</div>
+      <div style="font-size:11px;color:${sevColor};font-weight:700;margin-top:1px">${gutResult.severity||'—'}</div>
     </div>`;
   } else {
     h += `<div style="background:var(--surface2);border:1px dashed var(--border);border-radius:var(--rs);padding:11px;text-align:center">
-      <div style="font-size:9px;color:var(--sub);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Gut Health</div>
+      <div style="font-size:11px;color:var(--sub);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Gut Health</div>
       <div style="font-size:11px;color:var(--sub)">Not taken</div>
       <button class="btn btn-g" style="margin-top:6px;padding:5px 9px;font-size:10px" onclick="startAssess('gut')">Take →</button>
     </div>`;
   }
   if(aaResult){
     h += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);padding:11px;text-align:center">
-      <div style="font-size:9px;color:var(--sub);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Amino Acids</div>
+      <div style="font-size:11px;color:var(--sub);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Amino Acids</div>
       <div style="font-size:11px;font-weight:700;color:var(--blue);line-height:1.3">Low ${aaResult.primaryType||'—'}</div>
-      <div style="font-size:9px;color:var(--sub);margin-top:3px">Primary type</div>
+      <div style="font-size:11px;color:var(--sub);margin-top:3px">Primary type</div>
     </div>`;
   } else {
     h += `<div style="background:var(--surface2);border:1px dashed var(--border);border-radius:var(--rs);padding:11px;text-align:center">
-      <div style="font-size:9px;color:var(--sub);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Amino Acids</div>
+      <div style="font-size:11px;color:var(--sub);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Amino Acids</div>
       <div style="font-size:11px;color:var(--sub)">Not taken</div>
       <button class="btn btn-g" style="margin-top:6px;padding:5px 9px;font-size:10px" onclick="startAssess('aa')">Take →</button>
     </div>`;
@@ -6075,66 +6028,6 @@ function setFoodModalTab(tab){
 let _libArchived=false;
 const _ARCH_SVG='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v3H3zM5 10v9h14v-9M9 13h6"/></svg>';
 function rFoodModalLib(){var w=document.getElementById('food-lib-wrap');if(w){w.setAttribute('data-fulllib','1');try{w.innerHTML=rFoodLibHTML();}catch(e){}try{_libSwipeInit();}catch(e){}}return;}
-function _fmlOrigDead(){
-  const q=(document.getElementById('fml-q').value||'').toLowerCase().trim();
-  const all=getLib();
-  const archived=all.filter(it=>it.cat==='archived');
-  const active=all.filter(it=>it.cat!=='archived');
-  const el=document.getElementById('fml-list');
-  if(!el)return;
-  const source=_libArchived?archived:active;
-  const filtered=q?source.filter(it=>it.n.toLowerCase().includes(q)):source;
-  // header / archived-folder toggle
-  let head='';
-  if(_libArchived){
-    head=`<div style="display:flex;align-items:center;gap:8px;padding:2px 2px 10px">
-      <button onclick="_libArchived=false;rFoodModalLib()" style="background:none;border:none;color:var(--green);font-size:13px;font-weight:700;cursor:pointer;padding:0">‹ Back to library</button>
-      <span style="font-size:12px;color:var(--sub);margin-left:auto">Archived · ${archived.length}</span></div>`;
-  } else if(archived.length){
-    head=`<button onclick="_libArchived=true;rFoodModalLib()" style="display:flex;align-items:center;gap:9px;width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:10px 12px;margin-bottom:10px;cursor:pointer;color:var(--text);font-size:13px;font-weight:600">${_ARCH_SVG}Archived<span style="margin-left:auto;color:var(--sub)">${archived.length} ›</span></button>`;
-  }
-  if(!filtered.length){
-    el.innerHTML=head+`<div style="font-size:13px;color:var(--sub);padding:12px 0;text-align:center">${_libArchived?'No archived items':(q?'No items found':'Your library is empty')}</div>`;
-    return;
-  }
-  // ── ARCHIVED VIEW: list with Restore ──
-  if(_libArchived){
-    el.innerHTML=head+filtered.map(it=>{
-      const sid=it.id.replace(/['"]/g,'');
-      const macroLine=it.perGram?`P ${it.p}g · C ${it.c}g · F ${it.f}g · ${it.k} kcal /100g`:`P ${it.p}g · C ${it.c}g · F ${it.f}g · ${it.k} kcal`;
-      return`<div class="lib-pk-item" style="background:var(--surface2);border-radius:12px;margin-bottom:8px;padding:10px 12px">
-        <div class="lib-pk-em">${it.e||'🍽️'}</div>
-        <div style="flex:1;min-width:0"><div class="lib-pk-nm">${it.n}</div><div class="lib-pk-mc">${macroLine}</div></div>
-        <button onclick="fmlRestore('${sid}')" style="background:var(--green);color:#fff;border:none;border-radius:14px;font-size:12px;font-weight:700;padding:8px 13px;cursor:pointer;white-space:nowrap;flex:none">Restore</button>
-      </div>`;
-    }).join('');
-    return;
-  }
-  // ── ACTIVE VIEW: swipe-left to archive ──
-  el.innerHTML=head+filtered.map(it=>{
-    const sid=it.id.replace(/['"]/g,'');
-    const macroLine=it.perGram?`P ${it.p}g · C ${it.c}g · F ${it.f}g · ${it.k} kcal <span style="color:var(--sub)">/100g</span>`:`P ${it.p}g · C ${it.c}g · F ${it.f}g · ${it.k} kcal`;
-    return`<div class="lib-sw">
-      <div class="lib-sw-bg">${_ARCH_SVG}Archive</div>
-      <div class="lib-sw-fg" data-sid="${sid}" onclick="fmlExpand('${sid}')">
-        <div class="lib-pk-em">${it.e||'🍽️'}</div>
-        <div style="flex:1;min-width:0"><div class="lib-pk-nm">${it.n}</div><div class="lib-pk-mc">${macroLine}</div></div>
-        <button onclick="event.stopPropagation();fmlArchive('${sid}')" title="Archive" style="background:none;border:none;color:var(--sub);padding:4px 6px;cursor:pointer;flex:none">${_ARCH_SVG}</button>
-      </div>
-    </div>
-    <div id="fml-exp-${sid}" style="display:none;padding:8px 12px 12px;background:var(--surface2);border-radius:0 0 var(--rs) var(--rs);margin:-6px 0 8px">
-      ${it.perGram?`
-        <div style="font-size:12px;color:var(--sub);margin-bottom:7px">Per 100g — enter your portion weight below</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input class="fi" id="fml-g-${sid}" type="number" placeholder="grams" inputmode="decimal" style="flex:1;font-size:18px;text-align:center;padding:10px" oninput="fmlGramPreview('${sid}')">
-          <button class="btn btn-g btn-sm" style="height:44px;padding:0 18px" onclick="fmlLogGrams('${sid}')">Log It</button>
-        </div>
-        <div id="fml-gp-${sid}" style="font-size:13px;color:var(--sub);margin-top:7px;min-height:18px;text-align:center"></div>`
-      :`<button class="btn btn-g btn-f btn-sm" onclick="fmlLogDirect('${sid}')">Log It</button>`}
-    </div>`;
-  }).join('');
-  _fmlSwipeInit();
-}
 function fmlArchive(sid){
   const lib=getLib();const it=lib.find(x=>x.id===sid||x.id.replace(/['"]/g,'')===sid);if(!it)return;
   if(it.cat!=='archived'){ it.acat=it.cat||'custom'; it.cat='archived'; }
@@ -6210,13 +6103,6 @@ function getQMItem(i){const m=QM[i];const ing=_getQMIng(m);const t=_calcIngTot(i
 
 // ── QM Ingredient Editor ──────────────────────────────────────────────────
 let _ingEditIdx=null;
-function openIngEditor(i){
-  _ingEditIdx=i;
-  const m=QM[i];
-  document.getElementById('ing-title').textContent=m.e+' '+m.n;
-  _renderIngRows(_getQMIng(m));
-  document.getElementById('ing-ov').classList.add('open');
-}
 function _ingRowHTML(r,i){
   return `<div class="ing-row" style="display:grid;grid-template-columns:1fr 36px 36px 36px 44px 24px;gap:4px;align-items:center;background:var(--surface2);border-radius:var(--rs);padding:7px 10px;margin-bottom:6px">
     <input type="text" class="fi" value="${(r.n||'').replace(/"/g,'&quot;')}" placeholder="Name" style="padding:6px 8px;font-size:16px;min-width:0" oninput="updateIngTotals()">
@@ -6411,52 +6297,6 @@ function getSuggestedFoods(){
   }).filter(Boolean);
 
   return scored.sort((a,b)=>b.score-a.score).slice(0,5);
-}
-
-function rSuggestPanel(){
-  const m=getMacros(),t=getTgt();
-  const remP=Math.max(0,t.p-m.p),remC=Math.max(0,t.c-m.c),remF=Math.max(0,t.f-m.f),remK=Math.max(0,t.k-m.k);
-  const suggestions=getSuggestedFoods();
-  // Summary line describing the biggest gaps
-  const gaps=[];
-  if(remP>5)gaps.push(`${Math.round(remP)}g protein`);
-  if(remC>5)gaps.push(`${Math.round(remC)}g carbs`);
-  if(remF>5)gaps.push(`${Math.round(remF)}g fat`);
-  const gapStr=gaps.length?gaps.join(', '):null;
-
-  let h=`<div class="suggest-panel">`;
-  if(gapStr){
-    h+=`<div class="suggest-header">You still need: <span style="color:var(--text)">${gapStr}</span></div>`;
-  }else if(remK>50){
-    h+=`<div class="suggest-header">On track — ${Math.round(remK)} kcal remaining</div>`;
-  }else{
-    h+=`<div class="suggest-header" style="color:var(--green)">🎉 You've hit your targets for today!</div>`;
-  }
-  if(!suggestions.length){
-    h+=`<div style="font-size:13px;color:var(--sub);padding:12px 0">Add foods to your library to get personalised suggestions.</div>`;
-  }else{
-    suggestions.forEach(item=>{
-      const safeId=item.id.replace(/'/g,"\\'");
-      h+=`<div class="suggest-card">
-        <div class="suggest-card-top">
-          <div class="suggest-card-em">${item.e||'🍽️'}</div>
-          <div class="suggest-card-info">
-            <div class="suggest-card-name">${item.n}</div>
-            <div class="suggest-card-why">↑ ${item.why}</div>
-          </div>
-        </div>
-        <div class="suggest-card-macros">
-          <span style="color:var(--green)">${item.p}g P</span>
-          <span style="color:var(--orange)">${item.c}g C</span>
-          <span style="color:var(--blue)">${item.f}g F</span>
-          <span style="color:var(--sub)">${item.k} kcal</span>
-        </div>
-        <button class="suggest-log-btn" onclick="logSuggestion('${safeId}')">Log It</button>
-      </div>`;
-    });
-  }
-  h+=`</div>`;
-  return h;
 }
 
 function logSuggestion(id){
@@ -6922,10 +6762,6 @@ function autoCategorizeLib(){
 // ── Frequency tracking ────────────────────────────────────────
 function _getFreq(){try{return JSON.parse(localStorage.getItem('_qmFreq')||'{}')}catch(e){return{}}}
 function _incFreq(name){const f=_getFreq();f[name]=(f[name]||0)+1;localStorage.setItem('_qmFreq',JSON.stringify(f))}
-function _topItems(n){
-  const f=_getFreq();
-  return QM.map((m,i)=>({m,i,cnt:f[m.n]||0})).filter(x=>x.cnt>0).sort((a,b)=>b.cnt-a.cnt).slice(0,n);
-}
 function renderFavs(){try{var _fr=document.getElementById('fav-row');if(_fr){_fr.style.display='none';var _qa=_fr.previousElementSibling;if(_qa&&/quick add/i.test(_qa.textContent||''))_qa.style.display='none';}}catch(_e){}try{_renderSuggestStrip();}catch(_e){}return;}
 function _mealSuggest(maxN){
   try{
@@ -6995,49 +6831,6 @@ function _renderSuggestStrip(){
     strip.innerHTML="<div style=\"font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--sub,#888);margin:2px 0 8px\">✨ "+_suggestLabel()+"</div><div style=\"display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px\">"+cards+"</div>";
   }catch(e){}
 }
-function _renderSuggestRow(){try{var _fr=document.getElementById('fav-row');var _qa=_fr?_fr.previousElementSibling:null;if(_qa&&/quick add/i.test(_qa.textContent||''))_qa.style.display='none';}catch(_e){}
-  try{
-    var list=document.getElementById('fav-list'); if(!list) return;
-    var items=_mealSuggest(8); if(!items.length) return;
-    list.innerHTML=items.map(function(it){
-      var sid=String(it.id).replace(/'/g,"\\'");
-      var em=it.e||'🍽'; var nm=(it.n||'').replace(/</g,'&lt;');
-      return "<div class='qp' style='flex-shrink:0' onclick=\"quickLibAdd('"+sid+"')\">"+em+" "+nm+"</div>";
-    }).join('');
-    var row=document.getElementById('fav-row');
-    if(row){ row.style.display=''; var lbl=row.children[0]; if(lbl && lbl.id!=='fav-list'){ lbl.textContent='✨ '+_suggestLabel(); } }
-    var old=document.getElementById('quick-suggest'); if(old) old.remove();
-  }catch(e){}
-}
-function _rssDead(){try{var grid=document.getElementById('quick-grid');if(!grid)return;var strip=document.getElementById('quick-suggest');if(!strip){strip=document.createElement('div');strip.id='quick-suggest';strip.style.marginBottom='10px';grid.parentNode.insertBefore(strip,grid);}var items=_mealSuggest(8);if(!items.length){strip.style.display='none';strip.innerHTML='';return;}strip.style.display='block';var chips=items.map(function(it){var sid=String(it.id).replace(/'/g,"\\'");var em=it.e||'🍽';var nm=(it.n||'').replace(/</g,'&lt;');return '<button onclick="quickLibAdd(\''+sid+'\')" style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:3px;background:var(--surface2,#fff);border:1px solid var(--border,#ddd);border-radius:12px;padding:8px 10px;min-width:66px;max-width:98px;cursor:pointer;font-family:inherit"><span style="font-size:20px">'+em+'</span><span style="font-size:10px;line-height:1.15;color:var(--text,#333);text-align:center">'+nm+'</span></button>';}).join('');strip.innerHTML='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--sub,#888);margin:2px 0 7px">'+_suggestLabel()+'</div><div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">'+chips+'</div>';}catch(e){}}
-function _favsOrig(){
-  // Show recently logged items from the last 14 days
-  const row=document.getElementById('fav-row');
-  if(!row)return;
-  const seen=new Map();
-  for(let d=0;d<14;d++){
-    const dt=new Date();dt.setDate(dt.getDate()-d);
-    const key=dt.toISOString().slice(0,10);
-    let entries;try{entries=JSON.parse(lsGet('fl_'+key,'[]'));}catch(e){continue;}
-    entries.forEach(e=>{
-      const n=(e.name||e.n||'').trim();
-      if(n&&!seen.has(n))seen.set(n,e);
-    });
-    if(seen.size>=8)break;
-  }
-  if(!seen.size){row.style.display='none';return;}
-  row.style.display='block';
-  const lib=getLib();
-  document.getElementById('fav-list').innerHTML=[...seen.entries()].slice(0,8).map(([n,e])=>{
-    const libItem=lib.find(x=>x.n===n);
-    const em=libItem?libItem.e:(e.emoji||e.e||'🍽️');
-    if(libItem){
-      const sid=libItem.id.replace(/['"]/g,'');
-      return`<div class="qp" style="flex-shrink:0" onclick="quickLibAdd('${sid}')">${em} ${n}</div>`;
-    }
-    return`<div class="qp" style="flex-shrink:0" onclick="quickReLog(${JSON.stringify(JSON.stringify(e))})">${em} ${n}</div>`;
-  }).join('');
-}
 function renderQuickGrid(cat){
   const lib=getLib();
   const items=lib.filter(it=>it.cat!=='archived'&&(it.cat===cat||(cat==='custom'&&(it.cat==='custom'||it.source==='custom'))));
@@ -7077,18 +6870,6 @@ function _logFoodPrompt2(id){ try{
   _flogRender();
   return;
 }catch(e){console.error('logFood sheet',e);} }
-function _logFoodPrompt2_DEAD(id){ try{
-  var it=getLib().find(function(x){return x.id===id;}); if(!it) return;
-  var ov=document.getElementById('wlog-ov'); if(ov) ov.remove();
-  ov=document.createElement('div'); ov.id='wlog-ov';
-  ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center';
-  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
-  var em=it.e||'🍽'; var sid=String(id).replace(/'/g,"\\'");
-  ov.innerHTML="<div style=\"background:var(--surface,#fff);width:100%;max-width:480px;border-radius:18px 18px 0 0;padding:18px 18px 26px;font-family:inherit\"><div style=\"font-size:16px;font-weight:700;color:var(--text,#222);margin-bottom:2px\">"+em+" "+(it.n||'').replace(/</g,'&lt;')+"</div><div style=\"font-size:12px;color:var(--sub,#888);margin-bottom:14px\">Saved: P "+it.p+"g · C "+it.c+"g · F "+it.f+"g · "+it.k+" kcal</div><button onclick=\"document.getElementById('wlog-ov').remove();_quickLibAddOrig('"+sid+"')\" style=\"width:100%;padding:14px;border-radius:10px;border:none;background:var(--green,#b7baa7);color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:14px\">Log as saved</button><div style=\"display:flex;align-items:center;gap:10px;margin-bottom:12px\"><div style=\"flex:1;height:1px;background:var(--border,#ddd)\"></div><div style=\"font-size:11px;color:var(--sub,#999);text-transform:uppercase;letter-spacing:.05em\">or by weight</div><div style=\"flex:1;height:1px;background:var(--border,#ddd)\"></div></div><div style=\"font-size:11px;color:var(--sub,#888);margin-bottom:6px\">Enter grams (scaled from saved as per 100g)</div><div style=\"display:flex;gap:10px\"><input id=\"wlog-g\" type=\"number\" inputmode=\"decimal\" placeholder=\"grams\" style=\"flex:1;font-size:18px;padding:11px;border:1px solid var(--border,#ccc);border-radius:10px;font-family:inherit;box-sizing:border-box\"><button onclick=\"_logFoodByWeight('"+sid+"')\" style=\"flex:0 0 auto;padding:0 18px;border-radius:10px;border:none;background:var(--blue,#424c57);color:#fff;font-size:14px;font-weight:700;cursor:pointer\">Log</button></div><div id=\"wlog-prev\" style=\"font-size:13px;color:var(--text,#222);margin:10px 0 0;min-height:16px\"></div><button onclick=\"document.getElementById('wlog-ov').remove()\" style=\"width:100%;padding:11px;margin-top:14px;border-radius:10px;border:1px solid var(--border,#ccc);background:transparent;color:var(--sub,#777);font-size:13px;font-weight:600;cursor:pointer\">Cancel</button></div>";
-  document.body.appendChild(ov);
-  var inp=document.getElementById('wlog-g'); inp.oninput=function(){ _wlogPreview(it); }; inp.onkeydown=function(e){ if(e.key==='Enter') _logFoodByWeight(id); };
-  setTimeout(function(){ inp.focus(); },50);
-}catch(e){} }
 // ── Unified food-log sheet: log by servings (×N), weight, or pieces ──────────
 // Amounts scale against the item's reference serving (macros p/c/f/k are "per
 // serving"; servG = grams per serving, servU = pieces per serving). perGram
@@ -7183,9 +6964,9 @@ function _flogRender(){
     +'<div id="flog-refbox" style="display:none;margin-top:9px;padding:13px;background:var(--surface2,#f4f4f0);border-radius:10px">'
     +'<div style="font-size:11px;color:var(--sub,#888);margin-bottom:9px;line-height:1.5">Tell the app what one saved serving equals — then you can log this item by weight or by piece. Leave a field blank if it doesn\'t apply.</div>'
     +'<div style="display:flex;gap:9px;margin-bottom:9px">'
-    +'<div style="flex:1"><label style="font-size:10px;color:var(--sub,#888);font-weight:600;display:block;margin-bottom:3px">Grams / serving</label><input id="flog-ref-g" type="number" inputmode="decimal" value="'+(it.servG||'')+'" placeholder="e.g. 28" style="width:100%;font-size:15px;padding:8px;border:1px solid var(--border,#ccc);border-radius:8px;box-sizing:border-box"></div>'
-    +'<div style="flex:1"><label style="font-size:10px;color:var(--sub,#888);font-weight:600;display:block;margin-bottom:3px">Pieces / serving</label><input id="flog-ref-u" type="number" inputmode="decimal" value="'+(it.servU||'')+'" placeholder="e.g. 12" style="width:100%;font-size:15px;padding:8px;border:1px solid var(--border,#ccc);border-radius:8px;box-sizing:border-box"></div></div>'
-    +'<div style="margin-bottom:10px"><label style="font-size:10px;color:var(--sub,#888);font-weight:600;display:block;margin-bottom:3px">Piece name (optional)</label><input id="flog-ref-name" value="'+((it.unitName||'').replace(/"/g,'&quot;'))+'" placeholder="e.g. chip" style="width:100%;font-size:15px;padding:8px;border:1px solid var(--border,#ccc);border-radius:8px;box-sizing:border-box"></div>'
+    +'<div style="flex:1"><label style="font-size:10px;color:var(--sub,#888);font-weight:600;display:block;margin-bottom:3px">Grams / serving</label><input id="flog-ref-g" type="number" inputmode="decimal" value="'+(it.servG||'')+'" placeholder="e.g. 28" style="width:100%;font-size:16px;padding:8px;border:1px solid var(--border,#ccc);border-radius:8px;box-sizing:border-box"></div>'
+    +'<div style="flex:1"><label style="font-size:10px;color:var(--sub,#888);font-weight:600;display:block;margin-bottom:3px">Pieces / serving</label><input id="flog-ref-u" type="number" inputmode="decimal" value="'+(it.servU||'')+'" placeholder="e.g. 12" style="width:100%;font-size:16px;padding:8px;border:1px solid var(--border,#ccc);border-radius:8px;box-sizing:border-box"></div></div>'
+    +'<div style="margin-bottom:10px"><label style="font-size:10px;color:var(--sub,#888);font-weight:600;display:block;margin-bottom:3px">Piece name (optional)</label><input id="flog-ref-name" value="'+((it.unitName||'').replace(/"/g,'&quot;'))+'" placeholder="e.g. chip" style="width:100%;font-size:16px;padding:8px;border:1px solid var(--border,#ccc);border-radius:8px;box-sizing:border-box"></div>'
     +'<button onclick="_flogSaveRef()" style="width:100%;padding:10px;border:none;border-radius:8px;background:var(--blue,#424c57);color:#fff;font-size:13px;font-weight:700;cursor:pointer">Save serving size</button></div></div>';
   ov.innerHTML='<div style="background:var(--surface,#fff);width:100%;max-width:480px;border-radius:18px 18px 0 0;padding:18px 18px 26px;font-family:inherit;max-height:90vh;overflow-y:auto">'
     +'<div style="font-size:16px;font-weight:700;color:var(--text,#222)">'+em+' '+(it.n||'').replace(/</g,'&lt;')+'</div>'
@@ -7199,19 +6980,6 @@ function _flogRender(){
     +'</div>';
   setTimeout(function(){ var i=document.getElementById('flog-amt'); if(i){ i.focus(); if(_flog.mode==='serv'){ try{i.select();}catch(e){} } } _flogPreview(); },60);
 }
-function _logWeightPromptDead(id){ try{
-  var it=getLib().find(function(x){return x.id===id;}); if(!it) return;
-  var ov=document.getElementById('wlog-ov'); if(ov) ov.remove();
-  ov=document.createElement('div'); ov.id='wlog-ov';
-  ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center';
-  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
-  var em=it.e||'🍽';
-  ov.innerHTML="<div style=\"background:var(--surface,#fff);width:100%;max-width:480px;border-radius:18px 18px 0 0;padding:18px 18px 26px;font-family:inherit\"><div style=\"font-size:16px;font-weight:700;color:var(--text,#222);margin-bottom:2px\">"+em+" "+(it.n||'').replace(/</g,'&lt;')+"</div><div style=\"font-size:12px;color:var(--sub,#888);margin-bottom:14px\">Per 100g: P "+it.p+"g · C "+it.c+"g · F "+it.f+"g · "+it.k+" kcal</div><label style=\"font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--sub,#888)\">Weight (grams)</label><input id=\"wlog-g\" type=\"number\" inputmode=\"decimal\" value=\"100\" style=\"width:100%;font-size:18px;padding:11px;border:1px solid var(--border,#ccc);border-radius:10px;margin:6px 0 10px;font-family:inherit;box-sizing:border-box\"><div id=\"wlog-prev\" style=\"font-size:14px;color:var(--text,#222);margin-bottom:16px\"></div><div style=\"display:flex;gap:10px\"><button onclick=\"document.getElementById('wlog-ov').remove()\" style=\"flex:1;padding:13px;border-radius:10px;border:1px solid var(--border,#ccc);background:transparent;color:var(--sub,#777);font-size:14px;font-weight:600;cursor:pointer\">Cancel</button><button onclick=\"_logFoodByWeight('"+String(id).replace(/'/g,"\\'")+"')\" style=\"flex:2;padding:13px;border-radius:10px;border:none;background:var(--green,#b7baa7);color:#fff;font-size:14px;font-weight:700;cursor:pointer\">Log it</button></div></div>";
-  document.body.appendChild(ov);
-  var inp=document.getElementById('wlog-g'); inp.oninput=function(){ _wlogPreview(it); }; inp.onkeydown=function(e){ if(e.key==='Enter') _logFoodByWeight(id); };
-  setTimeout(function(){ inp.focus(); inp.select(); },50);
-  _wlogPreview(it);
-}catch(e){} }
 function _quickLibAddOrig(sid){
   const lib=getLib();
   const it=lib.find(x=>x.id===sid||x.id.replace(/['"]/g,'')===sid);
@@ -7264,36 +7032,6 @@ function setQCat(cat,btn){
 
 // ── Quick add ─────────────────────────────────────────────────
 let _gramItem=null;
-function quickAdd(i){
-  const m=getQMItem(i);
-  _incFreq(QM[i].n);
-  if(m.g){
-    _gramItem=m;
-    document.getElementById('gram-title').textContent=m.e+' '+m.n;
-    document.getElementById('gram-input').value='';
-    document.getElementById('gram-preview').textContent='';
-    document.getElementById('gram-ov').classList.add('open');
-    setTimeout(()=>document.getElementById('gram-input').focus(),300);
-    document.getElementById('gram-input').oninput=function(){
-      const grams=parseFloat(this.value);
-      if(!grams||grams<=0){document.getElementById('gram-preview').textContent='';return;}
-      const s=grams/100;
-      document.getElementById('gram-preview').textContent=
-        `${Math.round(m.k*s)} kcal · P ${Math.round(m.p*s)}g · C ${Math.round(m.c*s)}g · F ${Math.round(m.f*s)}g`;
-    };
-    return;
-  }
-  // One-tap log — no form needed
-  const log=getLog();
-  log.push({name:m.n,emoji:m.e,p:m.p,c:m.c,f:m.f,k:m.k,ts:Date.now(),t:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})});
-  putLog(log);
-  // Save/update in personal library
-  const _ing=_getQMIng(QM[i]);
-  saveToLib({n:m.n,e:m.e,cat:m.cat,p:m.p,c:m.c,f:m.f,k:m.k,ing:_ing,source:'qm'});
-  closeFood();rFood();
-  if(curPage==='today')rToday();
-  setTimeout(openMealCheckin,350);
-}
 function closeGram(){document.getElementById('gram-ov').classList.remove('open');_gramItem=null;}
 function logGrams(){
   const grams=parseFloat(document.getElementById('gram-input').value);
@@ -7311,26 +7049,6 @@ function logGrams(){
   closeGram();closeFood();rFood();
   if(curPage==='today')rToday();
   setTimeout(openMealCheckin,350);
-}
-
-function onPhoto(input){
-  const file=input.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=function(e){
-    const img=new Image();
-    img.onload=function(){
-      const canvas=document.createElement('canvas');
-      const max=400;let w=img.width,h=img.height;
-      if(w>h){if(w>max){h=h*max/w;w=max}}else{if(h>max){w=w*max/h;h=max}}
-      canvas.width=w;canvas.height=h;
-      canvas.getContext('2d').drawImage(img,0,0,w,h);
-      curPhoto=canvas.toDataURL('image/jpeg',.7);
-      const prev=document.getElementById('photo-preview');
-      prev.src=curPhoto;prev.style.display='block';
-    };
-    img.src=e.target.result;
-  };
-  reader.readAsDataURL(file);
 }
 
 // ── AI PHOTO SCAN (multi-photo, Gemini free tier) ────────────────────────────
@@ -7369,29 +7087,6 @@ function resizeToB64(file,maxPx,quality){
 // so it fits comfortably in the food log without blowing past the 5 MB
 // localStorage ceiling. Returns a Promise<string|null>. The list UI only shows
 // a 50x50 thumb (`.fth img`), so high resolution here is wasted bytes.
-function thumbForLog(srcDataUrl,maxPx,quality){
-  return new Promise(resolve=>{
-    if(!srcDataUrl){resolve(null);return;}
-    try{
-      const img=new Image();
-      img.onload=()=>{
-        try{
-          const m=maxPx||80,q=quality||.6;
-          const canvas=document.createElement('canvas');
-          let w=img.width,h=img.height;
-          if(w>h){if(w>m){h=Math.round(h*m/w);w=m}}
-          else{if(h>m){w=Math.round(w*m/h);h=m}}
-          canvas.width=w;canvas.height=h;
-          canvas.getContext('2d').drawImage(img,0,0,w,h);
-          resolve(canvas.toDataURL('image/jpeg',q));
-        }catch(e){resolve(null);}
-      };
-      img.onerror=()=>resolve(null);
-      img.src=srcDataUrl;
-    }catch(e){resolve(null);}
-  });
-}
-
 function renderAIPhotoStrip(){
   const strip=document.getElementById('ai-photo-strip');
   if(!_aiPhotos.length){strip.style.display='none';return;}
@@ -8582,14 +8277,6 @@ document.addEventListener('click', function(e){
 
 // ── SUPPLEMENT TRACKER ───────────────────────────────────────────────────────
 function getSupps(){try{return JSON.parse(lsGet('_supps','[]'))||[];}catch{return[];}}
-function setSupps(a){
-  // Cloud-first: write the real list straight to the user's account so it persists
-  // immediately, even if this device's localStorage is full or evicted.
-  cloudWriteSupps(a);
-  if(!lsSet('_supps',JSON.stringify(a))){
-    try{showToast('Saved to your account (this device\'s storage is full)');}catch(e){}
-  }
-}
 // Writes the supplement list directly to Firestore using the explicit array,
 // so a full/evicted local store can never push an empty list over a good cloud copy.
 function cloudWriteSupps(a){
@@ -8623,10 +8310,6 @@ function toggleSuppTaken(suppId, timing){
 }
 // Persisted across sessions so the user's expanded/collapsed choice sticks.
 function isRoutineCollapsed(){return lsGet('_routineCollapsed','0')==='1';}
-function toggleRoutineCollapsed(){
-  lsSet('_routineCollapsed',isRoutineCollapsed()?'0':'1');
-  rToday();
-}
 function isSuppCollapsed(){return lsGet('_suppCollapsed','1')==='1';}
 function toggleSuppCollapsed(){
   lsSet('_suppCollapsed',isSuppCollapsed()?'0':'1');
@@ -10389,26 +10072,6 @@ Make the routines specific and personal — reference their goal, body type, die
   renderWiz();
 }
 
-function wizFallbackPlan(p){
-  return{
-    targets:wizComputeTargets(p),
-    workouts:{},
-    foodSuggestions:[
-      {n:'Grilled Chicken Breast',e:'🍗',cat:'lunch',p:31,c:0,f:4,k:165},
-      {n:'Greek Yogurt',e:'🥛',cat:'breakfast',p:17,c:6,f:0,k:100},
-      {n:'Eggs (2)',e:'🥚',cat:'breakfast',p:12,c:0,f:10,k:140},
-      {n:'Rice (1 cup cooked)',e:'🍚',cat:'lunch',p:4,c:45,f:0,k:205},
-      {n:'Almonds (1oz)',e:'🥜',cat:'snacks',p:6,c:6,f:14,k:170},
-      {n:'Banana',e:'🍌',cat:'snacks',p:1,c:27,f:0,k:105},
-    ],
-    recoverySchedule:[
-      {t:'Post-workout',a:'Protein shake + fruit',n:'Replenish glycogen and start muscle repair'},
-      {t:'8pm',a:'Light stretching 10 min',n:'Reduce soreness and improve flexibility'},
-      {t:'Before bed',a:'Casein protein or Greek yogurt',n:'Overnight muscle protein synthesis'},
-    ]
-  };
-}
-
 function wizApply(){
   const plan=_wiz.profile._generatedPlan||{};
   // Save custom workouts
@@ -10538,12 +10201,6 @@ function getMealTotals(){
   return _mealComps.reduce((a,c)=>({p:a.p+(c.pTotal||0),c:a.c+(c.cTotal||0),f:a.f+(c.fTotal||0),k:a.k+(c.kTotal||0)}),{p:0,c:0,f:0,k:0});
 }
 
-function addComp(comp){
-  const g=+(comp.grams||0),s=g/100;
-  _mealComps.push({...comp,pTotal:+(comp.p100||0)*s,cTotal:+(comp.c100||0)*s,fTotal:+(comp.f100||0)*s,kTotal:+(comp.k100||0)*s});
-  rCompList();
-}
-
 function addBlankComp(){
   _mealComps.push({name:'Tap name to link food',emoji:'🍽️',grams:100,p100:0,c100:0,f100:0,k100:0,pTotal:0,cTotal:0,fTotal:0,kTotal:0,libId:null,libName:null});
   rCompList();
@@ -10623,11 +10280,6 @@ async function logMealBuilder(){
 }
 
 // ── Gemini Key Management ─────────────────────────────────────────────────
-function openKeyModal(){
-  document.getElementById('key-input').value=lsGet('_geminiKey','')||'';
-  document.getElementById('key-ov').classList.add('open');
-  setTimeout(()=>document.getElementById('key-input').focus(),300);
-}
 function closeKeyModal(){document.getElementById('key-ov').classList.remove('open');}
 function saveGeminiKey(){
   const k=(document.getElementById('key-input').value||'').trim();
@@ -10648,10 +10300,6 @@ let _recipePhotoData = null;
 let _recipeFileData = null;
 let _recipeFileType = null;
 
-function openRecipeImport(){
-  resetRecipeImport();
-  document.getElementById('recipe-ov').classList.add('open');
-}
 function closeRecipeImport(){
   document.getElementById('recipe-ov').classList.remove('open');
 }
@@ -11239,7 +10887,7 @@ function _ckCompactHTML(){
     const s=PV_STATES[id];const sel=ss===id;
     dots+=`<div onclick="pvAddCheckin('${id}')" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;padding:2px 0">
       <span style="width:30px;height:30px;border-radius:50%;background:${s.color};opacity:${sel?'1':'.38'};border:2.5px solid ${sel?'var(--text)':'transparent'};box-sizing:border-box"></span>
-      <span style="font-size:9px;font-weight:${sel?'700':'500'};color:${sel?'var(--text)':'var(--sub)'};text-align:center">${s.label}</span></div>`;
+      <span style="font-size:11px;font-weight:${sel?'700':'500'};color:${sel?'var(--text)':'var(--sub)'};text-align:center">${s.label}</span></div>`;
   });
   const sub=(ss&&PV_STATES[ss])
     ?`<div style="font-size:11.5px;color:var(--sub);margin-top:7px">${PV_STATES[ss].plain}${n>1?` &middot; ${n} check-ins today`:''}</div>`
@@ -12396,25 +12044,6 @@ function startPrayerTimer(sec){
     if(el)el.textContent=fmt(left);
   },1000);
 }
-async function _fetchPrayerReading(slot,mode){
-  const set=html=>{const el=document.getElementById('pr-scripture');if(el)el.innerHTML=html;};
-  set(`<div style="font-size:16px;color:rgba(255,255,255,.8)">Finding today's reading…</div>`);
-  try{
-    const prompt=mode==='christian'
-      ? `Pick today's Scripture readings for a Christian ${slot} prayer time. Return ONLY JSON, no markdown: {"readings":["<reference>","<reference>"]} — exactly two references, one a Psalm and one a New Testament passage, fitting for ${slot}. Use standard references like "Psalm 27" or "John 15:1-11".`
-      : `Write a short original reflective reading (2-4 sentences) for a ${slot} moment of stillness — calming, meaning-centered, non-religious, adaptable to any belief or none. No quotes from real authors, no religious content. Return ONLY JSON, no markdown: {"reading":"..."}`;
-    const res=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.6,maxOutputTokens:500,thinkingConfig:{thinkingBudget:0}}})});
-    const data=await res.json();
-    const raw=data?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
-    const jm=raw.match(/\{[\s\S]*\}/); const out=jm?JSON.parse(jm[0]):null;
-    if(mode==='christian'&&out&&Array.isArray(out.readings)&&out.readings.length){
-      set(out.readings.map(r=>`<div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:15px 16px;margin-bottom:11px;font-size:19px;font-weight:600"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M2 4h7a3 3 0 0 1 3 3v13a2.5 2.5 0 0 0-2.5-2.5H2zM22 4h-7a3 3 0 0 0-3 3v13a2.5 2.5 0 0 1 2.5-2.5H22z"/></svg>${_esc(r)}</div>`).join(''));
-    } else if(mode!=='christian'&&out&&out.reading){
-      set(`<div style="font-size:19px;line-height:1.65;white-space:pre-line;text-shadow:0 1px 10px rgba(0,0,0,.3)">${_esc(out.reading)}</div>`);
-    } else { set(`<div style="font-size:16px;color:rgba(255,255,255,.85)">Sit with a passage that's meaningful to you today.</div>`); }
-  }catch(e){ set(`<div style="font-size:16px;color:rgba(255,255,255,.85)">Couldn't load today's reading — sit with a passage that's meaningful to you today.</div>`); }
-}
-
 /* ════════════ IMMERSIVE PRACTICE PLAYER ════════════ */
 // Full-screen, swipeable, one step at a time — the exact feel of the Rhythm of Rest
 // guided prayer, in the regulation-green palette (#b7baa7). Launched from the Stress
@@ -12605,21 +12234,13 @@ function completePractice(){_practiceMarkDone(_pcId);closePractice();showToast('
 /* ════════════ SUPPS TAB ════════════ */
 function _suppPlan(){try{return JSON.parse(lsGet('_supps_plan','[]'))||[];}catch(e){return [];}}
 function cloudWriteSuppsPlan(p){ if(!fbUser || !fbDb) return; try{ fbDb.collection('users').doc(fbUser.uid).set({ settings:{ suppsPlan:p }, updated: Date.now() }, {merge:true}).catch(()=>{}); }catch(e){} }
-function _suppSave(p){try{cloudWriteSuppsPlan(p);}catch(e){}lsSet('_supps_plan',JSON.stringify(p));try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}}
+function _suppSave(p){try{cloudWriteSuppsPlan(p);}catch(e){}lsSet('_supps_plan',JSON.stringify(p));_touch('_supps_plan');try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}}
 function _suppTaken(){try{return JSON.parse(lsGet('supptk_'+viewDate,'[]'))||[];}catch(e){return [];}}
 function toggleSupp(id){let t=_suppTaken();t=t.includes(id)?t.filter(x=>x!==id):t.concat(id);lsSet('supptk_'+viewDate,JSON.stringify(t));rSupps();}
 function toggleAllSlot(slot){var plan=_suppPlan();var t=_suppTaken();var ids=plan.filter(function(s){return s.slot===slot;}).map(function(s){return s.id;});var allOn=ids.length>0&&ids.every(function(id){return t.includes(id);});if(allOn){t=t.filter(function(id){return ids.indexOf(id)<0;});}else{ids.forEach(function(id){if(!t.includes(id))t.push(id);});}lsSet('supptk_'+viewDate,JSON.stringify(t));showToast(allOn?('Cleared '+slot+' supplements'):('All '+slot+' supplements logged ✅'));rSupps();}
-function takeAllSlot(slot){const plan=_suppPlan();let t=_suppTaken();const ids=plan.filter(s=>s.slot===slot).map(s=>s.id);ids.forEach(id=>{if(!t.includes(id))t.push(id);});lsSet('supptk_'+viewDate,JSON.stringify(t));showToast('All '+slot+' supplements logged ✅');rSupps();}
 function _titr(){try{return JSON.parse(lsGet('_supp_titr','null'));}catch(e){return null;}}
 function titrFine(){const t=_titr();if(!t)return;t.day=(t.day||1)+1;lsSet('_supp_titr',JSON.stringify(t));showToast('Logged — steady as you go');rSupps();}
 function titrOff(){const t=_titr();if(!t)return;t.offCount=(t.offCount||0)+1;t.status='hold';lsSet('_supp_titr',JSON.stringify(t));showToast(t.offCount>=2?'Two off days — consider pausing this one':'Held at last good dose');rSupps();}
-function addSupp(){
-  const name=prompt('Supplement name (e.g. Magnesium glycinate)');if(!name)return;
-  const dose=prompt('Dose / amount (e.g. 2 caps)','1 cap')||'';
-  const slot=(prompt('When? type morning, midday, or evening','morning')||'morning').toLowerCase();
-  const p=_suppPlan();p.push({id:'s'+Date.now(),name,dose,slot:['morning','midday','evening'].includes(slot)?slot:'morning'});
-  _suppSave(p);rSupps();
-}
 function startTitr(id){
   const p=_suppPlan();const s=p.find(x=>x.id===id);if(!s)return;
   lsSet('_supp_titr',JSON.stringify({id,name:s.name,dose:s.dose,day:1,status:'titrating',offCount:0}));
@@ -12845,11 +12466,6 @@ function _exPose(p){
   (rig.bells||[]).forEach(bl=>{const x=P(bl.x),y=P(bl.y);out+=`<circle class="bell" cx="${x[0]}" cy="${y[0]}" r="${bl.r||5}">${an('cx',x)}${an('cy',y)}</circle>`;});
   return out;
 }
-function _exAnim(name){
-  const p=_exPattern(name);
-  return `<div class="ex-anim" data-p="${p}" aria-hidden="true"><svg viewBox="0 0 120 120" class="ex-fig">${_exPose(p)}</svg></div>`;
-}
-
 /* ════════════ EXERCISE hero (mockup) ════════════ */
 function _exReadiness(){
   let hrs=0;try{const r=JSON.parse(lsGet('rest_'+dk(),'null'))||JSON.parse(lsGet('rest_'+_yday(),'null'));if(r)hrs=r.h||0;}catch(e){}
@@ -12960,8 +12576,6 @@ function pvAddCheckin(s){
   _repaintRegulation();
 }
 // Back-compat alias (older code/UI paths may still call this).
-function setStressState(s){pvAddCheckin(s);}
-
 // Aggregate counts across the last N days → sorted [{id,n}], plus dominant.
 function pvCounts(days){
   const counts={};const today=new Date();
@@ -12975,14 +12589,6 @@ function pvCounts(days){
   const arr=Object.entries(counts).map(([id,n])=>({id,n})).sort((a,b)=>b.n-a.n);
   return {arr,total:arr.reduce((s,x)=>s+x.n,0),dominant:arr[0]?arr[0].id:null};
 }
-function pvDominant(days){return pvCounts(days).dominant;}
-
-function beginSuggested(){
-  const act=_pvPick(pvLatest(viewDate));
-  if(act&&typeof beginPractice==='function'){beginPractice(act.id);return;}
-  showToast('Pick a practice below');
-}
-
 /* ════════════ DIET EXTRAS (hydration + blood sugar) ════════════ */
 function _bsGet(){try{return JSON.parse(lsGet('bs_'+viewDate,'[]'))||[];}catch(e){return [];}}
 function addBS(){
@@ -13467,12 +13073,6 @@ function _winLabel(it){
   const h=Math.round(it.h0);const ap=h<12?'am':'pm';return ((h%12)||12)+ap;
 }
 function _fmtClock(d){ let h=d.getHours();const ap=h<12?'am':'pm';h=(h%12)||12;return h+':'+String(d.getMinutes()).padStart(2,'0')+ap; }
-function _pendingMealCheckin(){
-  try{const log=JSON.parse(lsGet('fl_'+dk(),'[]'))||[];const now=Date.now();
-    for(let j=log.length-1;j>=0;j--){const e=log[j];const ma=Array.isArray(e.moodAfter)?e.moodAfter.length:!!e.moodAfter;const ts=e.ts||0;
-      if(!ma && ts && (now-ts)<10800000 && (now-ts)>1800000)return e.name;}
-  }catch(e){}return null;
-}
 // Slim "right now" prompt for a given tab — shows active, not-done routine items mapped there.
 function _tabRoutineHTML(tab){
   try{const items=_routineNow().active.filter(it=>it.tab===tab);if(!items.length)return '';
