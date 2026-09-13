@@ -1,4 +1,4 @@
-const VERSION = '20260913-fresh1';
+const VERSION = '20260913-fresh2';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
@@ -18,35 +18,59 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Fetch: network first, fall back to cache
+// Fetch: network first, fall back to cache.
 self.addEventListener('fetch', e => {
+  const req = e.request;
+  if (req.method !== 'GET') return;
   // Audio streams (Safe Inside album) go straight to the network — the browser
   // handles range requests natively, and partial (206) responses can't be cached.
-  if (e.request.url.includes('/audio/')) return;
-  if (e.request.method !== 'GET') return;
+  if (req.url.includes('/audio/')) return;
 
-  // "Network first" was still going through the HTTP cache, and GitHub Pages
-  // serves the page with a ten-minute max-age — so for ten minutes after a
-  // deploy the fresh fetch quietly returned the old page and the app looked
-  // like it had not updated. The document and its code now always revalidate;
-  // images, fonts and audio keep their normal caching.
-  const url = new URL(e.request.url);
-  const isCode = e.request.mode === 'navigate' ||
-                 /\.(html|js|json|css)$/.test(url.pathname) ||
-                 url.pathname === '/' ;
-  const request = isCode
-    ? new Request(e.request.url, { cache: 'reload', credentials: 'same-origin', mode: 'same-origin' })
-    : e.request;
+  let url;
+  try { url = new URL(req.url); } catch (err) { return; }
 
-  e.respondWith(
-    fetch(request)
-      .then(r => {
-        const clone = r.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {});
-        return r;
-      })
-      .catch(() => caches.match(e.request))
-  );
+  // Never hand respondWith an undefined — that surfaces to the page as a hard
+  // network error, which on a navigation means a blank screen.
+  const fallback = async () => {
+    const cached = await caches.match(req);
+    if (cached) return cached;
+    try { return await fetch(req); }
+    catch (err) { return new Response('', { status: 504, statusText: 'Offline' }); }
+  };
+
+  const store = async (response) => {
+    try { const c = await caches.open(CACHE); await c.put(req, response.clone()); }
+    catch (err) {}
+  };
+
+  // Third-party code (the Firebase SDK, fonts) is fetched exactly as asked for.
+  // Rewriting those requests is what broke the app: a cross-origin script asked
+  // for as same-origin fails outright.
+  if (url.origin !== self.location.origin) {
+    e.respondWith((async () => {
+      try { const r = await fetch(req); store(r); return r; }
+      catch (err) { return fallback(); }
+    })());
+    return;
+  }
+
+  // Our own page and code always revalidate. "Network first" still went through
+  // the HTTP cache, and the host serves the page with a ten-minute max-age, so
+  // for ten minutes after a deploy the fresh fetch quietly returned the old
+  // build. Images and fonts keep their normal caching.
+  const isCode = req.mode === 'navigate' ||
+                 url.pathname === '/' ||
+                 /\.(html|js|json|css)$/.test(url.pathname);
+
+  e.respondWith((async () => {
+    try {
+      const r = await fetch(isCode ? new Request(url.href, { cache: 'reload' }) : req);
+      store(r);
+      return r;
+    } catch (err) {
+      return fallback();
+    }
+  })());
 });
 
 // ── TIMER NOTIFICATIONS ───────────────────────────────────────────────────────
