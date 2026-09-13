@@ -917,7 +917,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260805-build-indicator';
+const APP_BUILD='20260912-ios-app';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -13914,6 +13914,503 @@ try{
 }catch(e){}
 try{setTimeout(_tourWatch,1600);}catch(e){}
 
+</script>
+<script>
+/* ═══════════════ NATIVE iOS ADAPTER ═══════════════
+   Runs only inside the iOS app (ios/ in this repo), where the native shell has
+   injected window.Metastory. In a browser or a home-screen PWA this whole
+   block is a no-op and every existing code path stays exactly as it was.
+
+   It deliberately re-points a handful of existing functions rather than
+   editing their call sites: the timer, player and auth call sites are spread
+   across thousands of lines, and a single adapter at the end is far easier to
+   read, to reason about, and to delete if the app is ever retired.
+   ═══════════════════════════════════════════════════ */
+(function(){
+'use strict';
+
+var N = window.Metastory;
+if(!N || !N.isNative) return;
+
+var SUPPORT_EMAIL = 'support@metastoryhealth.com';
+
+document.documentElement.classList.add('native-ios');
+
+/* Re-point a global function, keeping the original behaviour and running fn
+   afterwards. Used for the fire-and-forget extras (haptics, Health) that
+   should never change what the original function returns. */
+function after(name, fn){
+  var orig = window[name];
+  if(typeof orig !== 'function') return;
+  window[name] = function(){
+    var result = orig.apply(this, arguments);
+    try{ fn.apply(this, arguments); }catch(e){}
+    return result;
+  };
+}
+
+function toast(msg, ms){
+  try{ if(typeof showToast === 'function') showToast(msg, ms); }catch(e){}
+}
+
+/* ── Rest timers ─────────────────────────────────────────────────────────
+   The service worker schedules its bell with setTimeout, which iOS stops
+   running seconds after the app leaves the screen — so the bell only rang if
+   you were already looking at it. A local notification is handed to the
+   system up front and fires regardless. Every existing caller goes through
+   _swTimerMsg, so re-pointing that one function covers the main timer, the
+   per-card timers, and the restore-after-reload path. */
+window._swTimerMsg = function(msg){
+  if(!msg) return;
+  if(msg.type === 'SCHEDULE_TIMER_NOTIF'){
+    N.timers.schedule({
+      id: 'rest',
+      seconds: Math.round((msg.delayMs || 0) / 1000),
+      title: msg.title || '⏱ Rest Over',
+      body: msg.body || 'Time to get back to it!'
+    }).catch(function(){});
+  } else if(msg.type === 'CANCEL_TIMER_NOTIF'){
+    N.timers.cancel('rest').catch(function(){});
+  }
+};
+
+var _askedForNotifications = false;
+window._reqNotifPerm = function(){
+  if(_askedForNotifications) return;
+  _askedForNotifications = true;
+  N.timers.requestPermission().then(function(state){
+    if(state === 'denied') toast('Turn on notifications to hear the rest bell', 3200);
+  }).catch(function(){});
+};
+
+/* ── Haptics ─────────────────────────────────────────────────────────────
+   Light on the things you do many times in a session, a success pattern on
+   the ones that close something out. */
+after('cardTimerStart', function(){ N.haptics.impact('light'); markWorkoutStarted(); });
+after('timerToggle',    function(){ N.haptics.selection(); });
+after('markExDone',     function(){ N.haptics.impact('medium'); });
+after('playAlarm',      function(){ N.haptics.notify('success'); });
+after('completePractice', function(){ N.haptics.notify('success'); });
+after('completePrayer',   function(){ N.haptics.notify('success'); });
+
+/* ── Apple Health ────────────────────────────────────────────────────────
+   Opt-in, and only ever after the person has tapped Connect in Settings —
+   an unprompted Health sheet on first launch is both bad manners and a
+   review risk. */
+function healthOn(){ return lsGet('_healthOn','') === '1'; }
+
+function workoutStartKey(){
+  return '_woStart_' + (typeof viewDate !== 'undefined' ? viewDate : dk());
+}
+
+/* Logging a set is the first moment we know a session is underway. */
+function markWorkoutStarted(){
+  try{ if(!lsGet(workoutStartKey(),'')) lsSet(workoutStartKey(), String(Date.now())); }catch(e){}
+}
+
+after('setWODone', function(done){
+  if(!done){ N.haptics.selection(); return; }
+  N.haptics.notify('success');
+  saveWorkoutToHealth();
+});
+
+function saveWorkoutToHealth(){
+  if(!healthOn()) return;
+
+  var end = Date.now();
+  var start = parseInt(lsGet(workoutStartKey(),'0'), 10) || 0;
+
+  // Marked done without logging a set, or a stale marker left over from a
+  // session that was abandoned hours ago. Neither should write a workout of
+  // an absurd length to Health, so fall back to a plausible 45 minutes.
+  if(!start || start >= end || (end - start) > 4 * 60 * 60 * 1000){
+    start = end - 45 * 60 * 1000;
+  }
+  if((end - start) < 60 * 1000) start = end - 60 * 1000;
+
+  N.health.saveWorkout({
+    start: start,
+    end: end,
+    activity: 'traditionalStrengthTraining'
+  }).then(function(){
+    try{ lsSet(workoutStartKey(), ''); }catch(e){}
+  }).catch(function(){
+    // Health was declined or is unavailable. The workout is already recorded
+    // in Metastory itself, so there is nothing to tell anyone about.
+  });
+}
+
+/* ── Lock screen, AirPods and background audio ───────────────────────────
+   The page keeps doing the playing; this mirrors what's playing into the
+   Now Playing panel and routes the hardware buttons back into the page's own
+   transport. Replaces the navigator.mediaSession version, which the native
+   Now Playing centre would otherwise fight with. */
+function currentAudioEl(){
+  try{ return (typeof _musCur === 'function') ? _musCur() : null; }catch(e){ return null; }
+}
+
+function trackDuration(el){
+  return (el && isFinite(el.duration)) ? el.duration : 0;
+}
+
+window._musMediaSession = function(tr){
+  if(!tr) return;
+  var el = currentAudioEl();
+  N.audio.activate().catch(function(){});
+  N.nowPlaying.set({
+    title: tr.t,
+    artist: MUSIC_ALBUM.artist,
+    album: MUSIC_ALBUM.title,
+    duration: trackDuration(el),
+    position: el ? (el.currentTime || 0) : 0,
+    playing: true,
+    index: _mus.idx,
+    count: MUSIC_ALBUM.tracks.length
+  });
+};
+
+/* _musPaint runs on every play and pause, which is exactly when the lock
+   screen needs to know. */
+after('_musPaint', function(){
+  if(!_mus || _mus.idx < 0){ N.nowPlaying.clear(); return; }
+  var el = currentAudioEl();
+  N.nowPlaying.state(_mus.playing, el ? (el.currentTime || 0) : 0, trackDuration(el));
+});
+
+after('musClose', function(){
+  N.nowPlaying.clear();
+  N.audio.release().catch(function(){});
+});
+
+/* Keep the lock-screen scrubber honest without posting on every timeupdate. */
+setInterval(function(){
+  if(!_mus || _mus.idx < 0 || !_mus.playing) return;
+  var el = currentAudioEl();
+  if(!el) return;
+  N.nowPlaying.state(true, el.currentTime || 0, trackDuration(el));
+}, 5000);
+
+window.addEventListener('metastory:remote-command', function(e){
+  var detail = e.detail || {};
+  var playing = !!(_mus && _mus.playing);
+
+  switch(detail.command){
+    case 'toggle':
+      musToggle();
+      break;
+    case 'play':
+      if(!playing) musToggle();
+      break;
+    case 'pause':
+      if(playing) musToggle();
+      break;
+    case 'next':
+      musNext();
+      break;
+    case 'previous':
+      musPrev();
+      break;
+    case 'stop':
+      musClose();
+      break;
+    case 'seek':
+      if(detail.position != null){
+        var el = currentAudioEl();
+        if(el){ try{ el.currentTime = detail.position; }catch(err){} }
+      }
+      break;
+  }
+});
+
+/* ── Sign-in ─────────────────────────────────────────────────────────────
+   Google refuses to serve its OAuth pages inside an embedded web view, so
+   signInWithPopup and signInWithRedirect both dead-end here. Both providers
+   run natively and hand back a token, which the Firebase SDK already on the
+   page turns into a session. Sign in with Apple is listed first and styled as
+   the primary option, as guideline 4.8 expects. */
+function signInSheet(){
+  if(document.getElementById('native-signin-ov')) return;
+
+  var ov = document.createElement('div');
+  ov.id = 'native-signin-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:flex-end;justify-content:center';
+  ov.innerHTML =
+    '<div style="background:var(--surface,#fff);width:100%;max-width:520px;border-radius:20px 20px 0 0;padding:22px 20px calc(24px + env(safe-area-inset-bottom));animation:prUp .22s ease">' +
+      '<div style="font-size:17px;font-weight:700;margin-bottom:6px;text-align:center">Sync your account</div>' +
+      '<div style="font-size:13px;color:var(--sub,#777);line-height:1.5;margin-bottom:18px;text-align:center">' +
+        'Signing in keeps your food logs, workouts and reflections on every device you use.' +
+      '</div>' +
+      '<button id="native-signin-apple" style="width:100%;height:48px;border:0;border-radius:12px;background:#000;color:#fff;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:10px"> Sign in with Apple</button>' +
+      '<button id="native-signin-google" style="width:100%;height:48px;border:1.5px solid var(--border,#ddd);border-radius:12px;background:var(--surface2,#fff);color:var(--txt,#222);font-size:16px;font-weight:600;cursor:pointer;margin-bottom:14px">Continue with Google</button>' +
+      '<button id="native-signin-cancel" style="width:100%;height:44px;border:0;border-radius:12px;background:transparent;color:var(--sub,#777);font-size:15px;font-weight:600;cursor:pointer">Not now</button>' +
+    '</div>';
+
+  document.body.appendChild(ov);
+
+  function close(){ try{ ov.remove(); }catch(e){} }
+
+  ov.addEventListener('click', function(e){ if(e.target === ov) close(); });
+  ov.querySelector('#native-signin-cancel').onclick = close;
+
+  ov.querySelector('#native-signin-apple').onclick = function(){
+    close();
+    runSignIn('apple');
+  };
+  ov.querySelector('#native-signin-google').onclick = function(){
+    close();
+    runSignIn('google');
+  };
+}
+
+function runSignIn(provider){
+  var request = (provider === 'apple') ? N.auth.apple() : N.auth.google();
+
+  request.then(function(res){
+    return credentialSignIn(res);
+  }).then(function(){
+    N.haptics.notify('success');
+    toast('Signed in ✓');
+  }).catch(function(err){
+    var message = (err && err.message) ? err.message : String(err);
+    // The person tapped Cancel — that isn't an error worth reporting.
+    if(message === 'cancelled') return;
+    N.haptics.notify('error');
+    toast('Sign-in failed — ' + message, 4000);
+  });
+}
+
+function credentialSignIn(res){
+  lsSet('_lastNativeProvider', res.provider);
+
+  // Kept so account deletion can revoke the Apple token, which Apple requires
+  // of every app offering Sign in with Apple.
+  if(res.provider === 'apple' && res.authorizationCode){
+    lsSet('_appleAuthCode', res.authorizationCode);
+  }
+
+  return fbAuth.signInWithCredential(nativeCredential(res)).then(function(result){
+    // Apple sends the name on the *first* authorization only. If it isn't
+    // saved to the Firebase profile now, it is gone for good.
+    if(res.displayName && result.user && !result.user.displayName){
+      return result.user.updateProfile({ displayName: res.displayName })
+        .catch(function(){})
+        .then(function(){ return result; });
+    }
+    return result;
+  });
+}
+
+function nativeCredential(res){
+  if(res.provider === 'apple'){
+    return new firebase.auth.OAuthProvider('apple.com').credential({
+      idToken: res.idToken,
+      rawNonce: res.rawNonce
+    });
+  }
+  return firebase.auth.GoogleAuthProvider.credential(res.idToken, res.accessToken || null);
+}
+
+function nativeAuthAction(){
+  if(typeof PREVIEW_SANDBOX !== 'undefined' && PREVIEW_SANDBOX){
+    toast('Preview mode — not connected to your account');
+    return;
+  }
+  if(fbUser){
+    if(confirm('Sign out?')) fbAuth.signOut();
+    return;
+  }
+  signInSheet();
+}
+
+window.toggleAuth = nativeAuthAction;
+window.handleUserMenuAuth = nativeAuthAction;
+
+/* ── Deleting an account ─────────────────────────────────────────────────
+   Required by App Review guideline 5.1.1(v) for any app that lets people
+   create an account. Re-authentication happens first, on purpose: if it came
+   last, a failure there would leave someone with their data erased and their
+   account still standing. */
+var USER_COLLECTIONS = ['foodLogs','workoutLogs','sleepLogs','dayMisc','journal'];
+
+async function deleteCollection(uid, name){
+  var col = fbDb.collection('users').doc(uid).collection(name);
+  for(;;){
+    var snap = await col.limit(300).get();
+    if(snap.empty) return;
+    var batch = fbDb.batch();
+    snap.docs.forEach(function(doc){ batch.delete(doc.ref); });
+    await batch.commit();
+    if(snap.size < 300) return;
+  }
+}
+
+async function deleteAccount(){
+  if(!fbUser || !fbDb){ toast('You need to be signed in.'); return; }
+
+  var who = fbUser.email || fbUser.displayName || 'your account';
+  if(!confirm(
+    'Delete your Metastory account?\n\n' +
+    'This permanently erases everything stored for ' + who + ' — your profile, ' +
+    'plan and targets, food and workout logs, sleep, journal entries and ' +
+    'assessments.\n\nThis cannot be undone.'
+  )) return;
+  if(!confirm('Last check — this is permanent. Delete the account?')) return;
+
+  var uid = fbUser.uid;
+  var provider = lsGet('_lastNativeProvider','apple');
+
+  try{
+    toast('Confirming it\'s you…', 3000);
+    var res = await (provider === 'google' ? N.auth.google() : N.auth.apple());
+    await fbUser.reauthenticateWithCredential(nativeCredential(res));
+
+    toast('Deleting your data…', 4000);
+    for(var i = 0; i < USER_COLLECTIONS.length; i++){
+      await deleteCollection(uid, USER_COLLECTIONS[i]);
+    }
+    await fbDb.collection('users').doc(uid).delete();
+
+    // Apple requires the token be revoked, not just the account dropped.
+    // Use the code from the re-authorization a moment ago, not the one saved
+    // at first sign-in: Apple's authorization codes are single-use and expire
+    // in five minutes, so the stored one is always dead by the time we get
+    // here and the revoke would silently do nothing.
+    try{
+      var code = res.authorizationCode || lsGet('_appleAuthCode','');
+      if(code && provider === 'apple' && typeof fbAuth.revokeAccessToken === 'function'){
+        await fbAuth.revokeAccessToken(code);
+      }
+    }catch(e){}
+
+    await fbUser.delete();
+
+    try{ localStorage.clear(); }catch(e){}
+    try{ Object.keys(MEM).forEach(function(k){ delete MEM[k]; }); }catch(e){}
+
+    alert('Your account and all of its data have been deleted.');
+    window.location.reload();
+  }catch(err){
+    var message = (err && err.message) ? err.message : String(err);
+    if(message === 'cancelled'){ toast('Deletion cancelled'); return; }
+    N.haptics.notify('error');
+    alert('Could not delete the account: ' + message + '\n\nNothing has been changed. Please try again, or email ' + SUPPORT_EMAIL + '.');
+  }
+}
+
+window.deleteAccount = deleteAccount;
+
+
+/* ── Settings ────────────────────────────────────────────────────────────
+   The existing modal is one big template string, so the native rows are
+   appended after it renders rather than threaded through it. */
+async function connectHealth(){
+  var available = await N.health.isAvailable().catch(function(){ return false; });
+  if(!available){ toast('Apple Health isn\'t available on this device'); return; }
+
+  try{
+    await N.health.requestAuthorization();
+    lsSet('_healthOn','1');
+    N.haptics.notify('success');
+    toast('Apple Health connected ✓');
+    syncBodyMassFromHealth();
+  }catch(e){
+    toast('Health permission was declined');
+  }
+  rSettingsModal();
+}
+
+function disconnectHealth(){
+  // iOS gives no way to hand a permission back, so this is Metastory's own
+  // switch: nothing further is written, and the Health app's own toggles stay
+  // the source of truth for what was already shared.
+  lsSet('_healthOn','');
+  toast('Metastory will stop writing to Apple Health');
+  rSettingsModal();
+}
+
+function syncBodyMassFromHealth(){
+  N.health.latestBodyMass().then(function(mass){
+    if(!mass || !mass.lb) return;
+    try{
+      var profile = JSON.parse(lsGet('_userProfile','{}')) || {};
+      if(!profile.weight){
+        profile.weight = Math.round(mass.lb);
+        lsSet('_userProfile', JSON.stringify(profile));
+      }
+    }catch(e){}
+  }).catch(function(){});
+}
+
+after('rSettingsModal', function(){
+  var body = document.getElementById('settings-body');
+  if(!body || document.getElementById('native-settings-card')) return;
+
+  var health = healthOn();
+
+  var html =
+    '<div class="card" style="margin-bottom:10px" id="native-settings-card">' +
+      '<div class="ct">❤️ Apple Health</div>' +
+      '<div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">' +
+        (health
+          ? 'Workouts you finish are saved to Apple Health, and your weight is read back from it.'
+          : 'Save the workouts you finish to Apple Health, and let Metastory read your weight instead of asking you to type it.') +
+      '</div>' +
+      (health
+        ? '<button class="btn btn-s btn-sm btn-f" style="color:var(--red);opacity:.85" onclick="_nativeDisconnectHealth()">Stop syncing with Health</button>'
+        : '<button class="btn btn-g btn-sm btn-f" onclick="_nativeConnectHealth()">Connect Apple Health</button>') +
+    '</div>' +
+
+    '<div class="card" style="margin-bottom:10px">' +
+      '<div class="ct">🔔 Notifications</div>' +
+      '<div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">' +
+        'Rest timers ring on the lock screen, even with Metastory closed.' +
+      '</div>' +
+      '<div id="native-notif-status" style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--sub)">Checking…</div>' +
+      '<button class="btn btn-s btn-sm btn-f" onclick="Metastory.app.openSettings()">Open iPhone Settings</button>' +
+    '</div>' +
+
+    (fbUser
+      ? '<div class="card" style="margin-bottom:10px">' +
+          '<div class="ct" style="color:var(--red)">Delete my account</div>' +
+          '<div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">' +
+            'Permanently erases your account and every log, plan and reflection stored with it. ' +
+            'This cannot be undone.' +
+          '</div>' +
+          '<button class="btn btn-s btn-sm btn-f" style="color:var(--red)" onclick="deleteAccount()">Delete my account</button>' +
+        '</div>'
+      : '') +
+
+    '<div class="card" style="margin-bottom:10px">' +
+      '<div style="font-size:11px;color:var(--sub);line-height:1.5;text-align:center">' +
+        'Metastory for iPhone ' + N.version + ' (' + N.build + ')<br>' +
+        'Metastory supports your own health habits. It is not medical advice, ' +
+        'and it does not diagnose or treat any condition.' +
+      '</div>' +
+    '</div>';
+
+  body.insertAdjacentHTML('beforeend', html);
+
+  N.timers.permission().then(function(state){
+    var el = document.getElementById('native-notif-status');
+    if(!el) return;
+    if(state === 'granted'){
+      el.textContent = '✅ Notifications are on';
+      el.style.color = 'var(--green)';
+    } else if(state === 'denied'){
+      el.textContent = '⚪ Turned off — rest bells won\'t ring';
+    } else {
+      el.textContent = '⚪ Not asked yet — start a rest timer to enable';
+    }
+  }).catch(function(){});
+});
+
+window._nativeConnectHealth = connectHealth;
+window._nativeDisconnectHealth = disconnectHealth;
+
+/* Pull weight through on launch for anyone who has already connected. */
+if(healthOn()) syncBodyMassFromHealth();
+
+})();
 </script>
 </body>
 </html>
