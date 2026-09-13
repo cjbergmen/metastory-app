@@ -8266,10 +8266,20 @@ function addSwipeToDismiss(ovId,closeFn){
 
   let startY=0,curY=0,dragging=false,fromGrab=false,startScroll=0,blocked=false;
 
+  let lastControlAt=0;
+  ['focusin','input','change'].forEach(function(ev){
+    modal.addEventListener(ev,function(){ lastControlAt=Date.now(); },true);
+  });
+  function controlBusy(){
+    if(Date.now()-lastControlAt < 1200) return true;
+    const a=document.activeElement;
+    return !!(a && modal.contains(a) && a.matches && a.matches('input,select,textarea,[contenteditable]'));
+  }
+
   modal.addEventListener('touchstart',e=>{
     startY=curY=e.touches[0].clientY;
     startScroll=modal.scrollTop;
-    blocked=onControl(e.target);
+    blocked=controlBusy()||onControl(e.target);
     fromGrab=!blocked&&inGrabArea(startY);
     dragging=false;
   },{passive:true});
@@ -8282,7 +8292,7 @@ function addSwipeToDismiss(ovId,closeFn){
       if(dragging){ modal.style.transform=''; dragging=false; }
       return;
     }
-    if(!fromGrab && !(startScroll<=0 && modal.scrollTop<=0)) return;
+    if(!fromGrab) return;
     dragging=true;
     // Stop the sheet from rubber-banding underneath the drag.
     if(e.cancelable) e.preventDefault();
@@ -14006,6 +14016,9 @@ window.deleteAccount = deleteAccount;
    users get asked about the new ones exactly once. */
 var HEALTH_SCOPE_V = '2';
 
+/* Shown in Settings so a stale cached page is obvious at a glance. */
+var WEB_BUILD = '0913-5';
+
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
   if(!available){ toast('Apple Health isn\'t available on this device'); return; }
@@ -14448,6 +14461,84 @@ function closeNotifPrefs(){
   var ov = document.getElementById('notif-ov');
   if(ov) ov.classList.remove('open');
 }
+
+
+/* ── Tapping a reminder lands on the thing it reminded you about ───────────
+   A notification that opens the app to wherever you happened to leave it is
+   a notification that made you do the work twice. Each reminder carries its
+   own destination; anything unrecognised falls back to Today rather than
+   going nowhere. */
+
+function notifRoute(id, tab){
+  if(!id) return;
+  // 'water3' -> 'water', 'supps-morning' -> 'supps', 'routine5' -> 'routine'
+  var key = String(id).split('-')[0].replace(/\d+$/, '');
+
+  try{
+    // Close whatever sheet happens to be open first, or the destination lands
+    // behind it.
+    document.querySelectorAll('.ov.open').forEach(function(o){ o.classList.remove('open'); });
+  }catch(e){}
+
+  function page(p){ try{ goPage(p); }catch(e){} }
+
+  switch(key){
+    case 'checkin':
+      page('today');
+      // The nervous-system ladder lives on Today; put it in view rather than
+      // making them hunt for it.
+      setTimeout(function(){
+        try{
+          var el = document.querySelector('.pv-state') || document.querySelector('[onclick^="pvAddCheckin"]');
+          if(el && el.scrollIntoView) el.scrollIntoView({behavior:'smooth', block:'center'});
+        }catch(e){}
+      }, 350);
+      break;
+    case 'winddown':
+    case 'listening':
+      page('rest');
+      setTimeout(function(){ try{ restGo(key === 'listening' ? 'practices' : 'home'); }catch(e){} }, 250);
+      break;
+    case 'supps':
+      page('supps');
+      break;
+    case 'meal':
+      page('food');
+      setTimeout(function(){ try{ openFood(); }catch(e){} }, 300);
+      break;
+    case 'water':
+      page('today');
+      setTimeout(function(){ try{ openWaterModal(); }catch(e){} }, 300);
+      break;
+    case 'workout':
+      page('workout');
+      break;
+    case 'routine':
+      page(tab || 'today');
+      break;
+    default:
+      page(tab || 'today');
+  }
+}
+
+if(N.on){
+  N.on('reminder-opened', function(d){
+    try{ notifRoute(d && d.id, d && d.tab); }catch(e){}
+  });
+}
+
+/* A cold launch from a notification emits before this file has run, so the
+   bridge holds the last one for us to pick up here. */
+if(N.takeHeld){
+  setTimeout(function(){
+    try{
+      var held = N.takeHeld('reminder-opened');
+      if(held) notifRoute(held.id, held.tab);
+    }catch(e){}
+  }, 1200);
+}
+
+window.notifRoute = notifRoute;
 
 window.openNotifPrefs = openNotifPrefs;
 window.closeNotifPrefs = closeNotifPrefs;
@@ -14901,7 +14992,7 @@ after('rSettingsModal', function(){
     '</div>' +
 
     '<div style="font-size:11px;color:var(--sub);line-height:1.5;text-align:center;padding:0 2px 10px">' +
-      'Metastory for iPhone ' + N.version + ' (' + N.build + ')' +
+      'Metastory for iPhone ' + N.version + ' (' + N.build + ') · web ' + WEB_BUILD +
     '</div>';
 
   body.insertAdjacentHTML('beforeend', html);
