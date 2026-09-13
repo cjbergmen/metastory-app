@@ -315,6 +315,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .ck-chip.on{border-color:var(--green);background:var(--green);color:#fff}
 
 /* ── ONBOARDING WIZARD ─────────────────────────────────────────────── */
+.wiz-sec+.wiz-sec{margin-top:22px;padding-top:20px;border-top:1px solid var(--border)}
+.wiz-sec-title{font-size:18px;font-weight:800;color:var(--text);letter-spacing:-.01em;margin-bottom:5px;line-height:1.25}
+.wiz-sec-sub{font-size:12.5px;color:var(--sub);line-height:1.5;margin-bottom:13px}
 .wiz-overlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;overflow-y:auto;opacity:0;transition:opacity .3s;pointer-events:none}
 .wiz-overlay.open{opacity:1;pointer-events:all}
 .wiz-inner{max-width:480px;width:100%;margin:0 auto;padding:24px 18px 40px;display:flex;flex-direction:column;min-height:100vh;box-sizing:border-box}
@@ -8864,43 +8867,41 @@ function closeWizard(){
 }
 
 const WIZ_STEPS=[
-  // 0: Welcome
+  // 1: Welcome — the whole-body frame and the plan pitch on one screen
   {type:'welcome'},
-  // 0b: DRESS rationale — the whole-body frame, set before any questions
-  {type:'dress'},
-  // 1: Basic stats
-  {type:'stats'},
-  // 1a: Body composition (drives lean-mass protein + calories)
-  {type:'bodyfat'},
-  // 1b: Body type
-  {type:'bodytype'},
-  // 2: Goal
-  {type:'opts',key:'goal',title:'What is your primary goal?',sub:'This shapes your entire training and nutrition plan.',icon:'🎯',
+  // 2: Body — stats and build together
+  {type:'group',id:'stats',parts:[
+    {type:'stats'},
+    {type:'bodyfat'}
+  ]},
+  // 3: Goal
+  {type:'opts',key:'goal',title:'What is your primary goal?',sub:'This shapes your entire training and nutrition plan.',
    opts:[
-    {val:'muscle',em:'💪',label:'Build Muscle & Strength',desc:'Maximize hypertrophy and get stronger'},
-    {val:'fat_loss',em:'🔥',label:'Lose Fat & Get Lean',desc:'Burn fat while preserving muscle mass'},
-    {val:'fitness',em:'🏃',label:'Improve Fitness & Endurance',desc:'Better cardio, energy, and overall health'},
-    {val:'maintenance',em:'⚖️',label:'Maintain & Feel Great',desc:'Stay in shape, build healthy habits'},
+    {val:'muscle',label:'Build Muscle & Strength',desc:'Maximize hypertrophy and get stronger'},
+    {val:'fat_loss',label:'Lose Fat & Get Lean',desc:'Burn fat while preserving muscle mass'},
+    {val:'fitness',label:'Improve Fitness & Endurance',desc:'Better cardio, energy, and overall health'},
+    {val:'maintenance',label:'Maintain & Feel Great',desc:'Stay in shape, build healthy habits'},
   ]},
-  // 2a: Activity level (drives calorie needs; refined from logged workouts)
-  {type:'opts',key:'activity',title:'How active are you day to day?',sub:'This sets your starting calorie needs. We fine-tune it from your logged workouts over time.',icon:'⚡',
-   opts:[
-    {val:'sedentary',label:'Mostly sedentary',desc:'Desk job, little planned exercise'},
-    {val:'light',label:'Lightly active',desc:'1–3 training sessions a week'},
-    {val:'moderate',label:'Moderately active',desc:'3–5 sessions a week'},
-    {val:'active',label:'Very active',desc:'6–7 sessions a week'},
-    {val:'very_active',label:'Extremely active',desc:'Hard daily training or a physical job'},
+  // 4: Where you are starting from — activity and experience
+  {type:'group',parts:[
+    {type:'opts',key:'activity',title:'How active are you day to day?',sub:'This sets your starting calorie needs. We fine-tune it from your logged workouts over time.',
+     opts:[
+      {val:'sedentary',label:'Mostly sedentary',desc:'Desk job, little planned exercise'},
+      {val:'light',label:'Lightly active',desc:'1\u20133 training sessions a week'},
+      {val:'moderate',label:'Moderately active',desc:'3\u20135 sessions a week'},
+      {val:'active',label:'Very active',desc:'6\u20137 sessions a week'},
+      {val:'very_active',label:'Extremely active',desc:'Hard daily training or a physical job'},
+    ]},
+    {type:'tiles',key:'level',title:'How much training is behind you?',sub:'Be honest \u2014 your plan adapts to where you are now.',
+     tiles:[
+      {val:'beginner',label:'Beginner',sub:'0\u20131 year'},
+      {val:'intermediate',label:'Intermediate',sub:'1\u20133 years'},
+      {val:'advanced',label:'Advanced',sub:'3+ years'},
+      {val:'athlete',label:'Athlete',sub:'Competitive'},
+    ]}
   ]},
-  // 3: Fitness level
-  {type:'tiles',key:'level',title:'What is your fitness level?',sub:'Be honest — your plan adapts to where you are now.',icon:'📊',
-   tiles:[
-    {val:'beginner',em:'🌱',label:'Beginner',sub:'0–1 year'},
-    {val:'intermediate',em:'🏋️',label:'Intermediate',sub:'1–3 years'},
-    {val:'advanced',em:'🔱',label:'Advanced',sub:'3+ years'},
-    {val:'athlete',em:'🏆',label:'Athlete',sub:'Competitive'},
-  ]},
-  // 4: Equipment preferences (multi-select + other)
-  {type:'multi',key:'equipment',otherKey:'equipmentOther',title:'What do you prefer to use for your workouts?',sub:'Select all that apply — your plan is built around what you like to use.',icon:'🏋️',
+  // 5: Equipment preferences (multi-select + other)
+  {type:'multi',key:'equipment',otherKey:'equipmentOther',title:'What do you prefer to use for your workouts?',sub:'Select all that apply \u2014 your plan is built around what you like to use.',
    opts:[
     {val:'dumbbells',label:'Dumbbells',desc:'Adjustable or fixed dumbbells'},
     {val:'barbell',label:'Barbell & Rack',desc:'Squat rack, bench, plates'},
@@ -8913,59 +8914,62 @@ const WIZ_STEPS=[
     {val:'elliptical',label:'Elliptical',desc:'Low-impact steady cardio'},
     {val:'bodyweight',label:'Bodyweight Only',desc:'No equipment needed'},
    ]},
-  // 5: Training style (multi-select)
-  {type:'multi',key:'style',title:'How do you like to train?',sub:'Select all that apply — your plan will blend these together.',icon:'⚡',
+  // 6: Training style (multi-select)
+  {type:'multi',key:'style',title:'How do you like to train?',sub:'Select all that apply \u2014 your plan will blend these together.',
    opts:[
-    {val:'strength',em:'🏋️',label:'Strength & Hypertrophy',desc:'Heavy lifting, progressive overload'},
-    {val:'hiit',em:'⚡',label:'HIIT & MetCon',desc:'High intensity circuits, intervals, functional fitness'},
-    {val:'cardio',em:'🏃',label:'Cardio & Endurance',desc:'Zone 2, steady-state, aerobic base building'},
-    {val:'mobility',em:'🧘',label:'Yoga & Mobility',desc:'Flexibility, flow, nervous system recovery'},
+    {val:'strength',label:'Strength & Hypertrophy',desc:'Heavy lifting, progressive overload'},
+    {val:'hiit',label:'HIIT & MetCon',desc:'High intensity circuits, intervals, functional fitness'},
+    {val:'cardio',label:'Cardio & Endurance',desc:'Zone 2, steady-state, aerobic base building'},
+    {val:'mobility',label:'Yoga & Mobility',desc:'Flexibility, flow, nervous system recovery'},
   ]},
-  // 6: Stress level
-  {type:'opts',key:'stress',title:'What is your current stress level?',sub:'Stress affects recovery more than most people realize. Be honest.',icon:'🧠',
-   opts:[
-    {val:'low',em:'😌',label:'Low — Life feels manageable',desc:'I recover well and feel balanced between sessions'},
-    {val:'moderate',em:'😐',label:'Moderate — Some tension',desc:'Normal life stress, generally doing okay'},
-    {val:'high',em:'😓',label:'High — Elevated right now',desc:'Work, relationships, or life demands are heavy'},
-    {val:'variable',em:'🔄',label:'Variable — Changes week to week',desc:'Hard to pin down, depends on the season of life'},
+  // 7: Recovery \u2014 stress and sleep, asked separately, answered on one screen
+  {type:'group',parts:[
+    {type:'opts',key:'stress',title:'What is your current stress level?',sub:'Stress affects recovery more than most people realize. Be honest.',
+     opts:[
+      {val:'low',label:'Low \u2014 Life feels manageable',desc:'I recover well and feel balanced between sessions'},
+      {val:'moderate',label:'Moderate \u2014 Some tension',desc:'Normal life stress, generally doing okay'},
+      {val:'high',label:'High \u2014 Elevated right now',desc:'Work, relationships, or life demands are heavy'},
+      {val:'variable',label:'Variable \u2014 Changes week to week',desc:'Hard to pin down, depends on the season of life'},
+    ]},
+    {type:'tiles',key:'sleep',title:'How is your sleep quality?',sub:'Sleep is your #1 recovery tool. Your plan adapts around it.',
+     tiles:[
+      {val:'great',label:'Great',sub:'7\u20139 hrs, wake rested'},
+      {val:'fair',label:'Fair',sub:'6\u20137 hrs, okay'},
+      {val:'poor',label:'Poor',sub:'Under 6 hrs or broken'},
+      {val:'variable',label:'Variable',sub:'Changes nightly'},
+    ]}
   ]},
-  // 7: Sleep quality
-  {type:'tiles',key:'sleep',title:'How is your sleep quality?',sub:'Sleep is your #1 recovery tool. Your plan adapts around it.',icon:'😴',
-   tiles:[
-    {val:'great',em:'😴',label:'Great',sub:'7–9 hrs, wake rested'},
-    {val:'fair',em:'😐',label:'Fair',sub:'6–7 hrs, okay'},
-    {val:'poor',em:'😩',label:'Poor',sub:'Under 6 hrs or broken'},
-    {val:'variable',em:'🔄',label:'Variable',sub:'Changes nightly'},
-  ]},
-  // 7c: Daily rhythm — times drive the routine + reminders
-  {type:'times',key:'times',title:'What does your day usually look like?',sub:'Your times shape when reminders appear and build your starting routine. Set your typical weekday, then add your weekend wake/sleep below if they’re different — leave those blank if they’re the same.',
+  // 8: Daily rhythm \u2014 three times that matter, the rest optional
+  {type:'times',key:'times',title:'What does your day usually look like?',sub:'These shape when reminders appear and build your starting routine. You can change any of them later.',
    fields:[
-    {k:'wake',label:'Wake up',def:'07:00',head:'Weekdays'},
-    {k:'breakfast',label:'Breakfast',def:'07:30'},
+    {k:'wake',label:'Wake up',def:'07:00'},
     {k:'workout',label:'Workout (usual time)',def:''},
-    {k:'lunch',label:'Lunch',def:'12:30'},
-    {k:'dinner',label:'Dinner',def:'18:30'},
     {k:'bed',label:'Bedtime',def:'22:00'},
-    {k:'wakeWeekend',label:'Wake up',def:'',head:'Weekends (only if different)'},
-    {k:'bedWeekend',label:'Bedtime',def:''}
+    {k:'breakfast',label:'Breakfast',def:'07:30',opt:true},
+    {k:'lunch',label:'Lunch',def:'12:30',opt:true},
+    {k:'dinner',label:'Dinner',def:'18:30',opt:true},
+    {k:'wakeWeekend',label:'Weekend wake up',def:'',opt:true},
+    {k:'bedWeekend',label:'Weekend bedtime',def:'',opt:true}
    ]},
-  // 8: Days per week
-  {type:'daypicker',key:'dayList',title:'Which days will you train?',sub:'Tap the days you want to work out — the rest become your recovery days. You can move these anytime later.',icon:'📅'},
-  // 7: Diet
-  {type:'tiles',key:'diet',title:'Any diet preference?',sub:'This shapes your macro targets.',icon:'🥗',
-   tiles:[
-    {val:'balanced',em:'⚖️',label:'Balanced',sub:'No restriction'},
-    {val:'high_protein',em:'🍗',label:'High Protein',sub:'160g+ per day'},
-    {val:'low_carb',em:'🥩',label:'Low Carb',sub:'Under 100g carbs'},
-    {val:'plant_based',em:'🌿',label:'Plant-Based',sub:'Minimal meat'},
+  // 9: Training days and anything to work around
+  {type:'group',parts:[
+    {type:'daypicker',key:'dayList',title:'Which days will you train?',sub:'Tap the days you want to work out \u2014 the rest become your recovery days. You can move these anytime later.'},
+    {type:'text',key:'injuries',title:'Anything to work around?',sub:'Optional \u2014 injuries or limitations, and we will plan around them.',placeholder:'e.g. Lower back pain, bad knees, shoulder impingement...'}
   ]},
-  // 8: Allergens / dietary restrictions
-  {type:'allergens',key:'allergens',title:'Any allergens or dietary restrictions?',sub:'Optional — we\'ll keep these out of your food recommendations.',icon:'⚠️'},
-  // 9: Injuries
-  {type:'text',key:'injuries',title:'Any injuries or limitations?',sub:'Optional — we will work around them.',icon:'🩹',placeholder:'e.g. Lower back pain, bad knees, shoulder impingement...'},
-  // 9: Generating
+  // 10: Food \u2014 preference and restrictions
+  {type:'group',parts:[
+    {type:'tiles',key:'diet',title:'Any diet preference?',sub:'This shapes your macro targets.',
+     tiles:[
+      {val:'balanced',label:'Balanced',sub:'No restriction'},
+      {val:'high_protein',label:'High Protein',sub:'160g+ per day'},
+      {val:'low_carb',label:'Low Carb',sub:'Under 100g carbs'},
+      {val:'plant_based',label:'Plant-Based',sub:'Minimal meat'},
+    ]},
+    {type:'allergens',key:'allergens',title:'Any allergens or dietary restrictions?',sub:'Optional \u2014 we will keep these out of your food recommendations.'}
+  ]},
+  // Generating
   {type:'loading'},
-  // 10: Done
+  // Done
   {type:'done'},
   // Final: offer health assessments (skippable)
   {type:'assess'},
@@ -9013,7 +9017,21 @@ function renderWiz(){
   wizUpdateNext();
 }
 
+function _wizTimeRow(f,tv){
+  return `<div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1.5px solid var(--border);border-radius:14px;padding:12px 14px">
+    <span style="font-size:15px;font-weight:600;color:var(--text)">${f.label}</span>
+    <input type="time" value="${tv[f.k]||''}" oninput="wizSaveTime('${f.k}',this.value)" style="background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:8px 11px;font-size:16px;color:var(--text);font-family:var(--font-sans);outline:none">
+  </div>`;
+}
+
+function _wizSection(part){
+  let html=renderWizStep(part);
+  html=html.replace('class="wiz-title"','class="wiz-sec-title"').replace('class="wiz-sub"','class="wiz-sec-sub"');
+  return '<div class="wiz-sec">'+html+'</div>';
+}
+
 function renderWizStep(s){
+  if(s.type==='group')return s.parts.map(_wizSection).join('');
   if(s.type==='welcome'){
     // In rebuild mode, this step is skipped entirely — but just in case:
     if(_wiz.rebuilding){
@@ -9022,27 +9040,21 @@ function renderWizStep(s){
         <div class="wiz-sub" style="font-size:15px;max-width:320px;margin-top:10px">We'll keep your profile info and build a new plan based on your updated preferences.</div>
       </div>`;
     }
-    return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:20px 0">
-      <div class="wiz-title" style="font-size:28px">Build Your Plan</div>
-      <div class="wiz-sub" style="font-size:15px;max-width:320px;margin-top:10px">Answer a few quick questions and we'll build a complete weekly workout and nutrition plan tailored just for you.</div>
-      <button onclick="lsSet('_onboardDone','1');closeWizard();" style="margin-top:28px;background:none;border:none;color:var(--sub);font-size:13px;cursor:pointer;text-decoration:underline;padding:4px">I already have a plan — skip this</button>
-    </div>`;
-  }
-  if(s.type==='dress'){
     const pill=(L,color,iconPath,desc)=>`<div style="display:flex;align-items:flex-start;gap:11px;padding:10px 0;border-top:1px solid var(--border)">
       <div style="width:34px;height:34px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--surface2);color:${color}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${iconPath}</svg></div>
       <div style="flex:1"><div style="font-size:14px;font-weight:700">${L}</div><div style="font-size:12.5px;color:var(--sub);line-height:1.45">${desc}</div></div></div>`;
-    return `<div class="wiz-title">Your body works as one system</div>
-      <div class="wiz-sub">You can’t spot-treat your health one piece at a time. Sleep moves blood sugar, stress moves digestion, movement moves mood — it’s all one connected system.</div>
+    return `<div class="wiz-title" style="font-size:26px">Your body works as one system</div>
+      <div class="wiz-sub">You can\u2019t spot-treat your health one piece at a time. Sleep moves blood sugar, stress moves digestion, movement moves mood \u2014 it\u2019s all one connected system.</div>
       <div class="card" style="margin-bottom:14px">
-        <span class="kicker">The five daily pillars — DRESS</span>
+        <span class="kicker">The five daily pillars \u2014 DRESS</span>
         ${pill('Diet','var(--green)','<path d="M12 21c-5 0-8-3.5-8-8 0-5.5 4.5-9 12-10-1 7.5-4.5 12-12 13"/><path d="M4 21c3-4 7-7 12-8"/>','Steady fuel and the raw materials your body rebuilds with.')}
         ${pill('Rest','var(--blue)','<path d="M21 13.5A8.5 8.5 0 1 1 10.5 3a7 7 0 0 0 10.5 10.5z"/>','When the body repairs, resets hormones, and clears the day.')}
         ${pill('Exercise','var(--green)','<path d="M3 12h4l3-7 4 14 3-7h4"/>','Movement matched to what you can actually recover from.')}
         ${pill('Stress','var(--purple)','<path d="M5 14c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 9c2-1.5 4-1.5 6 0s4 1.5 6 0"/><path d="M5 19c2-1.5 4-1.5 6 0s4 1.5 6 0"/>','Calming the nervous system so everything else can work.')}
-        ${pill('Supplements','var(--green)','<rect x="4" y="9" width="16" height="7" rx="3.5" transform="rotate(-35 12 12.5)"/><path d="M9.5 9.5l5 5.5"/>','Targeted support — last, once the foundations hold.')}
+        ${pill('Supplements','var(--green)','<rect x="4" y="9" width="16" height="7" rx="3.5" transform="rotate(-35 12 12.5)"/><path d="M9.5 9.5l5 5.5"/>','Targeted support \u2014 last, once the foundations hold.')}
       </div>
-      <div class="fdn-focus"><p style="margin:0;line-height:1.6">We don’t chase symptoms. Strengthen these five together and the body sorts out a remarkable amount on its own — that’s the whole idea behind everything here.</p></div>`;
+      <div class="fdn-focus"><p style="margin:0;line-height:1.6">Answer a few questions and we\u2019ll build a week of training, nutrition targets and a daily routine around all five \u2014 not one at a time.</p></div>
+      <div style="text-align:center"><button onclick="lsSet('_onboardDone','1');closeWizard();" style="margin-top:18px;background:none;border:none;color:var(--sub);font-size:13px;cursor:pointer;text-decoration:underline;padding:4px">I already have a plan \u2014 skip this</button></div>`;
   }
   if(s.type==='stats'){
     const p=_wiz.profile;
@@ -9093,37 +9105,6 @@ function renderWizStep(s){
       </div>
       <div style="font-size:11px;color:var(--sub);text-align:center;margin-top:12px;line-height:1.5">Not sure? Pick the closest — the way you feel after meals refines it over time.</div>`;
   }
-  if(s.type==='bodytype'){
-    const sel=_wiz.profile.bodyType||null;
-    const types=[
-      {val:'ectomorph',icon:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 4L9 15"/><path d="M20 4c-6 0-11 2-13 7-1 3 0 6 0 6s3 1 6 0c5-2 7-7 7-13z"/></svg>',label:'Ectomorph',sub:'Lean & lanky, fast metabolism, hard to gain weight',
-       desc:'Your body burns through calories quickly. You need higher carbs and more total food to build muscle.',
-       traits:'Fast metabolism · Hard gainer · Responds well to higher carbs'},
-      {val:'mesomorph',icon:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M3 9v6M21 9v6M7 8v8M17 8v8"/></svg>',label:'Mesomorph',sub:'Athletic build, gains muscle and loses fat easily',
-       desc:'You respond well to most training styles. Balanced macros work best — moderate protein, carbs, and fat.',
-       traits:'Athletic frame · Gains & loses easily · Balanced macros'},
-      {val:'endomorph',icon:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/></svg>',label:'Endomorph',sub:'Naturally broader, stores fat easily, slower metabolism',
-       desc:'Your body is carb-sensitive. Lower carb, higher protein, and strategic nutrition will get you the best results.',
-       traits:'Slower metabolism · Carb-sensitive · Builds strength easily'},
-    ];
-    return `<div class="wiz-title">What is your body type?</div>
-      <div class="wiz-sub">This shapes your macro split, calorie targets, and how your plan is built.</div>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        ${types.map(t=>`
-          <div onclick="wizSel('bodyType','${t.val}')" style="padding:14px 16px;background:var(--surface2);border:1.5px solid ${sel===t.val?'var(--green)':'var(--border)'};border-radius:14px;cursor:pointer;transition:border-color .15s${sel===t.val?';background:rgba(171,108,82,.08)':''}">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px">
-              <span style="width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;color:var(--green)">${t.icon}</span>
-              <div>
-                <div style="font-size:15px;font-weight:700;color:var(--text)">${t.label}</div>
-                <div style="font-size:12px;color:var(--sub);margin-top:1px">${t.sub}</div>
-              </div>
-              ${sel===t.val?`<div style="margin-left:auto;width:20px;height:20px;background:var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>`:''}
-            </div>
-            <div style="font-size:12px;color:var(--sub);line-height:1.45;padding-left:32px">${t.desc}</div>
-            <div style="font-size:11px;color:${sel===t.val?'var(--green)':'var(--sub)'};font-weight:600;margin-top:5px;padding-left:32px;opacity:.75">${t.traits}</div>
-          </div>`).join('')}
-      </div>`;
-  }
   if(s.type==='opts'){
     const sel=_wiz.profile[s.key]||null;
     return `<div class="wiz-title">${s.title}</div>
@@ -9172,11 +9153,14 @@ function renderWizStep(s){
     return `<div class="wiz-title">${s.title}</div>
       <div class="wiz-sub">${s.sub}</div>
       <div style="display:flex;flex-direction:column;gap:10px">
-        ${s.fields.map(f=>`${f.head?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--sub);margin:10px 2px 0">${f.head}</div>`:''}<div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1.5px solid var(--border);border-radius:14px;padding:12px 14px">
-          <span style="font-size:15px;font-weight:600;color:var(--text)">${f.label}</span>
-          <input type="time" value="${tv[f.k]||''}" oninput="wizSaveTime('${f.k}',this.value)" style="background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:8px 11px;font-size:16px;color:var(--text);font-family:var(--font-sans);outline:none">
-        </div>`).join('')}
+        ${s.fields.filter(f=>!f.opt).map(f=>_wizTimeRow(f,tv)).join('')}
       </div>
+      ${s.fields.some(f=>f.opt)?`<details style="margin-top:12px">
+        <summary style="font-size:13px;color:var(--sub);cursor:pointer;padding:8px 2px;font-weight:600">Meal times and weekends</summary>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+          ${s.fields.filter(f=>f.opt).map(f=>_wizTimeRow(f,tv)).join('')}
+        </div>
+      </details>`:''}
       <div style="font-size:12px;color:var(--sub);margin-top:12px;line-height:1.5">We’ll build your starting routine around these — water on waking, sunlight, meals, wind-down — and you can fine-tune any of it later.</div>`;
   }
   if(s.type==='multi'){
@@ -9288,38 +9272,36 @@ function renderWizStep(s){
   return '';
 }
 
-function wizUpdateNext(){
-  const btn=document.getElementById('wiz-next');
-  if(!btn)return;
-  const s=WIZ_STEPS[_wiz.step];
-  let ok=true;
+function _wizStepOk(s){
+  if(s.type==='group')return s.parts.every(_wizStepOk);
   if(s.type==='stats'){
     const age=document.getElementById('wi-age')?.value;
     const wt=document.getElementById('wi-weight')?.value;
     const sex=document.getElementById('wi-sex')?.value;
-    ok=!!(age&&wt&&sex);
-  }else if(s.type==='bodytype'){
-    ok=!!_wiz.profile.bodyType;
-  }else if(s.type==='bodyfat'){
-    ok=_wiz.profile.bodyFat!=null;
-  }else if(s.type==='opts'){
-    ok=!!_wiz.profile[s.key];
-  }else if(s.type==='tiles'){
-    ok=_wiz.profile[s.key]!==undefined&&_wiz.profile[s.key]!==null;
-  }else if(s.type==='daypicker'){
-    ok=Array.isArray(_wiz.profile.dayList)&&_wiz.profile.dayList.length>0;
-  }else if(s.type==='multi'){
-    ok=(_wiz.profile[s.key]||[]).length>0;
+    return !!(age&&wt&&sex);
   }
-  btn.disabled=!ok;
+  if(s.type==='bodyfat')return _wiz.profile.bodyFat!=null;
+  if(s.type==='opts')return !!_wiz.profile[s.key];
+  if(s.type==='tiles')return _wiz.profile[s.key]!==undefined&&_wiz.profile[s.key]!==null;
+  if(s.type==='daypicker')return Array.isArray(_wiz.profile.dayList)&&_wiz.profile.dayList.length>0;
+  if(s.type==='multi')return (_wiz.profile[s.key]||[]).length>0;
+  return true;
+}
+
+function wizUpdateNext(){
+  const btn=document.getElementById('wiz-next');
+  if(!btn)return;
+  btn.disabled=!_wizStepOk(WIZ_STEPS[_wiz.step]);
 }
 
 function wizSel(key,val){
+  _wizSaveStep(WIZ_STEPS[_wiz.step]);
   _wiz.profile[key]=val;
   renderWiz();
 }
 
 function wizToggleDay(d){
+  _wizSaveStep(WIZ_STEPS[_wiz.step]);
   if(!Array.isArray(_wiz.profile.dayList))_wiz.profile.dayList=[];
   const arr=_wiz.profile.dayList;
   const i=arr.indexOf(d);
@@ -9329,6 +9311,7 @@ function wizToggleDay(d){
   renderWiz();
 }
 function wizToggle(key,val){
+  _wizSaveStep(WIZ_STEPS[_wiz.step]);
   if(!Array.isArray(_wiz.profile[key]))_wiz.profile[key]=(key==='equipment'&&_wiz.profile[key])?_equipPrefs({equipment:_wiz.profile[key]}).list:[];
   const arr=_wiz.profile[key];
   const idx=arr.indexOf(val);
@@ -9341,7 +9324,7 @@ function wizSaveText(key,val){_wiz.profile[key]=val;}
 // Allow editing profile stats from rebuild mode
 function _wizEditProfile(){
   _wiz._editingProfile=true;
-  _wiz.step=1; // go to stats step
+  _wiz.step=Math.max(1,WIZ_STEPS.findIndex(x=>x.id==='stats')); // go to stats step
   renderWiz();
 }
 
@@ -9351,21 +9334,24 @@ function _wizShouldSkip(stepIdx){
   const s=WIZ_STEPS[stepIdx];
   // In rebuild mode, skip welcome and stats — unless they clicked "Edit profile"
   if(s.type==='welcome')return true;
-  if(s.type==='stats')return !_wiz._editingProfile;
+  if(s.id==='stats')return !_wiz._editingProfile;
   return false;
+}
+
+function _wizSaveStep(s){
+  if(s.type==='group'){s.parts.forEach(_wizSaveStep);return;}
+  if(s.type!=='stats')return;
+  _wiz.profile.age=+document.getElementById('wi-age')?.value||0;
+  _wiz.profile.weight=+document.getElementById('wi-weight')?.value||0;
+  _wiz.profile.htFt=+document.getElementById('wi-ht-ft')?.value||0;
+  _wiz.profile.htIn=+document.getElementById('wi-ht-in')?.value||0;
+  _wiz.profile.sex=document.getElementById('wi-sex')?.value||'';
+  _wiz._editingProfile=false; // done editing, resume rebuild flow
 }
 
 function wizNext(){
   const s=WIZ_STEPS[_wiz.step];
-  // Save stats step values
-  if(s.type==='stats'){
-    _wiz.profile.age=+document.getElementById('wi-age')?.value||0;
-    _wiz.profile.weight=+document.getElementById('wi-weight')?.value||0;
-    _wiz.profile.htFt=+document.getElementById('wi-ht-ft')?.value||0;
-    _wiz.profile.htIn=+document.getElementById('wi-ht-in')?.value||0;
-    _wiz.profile.sex=document.getElementById('wi-sex')?.value||'';
-    _wiz._editingProfile=false; // done editing, resume rebuild flow
-  }
+  _wizSaveStep(s);
   // If next step is loading, trigger generation
   if(_wiz.step+1===WIZ_STEPS.findIndex(x=>x.type==='loading')){
     _wiz.step++;
@@ -9382,6 +9368,7 @@ function wizNext(){
 }
 
 function wizBack(){
+  _wizSaveStep(WIZ_STEPS[_wiz.step]);
   let prev=_wiz.step-1;
   // Skip steps that don't apply in rebuild mode
   while(prev>0&&_wizShouldSkip(prev))prev--;
