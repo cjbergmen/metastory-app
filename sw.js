@@ -1,4 +1,4 @@
-const VERSION = '20260913-privacy';
+const VERSION = '20260913-devices';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately

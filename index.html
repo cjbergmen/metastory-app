@@ -917,7 +917,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260913-privacy';
+const APP_BUILD='20260913-devices';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -14249,6 +14249,10 @@ async function connectHealth(){
     N.haptics.notify('success');
     toast('Apple Health connected ✓');
     syncBodyMassFromHealth();
+    healthSyncSources();
+    healthSyncSignals().then(function(res){
+      if(res && res.days && res.days.length) toast('Read ' + res.days.length + ' days from Health ✓', 3000);
+    });
   }catch(e){
     toast('Health permission was declined');
   }
@@ -14263,6 +14267,200 @@ function disconnectHealth(){
   toast('Metastory will stop writing to Apple Health');
   rSettingsModal();
 }
+
+/* ── Signals from Apple Health ────────────────────────────────────────────
+   Metastory doesn't integrate with Oura, WHOOP, Garmin, Polar, Fitbit or the
+   Apple Watch one at a time — they all write into Apple Health, so reading
+   Health well is the integration. Sleep fills the Rest log where the person
+   hasn't logged it themselves; resting heart rate and HRV give the
+   nervous-system picture something measured to sit next to the self-report. */
+
+function _healthDaily(){
+  try{ return JSON.parse(lsGet('_healthDaily','null')); }catch(e){ return null; }
+}
+
+function _hhmm(ms){
+  try{
+    var d = new Date(ms);
+    return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  }catch(e){ return ''; }
+}
+
+function healthSyncSignals(){
+  if(!healthOn() || !N.health) return Promise.resolve(null);
+
+  return N.health.summary(45).then(function(res){
+    if(!res) return null;
+    lsSet('_healthDaily', JSON.stringify(res));
+
+    // Sleep the watch or ring already measured, written into the Rest log.
+    // A night the person logged by hand is never overwritten.
+    (res.days || []).forEach(function(d){
+      if(!d.sleep || !d.sleep.asleepMin) return;
+      var key = 'rest_' + d.date;
+      var existing = null;
+      try{ existing = JSON.parse(lsGet(key,'null')); }catch(e){}
+      if(existing && existing.h && existing.source !== 'health') return;
+
+      var rec = {};
+      if(existing) for(var k in existing) rec[k] = existing[k];
+      rec.h = Math.round(d.sleep.asleepMin / 6) / 10;
+      rec.source = 'health';
+      if(d.sleep.start) rec.bed = _hhmm(d.sleep.start);
+      if(d.sleep.end) rec.wake = _hhmm(d.sleep.end);
+      lsSet(key, JSON.stringify(rec));
+      try{ fbSyncSleep(d.date, rec); }catch(e){}
+    });
+
+    // Weight, body fat and lean mass, if a scale is writing them.
+    try{
+      var latest = res.latest || {};
+      var profile = JSON.parse(lsGet('_userProfile','{}')) || {};
+      var changed = false;
+      if(latest.weightLb && !profile.weight){ profile.weight = Math.round(latest.weightLb); changed = true; }
+      if(changed){ lsSet('_userProfile', JSON.stringify(profile)); try{ fbSyncSettings(); }catch(e){} }
+    }catch(e){}
+
+    try{ if(typeof rToday === 'function' && curPage === 'today') rToday(); }catch(e){}
+    return res;
+  }).catch(function(){ return null; });
+}
+
+function healthSyncSources(){
+  if(!healthOn() || !N.health || !N.health.sources) return;
+  N.health.sources().then(function(names){
+    if(names && names.length) lsSet('_healthSources', JSON.stringify(names));
+  }).catch(function(){});
+}
+
+/* The average of the days that have a value, ignoring today, so "today vs
+   usual" compares against a baseline today isn't part of. */
+function _healthBaseline(key, days){
+  var data = _healthDaily();
+  if(!data || !data.days) return null;
+  var today = dk();
+  var vals = data.days
+    .filter(function(d){ return d.date !== today && typeof d[key] === 'number'; })
+    .slice(-(days || 14))
+    .map(function(d){ return d[key]; });
+  if(vals.length < 3) return null;
+  return vals.reduce(function(a,b){ return a+b; }, 0) / vals.length;
+}
+
+function _healthLatest(key){
+  var data = _healthDaily();
+  if(!data || !data.days) return null;
+  for(var i = data.days.length - 1; i >= 0; i--){
+    if(typeof data.days[i][key] === 'number') return { value: data.days[i][key], date: data.days[i].date };
+  }
+  return null;
+}
+
+function _healthLastNight(){
+  var data = _healthDaily();
+  if(!data || !data.days) return null;
+  for(var i = data.days.length - 1; i >= 0; i--){
+    var d = data.days[i];
+    if(d.sleep && d.sleep.asleepMin) return { date: d.date, sleep: d.sleep };
+  }
+  return null;
+}
+
+/* A signal reads as up, down or level against the person's own baseline —
+   never against a population norm, which for HRV means nothing. */
+function _healthSignalRow(label, value, unit, baseline, higherIsBetter, note){
+  if(value === null || value === undefined) return '';
+  var arrow = '', color = 'var(--sub)';
+  if(baseline){
+    var delta = (value - baseline) / baseline;
+    if(Math.abs(delta) >= 0.07){
+      var good = higherIsBetter ? delta > 0 : delta < 0;
+      arrow = delta > 0 ? '▲' : '▼';
+      color = good ? 'var(--green)' : 'var(--orange)';
+    } else {
+      arrow = '→';
+    }
+  }
+  return '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--border)">' +
+    '<span style="font-size:13px;color:var(--sub)">' + label + '</span>' +
+    '<span style="font-size:14px;font-weight:700">' + value + '<span style="font-size:11px;font-weight:600;color:var(--sub)"> ' + unit + '</span>' +
+    (arrow ? ' <span style="color:' + color + ';font-size:12px">' + arrow + '</span>' : '') +
+    (note ? '<div style="font-size:11px;font-weight:500;color:var(--sub);text-align:right">' + note + '</div>' : '') +
+    '</span></div>';
+}
+
+function healthSignalsCardHTML(){
+  var data = _healthDaily();
+  if(!data || !data.days || !data.days.length) return '';
+
+  var night = _healthLastNight();
+  var rhr = _healthLatest('restingHR');
+  var hrv = _healthLatest('hrvMs');
+  var steps = _healthLatest('steps');
+  if(!night && !rhr && !hrv && !steps) return '';
+
+  var rows = '';
+
+  if(night){
+    var mins = night.sleep.asleepMin;
+    var label = Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm';
+    var parts = [];
+    if(night.sleep.deepMin) parts.push(night.sleep.deepMin + 'm deep');
+    if(night.sleep.remMin) parts.push(night.sleep.remMin + 'm REM');
+    rows += '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--border)">' +
+      '<span style="font-size:13px;color:var(--sub)">Slept</span>' +
+      '<span style="font-size:14px;font-weight:700;text-align:right">' + label +
+      (parts.length ? '<div style="font-size:11px;font-weight:500;color:var(--sub)">' + parts.join(' · ') + '</div>' : '') +
+      '</span></div>';
+  }
+
+  if(hrv) rows += _healthSignalRow('Heart rate variability', Math.round(hrv.value), 'ms', _healthBaseline('hrvMs', 14), true,
+    'your 14-day average is ' + (_healthBaseline('hrvMs', 14) ? Math.round(_healthBaseline('hrvMs', 14)) + ' ms' : '—'));
+  if(rhr) rows += _healthSignalRow('Resting heart rate', Math.round(rhr.value), 'bpm', _healthBaseline('restingHR', 14), false, '');
+  if(steps) rows += _healthSignalRow('Steps', Math.round(steps.value), '', _healthBaseline('steps', 14), true, '');
+
+  if(!rows) return '';
+
+  var sources = [];
+  try{ sources = JSON.parse(lsGet('_healthSources','[]')) || []; }catch(e){}
+  var credit = sources.filter(function(n){ return n !== 'Metastory'; }).slice(0, 3).join(', ');
+
+  return '<div class="card" id="health-signals-card">' +
+    '<span class="kicker" style="color:var(--sub)">From your devices</span>' +
+    '<div style="margin-top:8px">' + rows + '</div>' +
+    (credit ? '<div style="font-size:11px;color:var(--sub);margin-top:8px">via ' + credit + '</div>' : '') +
+    '</div>';
+}
+
+/* Health is re-read on launch and when the app comes back to the front, but
+   no more than hourly — the queries are cheap, the battery isn't. */
+function healthRefreshIfStale(){
+  if(!healthOn()) return;
+  var last = parseInt(lsGet('_healthSyncAt','0'), 10) || 0;
+  if(Date.now() - last < 60 * 60 * 1000) return;
+  lsSet('_healthSyncAt', String(Date.now()));
+  healthSyncSignals();
+  healthSyncSources();
+}
+
+document.addEventListener('visibilitychange', function(){
+  if(!document.hidden) healthRefreshIfStale();
+});
+setTimeout(healthRefreshIfStale, 1500);
+
+after('rToday', function(){
+  try{
+    if(document.getElementById('health-signals-card')) return;
+    var html = healthSignalsCardHTML();
+    if(!html) return;
+    var hero = document.getElementById('td-hero');
+    if(hero) hero.insertAdjacentHTML('afterend', html);
+    else {
+      var page = document.getElementById('page-today');
+      if(page) page.insertAdjacentHTML('beforeend', html);
+    }
+  }catch(e){}
+});
 
 function syncBodyMassFromHealth(){
   N.health.latestBodyMass().then(function(mass){
@@ -14304,8 +14502,10 @@ after('rSettingsModal', function(){
           ? 'Workouts you finish are saved to Apple Health, and your weight is read back from it. That weight is part of the profile your personalized guidance is generated from.'
           : 'Save the workouts you finish to Apple Health, and let Metastory read your weight instead of asking you to type it.') +
       '</div>' +
+      (health ? _nativeHealthSourcesHTML() : '') +
       (health
-        ? '<button class="btn btn-s btn-sm btn-f" style="color:var(--red);opacity:.85" onclick="_nativeDisconnectHealth()">Stop syncing with Health</button>'
+        ? '<button class="btn btn-s btn-sm btn-f" onclick="_nativeHealthRefresh()">Refresh from Health</button>' +
+          '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--red);opacity:.85" onclick="_nativeDisconnectHealth()">Stop syncing with Health</button>'
         : '<button class="btn btn-g btn-sm btn-f" onclick="_nativeConnectHealth()">Connect Apple Health</button>') +
 
       '<div style="height:1px;background:var(--border);margin:14px 0"></div>' +
@@ -14407,6 +14607,43 @@ function nativeLinkProvider(provider){
 
 window._nativeLinkProvider = nativeLinkProvider;
 window._nativeSignInMethodsBody = _nativeSignInMethodsBody;
+
+function _nativeHealthSourcesHTML(){
+  var sources = [];
+  try{ sources = JSON.parse(lsGet('_healthSources','[]')) || []; }catch(e){}
+  sources = sources.filter(function(n){ return n !== 'Metastory'; });
+
+  var data = _healthDaily();
+  var days = (data && data.days) ? data.days.length : 0;
+
+  var html = '';
+  if(sources.length){
+    html += '<div style="font-size:12px;color:var(--green);font-weight:600;margin-bottom:6px">Reading from ' + sources.join(', ') + '</div>';
+  }
+  if(days){
+    html += '<div style="font-size:11px;color:var(--sub);margin-bottom:10px">' + days + ' days of signals — sleep, resting heart rate, HRV, breathing, steps and body composition, from whichever ring, watch or strap writes them.</div>';
+  } else {
+    html += '<div style="font-size:11px;color:var(--sub);margin-bottom:10px">Nothing read yet. If you wear a ring, watch or strap, make sure its own app is set to write to Apple Health.</div>';
+  }
+  return html;
+}
+
+function nativeHealthRefresh(){
+  toast('Reading from Health…');
+  healthSyncSources();
+  healthSyncSignals().then(function(res){
+    if(res && res.days && res.days.length){
+      N.haptics.notify('success');
+      toast('Read ' + res.days.length + ' days from Health ✓', 3000);
+    } else {
+      toast('Nothing came back from Health', 3000);
+    }
+    try{ rSettingsModal(); }catch(e){}
+  });
+}
+
+window._nativeHealthRefresh = nativeHealthRefresh;
+window._nativeHealthSourcesHTML = _nativeHealthSourcesHTML;
 
 window._nativeConnectHealth = connectHealth;
 window._nativeDisconnectHealth = disconnectHealth;
