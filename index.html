@@ -917,7 +917,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260913-devices';
+const APP_BUILD='20260913-notifs';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -1197,6 +1197,7 @@ function fbSyncSettings(){
     if(lsGet('_onboardDone','')) settings.onboardDone='1';
     if(lsGet('_tourDone','')) settings.tourDone='1';
     try { const df=lsGet('_detFlags',''); if(df) settings.detFlags=JSON.parse(df); } catch(e){}
+    try { const np=lsGet('_notifPrefs',''); if(np) settings.notifPrefs=JSON.parse(np); } catch(e){}
     try { const cw=lsGet('_customWorkouts',''); if(cw) settings.customWorkouts=JSON.parse(cw); } catch(e){}
     try { const wa=lsGet('_weekAdjust',''); if(wa) settings.weekAdjust=JSON.parse(wa); } catch(e){}
     try { const aw=lsGet('_aiWeekly',''); if(aw) settings.aiWeekly=JSON.parse(aw); } catch(e){}
@@ -1323,6 +1324,7 @@ async function fbPullAll(){
         if(s.onboardDone || s.userProfile || s.userTargets || s.routineTR) lsSet('_onboardDone', '1');
         if(s.tourDone) lsSet('_tourDone', '1');
         if(s.detFlags) lsSet('_detFlags', JSON.stringify(s.detFlags));
+        if(s.notifPrefs) lsSet('_notifPrefs', JSON.stringify(s.notifPrefs));
         if(s.customWorkouts) lsSet('_customWorkouts', JSON.stringify(s.customWorkouts));
         if(s.weekAdjust) lsSet('_weekAdjust', JSON.stringify(s.weekAdjust));
         if(s.aiWeekly) lsSet('_aiWeekly', JSON.stringify(s.aiWeekly));
@@ -13883,6 +13885,9 @@ function toast(msg, ms){
 window._swTimerMsg = function(msg){
   if(!msg) return;
   if(msg.type === 'SCHEDULE_TIMER_NOTIF'){
+    // The one notification someone can turn off without going to iPhone
+    // Settings — it belongs to the timer, not to the reminder set.
+    if(notifPrefs().restTimers === false) return;
     N.timers.schedule({
       id: 'rest',
       seconds: Math.round((msg.delayMs || 0) / 1000),
@@ -14268,6 +14273,405 @@ function disconnectHealth(){
   rSettingsModal();
 }
 
+/* ── What Metastory is allowed to interrupt you about ─────────────────────
+   Everything here is off until the person turns it on, each reminder keeps
+   its own time, and the whole set is rebuilt from these preferences rather
+   than added to — so turning something off actually removes it from iOS
+   rather than leaving an orphan firing every morning. */
+
+var NOTIF_DEFAULTS = {
+  enabled: true,          // the master switch; rest timers ignore it
+  restTimers: true,       // the bell between sets — the one thing already on
+  quietFrom: '',          // e.g. '22:00' — reminders inside the window are skipped
+  quietTo: '',            // e.g. '07:00'
+  items: {
+    checkin:   { on: false, time: '09:00' },
+    routine:   { on: false, lead: 0 },
+    supps:     { on: false, morning: '08:00', midday: '13:00', evening: '20:00' },
+    water:     { on: false, times: ['10:00', '14:00', '17:00'] },
+    meals:     { on: false, times: ['08:30', '12:30', '18:30'] },
+    workout:   { on: false, time: '17:00' },
+    listening: { on: false, time: '19:30' },
+    winddown:  { on: false, time: '21:30' },
+    weekly:    { on: false, time: '18:00', weekday: 1 }   // 1 = Sunday
+  }
+};
+
+function notifPrefs(){
+  var prefs;
+  try{ prefs = JSON.parse(lsGet('_notifPrefs','null')); }catch(e){}
+  if(!prefs) prefs = {};
+
+  var merged = {};
+  for(var k in NOTIF_DEFAULTS) merged[k] = NOTIF_DEFAULTS[k];
+  for(var j in prefs) if(j !== 'items') merged[j] = prefs[j];
+
+  merged.items = {};
+  for(var name in NOTIF_DEFAULTS.items){
+    var base = NOTIF_DEFAULTS.items[name], saved = (prefs.items || {})[name] || {};
+    var item = {};
+    for(var f in base) item[f] = base[f];
+    for(var g in saved) item[g] = saved[g];
+    merged.items[name] = item;
+  }
+  return merged;
+}
+
+function notifSave(prefs){
+  lsSet('_notifPrefs', JSON.stringify(prefs));
+  try{ fbSyncSettings(); }catch(e){}
+  notifReconcile();
+}
+
+function _notifMinutes(hhmm){
+  var m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || '');
+  return m ? (+m[1]) * 60 + (+m[2]) : null;
+}
+
+/* A time inside the quiet window is dropped rather than nudged, because
+   moving someone's wind-down reminder to 7am would be worse than silence. */
+function _notifQuiet(prefs, hhmm){
+  var from = _notifMinutes(prefs.quietFrom), to = _notifMinutes(prefs.quietTo), at = _notifMinutes(hhmm);
+  if(from === null || to === null || at === null || from === to) return false;
+  return from < to ? (at >= from && at < to) : (at >= from || at < to);
+}
+
+function _notifItem(id, hhmm, title, body, weekdays, tab){
+  var at = _notifMinutes(hhmm);
+  if(at === null) return null;
+  var item = {
+    id: id,
+    hour: Math.floor(at / 60),
+    minute: at % 60,
+    title: title,
+    body: body
+  };
+  if(weekdays && weekdays.length) item.weekdays = weekdays;
+  if(tab) item.tab = tab;
+  return item;
+}
+
+/* Which weekdays this person trains, as iOS numbers them (1 = Sunday). The
+   plan is a day-of-week map, so a workout reminder lands only on the days
+   they actually have a session. */
+function _notifTrainWeekdays(){
+  try{
+    if(typeof _trainDaySet !== 'function') return [];
+    var days = _trainDaySet(dk()) || [];
+    return days.map(function(d){ return (d % 7) + 1; });
+  }catch(e){ return []; }
+}
+
+function notifBuildItems(){
+  var prefs = notifPrefs();
+  if(!prefs.enabled) return [];
+  var items = [], it = prefs.items;
+
+  function push(built){
+    if(built && !_notifQuiet(prefs, String(built.hour).padStart(2,'0') + ':' + String(built.minute).padStart(2,'0'))) items.push(built);
+  }
+
+  if(it.checkin.on){
+    push(_notifItem('checkin', it.checkin.time, 'How are you doing?',
+      'A quick nervous-system check-in — it takes about thirty seconds.', null, 'stress'));
+  }
+
+  if(it.routine.on && typeof _classifyRoutine === 'function'){
+    // Their own routine, at their own times — capped so a long routine can't
+    // turn into twenty notifications a day.
+    try{
+      var rows = (_classifyRoutine() || []).filter(function(r){ return r.time && /^\d{1,2}:\d{2}$/.test(r.time); });
+      rows.slice(0, 8).forEach(function(r, i){
+        var at = _notifMinutes(r.time) - (it.routine.lead || 0);
+        if(at < 0) at += 24 * 60;
+        var hhmm = String(Math.floor(at / 60)).padStart(2,'0') + ':' + String(at % 60).padStart(2,'0');
+        push(_notifItem('routine' + i, hhmm, r.a || 'Your routine',
+          (r.n || 'From your daily routine.'), null, r.tab || 'today'));
+      });
+    }catch(e){}
+  }
+
+  if(it.supps.on && typeof _suppPlan === 'function'){
+    try{
+      var plan = _suppPlan() || [];
+      var slots = { morning: 0, midday: 0, evening: 0 };
+      plan.forEach(function(s){
+        var slot = String(s.slot || 'morning').toLowerCase();
+        if(slots[slot] !== undefined) slots[slot]++;
+      });
+      ['morning','midday','evening'].forEach(function(slot){
+        if(!slots[slot]) return;
+        push(_notifItem('supps-' + slot, it.supps[slot],
+          'Supplements — ' + slot,
+          slots[slot] + (slots[slot] === 1 ? ' supplement' : ' supplements') + ' to take.', null, 'supps'));
+      });
+    }catch(e){}
+  }
+
+  if(it.water.on){
+    (it.water.times || []).forEach(function(t, i){
+      push(_notifItem('water' + i, t, 'Water', 'A glass now keeps you on target for the day.', null, 'today'));
+    });
+  }
+
+  if(it.meals.on){
+    var labels = ['Breakfast', 'Lunch', 'Dinner'];
+    (it.meals.times || []).forEach(function(t, i){
+      push(_notifItem('meal' + i, t, 'Log ' + (labels[i] || 'your meal').toLowerCase(),
+        'A few seconds now beats reconstructing it tonight.', null, 'food'));
+    });
+  }
+
+  if(it.workout.on){
+    push(_notifItem('workout', it.workout.time, 'Training today',
+      'Your session is ready when you are.', _notifTrainWeekdays(), 'exercise'));
+  }
+
+  if(it.listening.on){
+    push(_notifItem('listening', it.listening.time, 'Safe Inside',
+      'Ten minutes of listening does more for your vagal tone than willpower does.', null, 'listen'));
+  }
+
+  if(it.winddown.on){
+    push(_notifItem('winddown', it.winddown.time, 'Wind down',
+      'Lights low, screens away. Sleep starts about an hour before you lie down.', null, 'rest'));
+  }
+
+  if(it.weekly.on){
+    push(_notifItem('weekly', it.weekly.time, 'Your week in review',
+      'See what the last seven days actually looked like.', [it.weekly.weekday || 1], 'progress'));
+  }
+
+  return items;
+}
+
+function notifReconcile(){
+  if(!N.timers || !N.timers.replaceReminders) return Promise.resolve(0);
+  var items = notifBuildItems();
+  return N.timers.replaceReminders(items).then(function(count){
+    lsSet('_notifCount', String(count || 0));
+    return count;
+  }).catch(function(){ return 0; });
+}
+
+/* Turning the first reminder on is the moment to ask for permission — not at
+   launch, when there is nothing to justify the request. */
+function notifEnsurePermission(){
+  return N.timers.permission().then(function(state){
+    if(state === 'granted') return true;
+    if(state === 'denied') return false;
+    return N.timers.requestPermission().then(function(next){ return next === 'granted'; });
+  }).catch(function(){ return false; });
+}
+
+// MARK: the sheet
+
+function notifSheetHTML(){
+  var prefs = notifPrefs(), it = prefs.items;
+
+  function toggle(id, on, label, sub){
+    return '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">' +
+      '<div style="flex:1">' +
+        '<div style="font-size:14px;font-weight:650">' + label + '</div>' +
+        (sub ? '<div style="font-size:11.5px;color:var(--sub);line-height:1.45;margin-top:2px">' + sub + '</div>' : '') +
+        '<div id="notif-detail-' + id + '" style="margin-top:' + (on ? '8px' : '0') + '">' + (on ? notifDetailHTML(id) : '') + '</div>' +
+      '</div>' +
+      '<button onclick="notifToggle(\'' + id + '\')" aria-label="' + label + '" style="flex:none;width:46px;height:28px;border-radius:999px;border:none;cursor:pointer;position:relative;background:' + (on ? 'var(--green)' : 'var(--border)') + ';transition:background .15s">' +
+        '<span style="position:absolute;top:3px;left:' + (on ? '21px' : '3px') + ';width:22px;height:22px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 3px rgba(0,0,0,.25)"></span>' +
+      '</button>' +
+    '</div>';
+  }
+
+  var h = '';
+
+  h += '<div style="font-size:12px;color:var(--sub);line-height:1.5;margin-bottom:14px">' +
+    'Nothing here is on unless you turn it on, and each one keeps its own time. ' +
+    'Rest timers are separate — those ring whenever a timer is running.' +
+    '</div>';
+
+  h += '<div class="card" style="margin-bottom:10px">' +
+    toggle('restTimers', prefs.restTimers, '⏱ Rest timers', 'The bell between sets. Breaks through Focus, because it is useless late.') +
+    '</div>';
+
+  h += '<div class="card" style="margin-bottom:10px">' +
+    '<div class="ct">Daily</div>' +
+    toggle('checkin', it.checkin.on, '🫀 Nervous-system check-in', 'One question about where your state is today.') +
+    toggle('routine', it.routine.on, '🧭 My routine steps', 'Each step of your own routine, at the time you set for it.') +
+    toggle('supps', it.supps.on, '💊 Supplements', 'One reminder per slot you actually have supplements in.') +
+    toggle('water', it.water.on, '💧 Water', 'A few nudges spread through the day.') +
+    toggle('meals', it.meals.on, '🍽 Log meals', 'Catch the meal while you remember what was in it.') +
+    '</div>';
+
+  h += '<div class="card" style="margin-bottom:10px">' +
+    '<div class="ct">Around your plan</div>' +
+    toggle('workout', it.workout.on, '🏋️ Training days', 'Only on the days your plan has a session.') +
+    toggle('listening', it.listening.on, '🎧 Listening session', 'A prompt to sit with Safe Inside.') +
+    toggle('winddown', it.winddown.on, '🌙 Wind down', 'The hour before bed is where sleep is won or lost.') +
+    toggle('weekly', it.weekly.on, '📈 Weekly review', 'One summary, once a week.') +
+    '</div>';
+
+  h += '<div class="card" style="margin-bottom:10px">' +
+    '<div class="ct">Quiet hours</div>' +
+    '<div style="font-size:11.5px;color:var(--sub);line-height:1.45;margin-bottom:10px">Any reminder that falls inside this window is skipped rather than moved.</div>' +
+    '<div style="display:flex;gap:10px;align-items:center">' +
+      '<input type="time" class="fi" id="notif-quiet-from" value="' + (prefs.quietFrom || '') + '" onchange="notifSetQuiet()" style="flex:1;font-size:16px">' +
+      '<span style="font-size:12px;color:var(--sub)">to</span>' +
+      '<input type="time" class="fi" id="notif-quiet-to" value="' + (prefs.quietTo || '') + '" onchange="notifSetQuiet()" style="flex:1;font-size:16px">' +
+    '</div>' +
+    '</div>';
+
+  var count = parseInt(lsGet('_notifCount','0'), 10) || 0;
+  h += '<div id="notif-status" style="font-size:11.5px;color:var(--sub);text-align:center;padding:4px 0 10px">' +
+    (count ? (count + ' reminder' + (count === 1 ? '' : 's') + ' scheduled') : 'No reminders scheduled') +
+    '</div>';
+
+  return h;
+}
+
+function notifDetailHTML(id){
+  var it = notifPrefs().items;
+
+  function timeField(name, value, label){
+    return '<label style="display:flex;align-items:center;gap:8px;margin-top:6px">' +
+      (label ? '<span style="font-size:11.5px;color:var(--sub);min-width:64px">' + label + '</span>' : '') +
+      '<input type="time" class="fi" value="' + value + '" onchange="notifSetTime(\'' + name + '\', this.value)" style="font-size:16px;padding:6px 8px;width:120px">' +
+      '</label>';
+  }
+
+  switch(id){
+    case 'checkin':   return timeField('checkin.time', it.checkin.time, '');
+    case 'winddown':  return timeField('winddown.time', it.winddown.time, '');
+    case 'listening': return timeField('listening.time', it.listening.time, '');
+    case 'workout':   return timeField('workout.time', it.workout.time, '') +
+      '<div style="font-size:11px;color:var(--sub);margin-top:4px">Fires only on your training days.</div>';
+    case 'weekly':    return timeField('weekly.time', it.weekly.time, '') +
+      '<div style="font-size:11px;color:var(--sub);margin-top:4px">Sundays.</div>';
+    case 'supps':     return timeField('supps.morning', it.supps.morning, 'Morning') +
+                             timeField('supps.midday', it.supps.midday, 'Midday') +
+                             timeField('supps.evening', it.supps.evening, 'Evening');
+    case 'water':     return (it.water.times || []).map(function(t, i){
+                          return timeField('water.times.' + i, t, 'Nudge ' + (i + 1));
+                        }).join('');
+    case 'meals':     return ['Breakfast','Lunch','Dinner'].map(function(label, i){
+                          return timeField('meals.times.' + i, (it.meals.times || [])[i] || '', label);
+                        }).join('');
+    case 'routine':   return '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">' +
+                        [0, 5, 10, 15].map(function(m){
+                          var on = (it.routine.lead || 0) === m;
+                          return '<button onclick="notifSetLead(' + m + ')" style="font-size:11.5px;font-weight:650;padding:6px 10px;border-radius:999px;cursor:pointer;border:1.5px solid ' + (on ? 'var(--green)' : 'var(--border)') + ';background:' + (on ? 'rgba(171,108,82,.12)' : 'var(--surface2)') + ';color:' + (on ? 'var(--green)' : 'var(--sub)') + '">' +
+                            (m ? m + ' min early' : 'On time') + '</button>';
+                        }).join('') + '</div>';
+    default:          return '';
+  }
+}
+
+function notifToggle(id){
+  var prefs = notifPrefs();
+
+  if(id === 'restTimers'){
+    prefs.restTimers = !prefs.restTimers;
+    notifSave(prefs);
+    notifRender();
+    return;
+  }
+
+  var item = prefs.items[id];
+  if(!item) return;
+
+  if(item.on){
+    item.on = false;
+    notifSave(prefs);
+    notifRender();
+    return;
+  }
+
+  notifEnsurePermission().then(function(granted){
+    if(!granted){
+      toast('Notifications are off for Metastory — turn them on in iPhone Settings', 4500);
+      return;
+    }
+    item.on = true;
+    notifSave(prefs);
+    notifRender();
+  });
+}
+
+function notifSetTime(path, value){
+  if(!value) return;
+  var prefs = notifPrefs(), parts = path.split('.');
+  var target = prefs.items[parts[0]];
+  if(!target) return;
+  if(parts.length === 2) target[parts[1]] = value;
+  if(parts.length === 3) target[parts[1]][+parts[2]] = value;
+  notifSave(prefs);
+  notifRender();
+}
+
+function notifSetLead(minutes){
+  var prefs = notifPrefs();
+  prefs.items.routine.lead = minutes;
+  notifSave(prefs);
+  notifRender();
+}
+
+function notifSetQuiet(){
+  var prefs = notifPrefs();
+  var from = document.getElementById('notif-quiet-from');
+  var to = document.getElementById('notif-quiet-to');
+  prefs.quietFrom = from ? from.value : '';
+  prefs.quietTo = to ? to.value : '';
+  notifSave(prefs);
+  notifRender();
+}
+
+function notifRender(){
+  var body = document.getElementById('notif-body');
+  if(body) body.innerHTML = notifSheetHTML();
+}
+
+function openNotifPrefs(){
+  var ov = document.getElementById('notif-ov');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.className = 'ov';
+    ov.id = 'notif-ov';
+    ov.innerHTML = '<div class="modal">' +
+      '<div class="mh"></div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
+        '<div class="mt2" style="margin-bottom:0">🔔 Notifications</div>' +
+        '<button onclick="closeNotifPrefs()" style="background:none;border:none;color:var(--sub);font-size:20px;cursor:pointer;padding:4px">✕</button>' +
+      '</div>' +
+      '<div id="notif-body"></div>' +
+    '</div>';
+    document.body.appendChild(ov);
+    try{ addSwipeToDismiss('notif-ov', closeNotifPrefs); }catch(e){}
+    try{ _wireOverlayTaps(); }catch(e){}
+  }
+  notifRender();
+  ov.classList.add('open');
+  // Anything that changed elsewhere — a new supplement, a moved training day —
+  // should be reflected in what is actually scheduled.
+  notifReconcile().then(function(){ notifRender(); });
+}
+
+function closeNotifPrefs(){
+  var ov = document.getElementById('notif-ov');
+  if(ov) ov.classList.remove('open');
+}
+
+window.openNotifPrefs = openNotifPrefs;
+window.closeNotifPrefs = closeNotifPrefs;
+window.notifToggle = notifToggle;
+window.notifSetTime = notifSetTime;
+window.notifSetLead = notifSetLead;
+window.notifSetQuiet = notifSetQuiet;
+
+/* Keep the schedule honest: the plan, the routine and the supplement list all
+   change from other screens, and a reminder built from them should follow. */
+after('saveRoutineData', function(){ notifReconcile(); });
+after('_suppSave', function(){ notifReconcile(); });
+setTimeout(function(){ notifReconcile(); }, 2500);
+
 /* ── Signals from Apple Health ────────────────────────────────────────────
    Metastory doesn't integrate with Oura, WHOOP, Garmin, Polar, Fitbit or the
    Apple Watch one at a time — they all write into Apple Health, so reading
@@ -14515,6 +14919,10 @@ after('rSettingsModal', function(){
         'Rest timers ring on the lock screen, even with Metastory closed.' +
       '</div>' +
       '<div id="native-notif-status" style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--sub)">Checking…</div>' +
+      '<button class="btn btn-g btn-sm btn-f" onclick="openNotifPrefs()">Choose what Metastory sends</button>' +
+      '<div style="font-size:11px;color:var(--sub);margin:6px 0 10px;line-height:1.4">' +
+        (parseInt(lsGet('_notifCount','0'), 10) || 0) + ' reminder' + ((parseInt(lsGet('_notifCount','0'), 10) || 0) === 1 ? '' : 's') + ' scheduled. Everything is off until you turn it on.' +
+      '</div>' +
       '<button class="btn btn-s btn-sm btn-f" onclick="Metastory.app.openSettings()">Open iPhone Settings</button>' +
     '</div>' +
 
