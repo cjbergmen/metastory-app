@@ -917,7 +917,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260913-settings-trim';
+const APP_BUILD='20260913-sheet-swipe';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -8479,53 +8479,97 @@ document.addEventListener('visibilitychange',function(){
 })();
 
 // ── MODAL CLOSE ON OVERLAY TAP ────────────────────────────────────────────────
-['food-ov','water-ov','timer-ov','usr-ov','key-ov','settings-ov','recipe-ov','checkin-ov'].forEach(id=>{
-  const el=document.getElementById(id);
-  if(!el)return;
-  el.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open')});
-});
+function _wireOverlayTaps(){
+  ['food-ov','water-ov','timer-ov','usr-ov','key-ov','settings-ov','recipe-ov','checkin-ov','supp-ov','routine-ov'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el || el._tapWired)return;
+    el._tapWired=true;
+    el.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open')});
+  });
+}
 
 // ── SWIPE DOWN TO DISMISS MODALS ──────────────────────────────────────────────
 function addSwipeToDismiss(ovId,closeFn){
   const ov=document.getElementById(ovId);
   if(!ov)return;
   const modal=ov.querySelector('.modal');
-  if(!modal)return;
-  let startY=0,curY=0,dragging=false;
+  if(!modal || modal._swipeWired)return;
+  modal._swipeWired=true;
+
+  // The sheet itself is the scroller, so a downward drag can mean two things.
+  // Anywhere in the grab area — the handle and the title row — it always means
+  // dismiss. Below that it only means dismiss when the content is already
+  // scrolled to the top, so a drag through a long Settings list still scrolls.
+  function inGrabArea(y){
+    const mh = modal.querySelector('.mh');
+    const top = modal.getBoundingClientRect().top;
+    const bottom = mh ? mh.getBoundingClientRect().bottom + 52 : top + 64;
+    return y <= bottom;
+  }
+
+  let startY=0,curY=0,dragging=false,fromGrab=false,startScroll=0;
+
   modal.addEventListener('touchstart',e=>{
-    startY=e.touches[0].clientY;
-    curY=startY;
+    startY=curY=e.touches[0].clientY;
+    startScroll=modal.scrollTop;
+    fromGrab=inGrabArea(startY);
     dragging=false;
   },{passive:true});
+
   modal.addEventListener('touchmove',e=>{
     curY=e.touches[0].clientY;
     const dy=curY-startY;
-    if(dy>0&&modal.scrollTop===0){
-      dragging=true;
-      modal.style.transform=`translateY(${dy}px)`;
-      modal.style.transition='none';
+    if(dy<=0){
+      if(dragging){ modal.style.transform=''; dragging=false; }
+      return;
     }
-  },{passive:true});
-  modal.addEventListener('touchend',()=>{
+    if(!fromGrab && !(startScroll<=0 && modal.scrollTop<=0)) return;
+    dragging=true;
+    // Stop the sheet from rubber-banding underneath the drag.
+    if(e.cancelable) e.preventDefault();
+    modal.style.transition='none';
+    modal.style.transform='translateY('+dy+'px)';
+  },{passive:false});
+
+  function settle(){
+    if(!dragging){
+      modal.style.transform='';
+      return;
+    }
     const dy=curY-startY;
     modal.style.transition='transform .25s cubic-bezier(.4,0,.2,1)';
-    if(dragging&&dy>80){
+    if(dy>70){
       modal.style.transform='translateY(100%)';
       setTimeout(()=>{closeFn();modal.style.transform='';modal.style.transition='';},250);
-    } else {
+    }else{
       modal.style.transform='';
       setTimeout(()=>{modal.style.transition='';},250);
     }
     dragging=false;
-  });
+  }
+
+  modal.addEventListener('touchend',settle);
+  modal.addEventListener('touchcancel',settle);
 }
-addSwipeToDismiss('food-ov',closeFood);
-addSwipeToDismiss('water-ov',()=>document.getElementById('water-ov').classList.remove('open'));
-addSwipeToDismiss('checkin-ov',closeCheckin);
-addSwipeToDismiss('recipe-ov',closeRecipeImport);
-addSwipeToDismiss('settings-ov',closeSettings);
-addSwipeToDismiss('supp-ov',closeSuppModal);
-addSwipeToDismiss('routine-ov',closeRoutineEditor);
+/* The sheets further down the document — Settings, Supplements, Recipe import —
+   do not exist yet when this script runs, so wiring them here silently did
+   nothing and those three could never be swiped or tapped away. Wire once the
+   document is parsed instead. */
+function _wireSheetDismiss(){
+  addSwipeToDismiss('food-ov',closeFood);
+  addSwipeToDismiss('water-ov',()=>document.getElementById('water-ov').classList.remove('open'));
+  addSwipeToDismiss('checkin-ov',closeCheckin);
+  addSwipeToDismiss('recipe-ov',closeRecipeImport);
+  addSwipeToDismiss('settings-ov',closeSettings);
+  addSwipeToDismiss('supp-ov',closeSuppModal);
+  addSwipeToDismiss('routine-ov',closeRoutineEditor);
+  _wireOverlayTaps();
+}
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', _wireSheetDismiss);
+}else{
+  _wireSheetDismiss();
+}
 document.addEventListener('click', function(e){
   const dd = document.getElementById('user-menu-dd');
   const btn = document.getElementById('user-menu-btn');
