@@ -10650,11 +10650,42 @@ function saveImportedRecipe(){
   if(curPage==='food') rFood();
 }
 
+
+/* Temporary: record what closes a sheet, across reloads, so a bug that only
+   shows up on a real device can be read back out of Settings. */
+function _dbg(what, extra){
+  try{
+    var log = JSON.parse(lsGet('_dbgLog','[]')) || [];
+    log.push({t:new Date().toTimeString().slice(0,8), w:what, x:extra||''});
+    while(log.length > 12) log.shift();
+    lsSet('_dbgLog', JSON.stringify(log));
+  }catch(e){}
+}
+window._dbg = _dbg;
+try{
+  var _loads = (parseInt(lsGet('_dbgLoads','0'),10)||0) + 1;
+  lsSet('_dbgLoads', String(_loads));
+  _dbg('page-load', '#' + _loads);
+}catch(e){}
+
 // ── Service Worker (cache busting) ────────────────────────────
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('./sw.js').catch(()=>{});
   navigator.serviceWorker.addEventListener('message', e => {
-    if(e.data && e.data.type==='RELOAD') window.location.reload();
+    if(!e.data || e.data.type !== 'RELOAD') return;
+    // A new build is ready. Reloading right now would discard whatever the
+    // person is in the middle of — a half-set reminder time, a meal being
+    // logged — so wait until nothing is open and they are not touching the
+    // screen. The next quiet moment is soon enough for a cache refresh.
+    _dbg('sw-reload-offered');
+    var tries = 0;
+    (function whenIdle(){
+      var busy = document.querySelector('.ov.open, #wiz-overlay.open') ||
+                 (document.activeElement && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName));
+      if(!busy){ _dbg('sw-reload-taken'); window.location.reload(); return; }
+      if(++tries > 600) return;              // give up after ~10 minutes
+      setTimeout(whenIdle, 1000);
+    })();
   });
 }
 // Last resort when a device is stuck on an old build: drop the service worker
@@ -14017,7 +14048,7 @@ window.deleteAccount = deleteAccount;
 var HEALTH_SCOPE_V = '2';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0913-5';
+var WEB_BUILD = '0913-6';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
@@ -14540,6 +14571,34 @@ if(N.takeHeld){
 
 window.notifRoute = notifRoute;
 
+/* Instrumentation for the sheet that keeps closing itself. */
+(function(){
+  function watch(){
+    var ov = document.getElementById('notif-ov');
+    if(!ov || ov._dbgWatched) return;
+    ov._dbgWatched = true;
+    new MutationObserver(function(muts){
+      muts.forEach(function(m){
+        if(m.attributeName !== 'class') return;
+        var open = ov.classList.contains('open');
+        if(ov._dbgWasOpen && !open) _dbg('sheet-closed', window._dbgVia || 'unknown');
+        ov._dbgWasOpen = open;
+        window._dbgVia = '';
+      });
+    }).observe(ov, {attributes:true, attributeFilter:['class']});
+    ov._dbgWasOpen = ov.classList.contains('open');
+  }
+  setInterval(watch, 1000);
+  var origClose = window.closeNotifPrefs;
+  setTimeout(function(){
+    if(typeof window.closeNotifPrefs === 'function'){
+      var real = window.closeNotifPrefs;
+      window.closeNotifPrefs = function(){ window._dbgVia = 'closeNotifPrefs'; return real.apply(this, arguments); };
+    }
+  }, 2000);
+})();
+
+
 window.openNotifPrefs = openNotifPrefs;
 window.closeNotifPrefs = closeNotifPrefs;
 window.notifToggle = notifToggle;
@@ -14923,6 +14982,18 @@ function syncBodyMassFromHealth(){
 /* Shown only when a read came back with nothing. An empty Health read is
    indistinguishable from a declined one — iOS deliberately hides read
    permission — so say what actually came back rather than leaving a dead end. */
+function _nativeDbgHTML(){
+  var log = [];
+  try{ log = JSON.parse(lsGet('_dbgLog','[]')) || []; }catch(e){}
+  if(!log.length) return '';
+  return '<details style="margin:10px 0">' +
+    '<summary style="font-size:12px;color:var(--sub);cursor:pointer;padding:4px 0;font-weight:600">Diagnostics</summary>' +
+    '<div style="font-size:11px;color:var(--sub);line-height:1.6;padding:6px 0;font-family:ui-monospace,monospace">' +
+      log.map(function(e){ return e.t + '  ' + e.w + (e.x ? '  ' + e.x : ''); }).join('<br>') +
+    '</div></details>';
+}
+window._nativeDbgHTML = _nativeDbgHTML;
+
 function _nativeHealthDiagHTML(){
   var raw = null;
   try{ raw = JSON.parse(lsGet('_healthLastRaw','null')); }catch(e){}
@@ -14989,6 +15060,7 @@ after('rSettingsModal', function(){
         (parseInt(lsGet('_notifCount','0'), 10) || 0) + ' reminder' + ((parseInt(lsGet('_notifCount','0'), 10) || 0) === 1 ? '' : 's') + ' scheduled. Everything is off until you turn it on.' +
       '</div>' +
       '<button class="btn btn-s btn-sm btn-f" onclick="Metastory.app.openSettings()">Open iPhone Settings</button>' +
+      _nativeDbgHTML() +
     '</div>' +
 
     '<div style="font-size:11px;color:var(--sub);line-height:1.5;text-align:center;padding:0 2px 10px">' +
