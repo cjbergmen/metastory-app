@@ -8243,16 +8243,39 @@ function addSwipeToDismiss(ovId,closeFn){
     return y <= bottom;
   }
 
-  let startY=0,curY=0,dragging=false,fromGrab=false,startScroll=0;
+  // A drag that starts on a control belongs to the control. Spinning the iOS
+  // time wheel, dragging a slider, or scrolling a list inside the sheet are all
+  // downward touchmoves, and reading them as "dismiss" closes the sheet out
+  // from under whatever the person was actually doing.
+  const CONTROLS='input,select,textarea,button,a,label,summary,[contenteditable],[role="slider"],[role="listbox"]';
+  function onControl(target){
+    if(!target||!target.closest)return false;
+    if(target.closest(CONTROLS))return true;
+    // Anything inside the sheet that scrolls on its own axis.
+    let el=target;
+    while(el&&el!==modal){
+      if(el.nodeType===1){
+        const st=getComputedStyle(el);
+        const scrolls=/(auto|scroll)/.test(st.overflowY)&&el.scrollHeight>el.clientHeight+1;
+        if(scrolls)return true;
+      }
+      el=el.parentElement;
+    }
+    return false;
+  }
+
+  let startY=0,curY=0,dragging=false,fromGrab=false,startScroll=0,blocked=false;
 
   modal.addEventListener('touchstart',e=>{
     startY=curY=e.touches[0].clientY;
     startScroll=modal.scrollTop;
-    fromGrab=inGrabArea(startY);
+    blocked=onControl(e.target);
+    fromGrab=!blocked&&inGrabArea(startY);
     dragging=false;
   },{passive:true});
 
   modal.addEventListener('touchmove',e=>{
+    if(blocked)return;
     curY=e.touches[0].clientY;
     const dy=curY-startY;
     if(dy<=0){
@@ -8268,7 +8291,8 @@ function addSwipeToDismiss(ovId,closeFn){
   },{passive:false});
 
   function settle(){
-    if(!dragging){
+    if(blocked||!dragging){
+      blocked=false;
       modal.style.transform='';
       return;
     }
