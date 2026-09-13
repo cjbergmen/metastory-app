@@ -1,4 +1,4 @@
-const VERSION = '20260913-health5';
+const VERSION = '20260913-fresh1';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
@@ -23,11 +23,26 @@ self.addEventListener('fetch', e => {
   // Audio streams (Safe Inside album) go straight to the network — the browser
   // handles range requests natively, and partial (206) responses can't be cached.
   if (e.request.url.includes('/audio/')) return;
+  if (e.request.method !== 'GET') return;
+
+  // "Network first" was still going through the HTTP cache, and GitHub Pages
+  // serves the page with a ten-minute max-age — so for ten minutes after a
+  // deploy the fresh fetch quietly returned the old page and the app looked
+  // like it had not updated. The document and its code now always revalidate;
+  // images, fonts and audio keep their normal caching.
+  const url = new URL(e.request.url);
+  const isCode = e.request.mode === 'navigate' ||
+                 /\.(html|js|json|css)$/.test(url.pathname) ||
+                 url.pathname === '/' ;
+  const request = isCode
+    ? new Request(e.request.url, { cache: 'reload', credentials: 'same-origin', mode: 'same-origin' })
+    : e.request;
+
   e.respondWith(
-    fetch(e.request)
+    fetch(request)
       .then(r => {
         const clone = r.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
+        caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {});
         return r;
       })
       .catch(() => caches.match(e.request))
