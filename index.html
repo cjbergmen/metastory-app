@@ -314,6 +314,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .ck-chip{padding:7px 13px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);color:var(--sub);font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--font-sans);transition:all .15s}
 .ck-chip.on{border-color:var(--green);background:var(--green);color:#fff}
 
+@keyframes ms-landed{0%{box-shadow:0 0 0 0 rgba(171,108,82,.55)}70%{box-shadow:0 0 0 12px rgba(171,108,82,0)}100%{box-shadow:0 0 0 0 rgba(171,108,82,0)}}
+.ms-landed{animation:ms-landed 1.6s ease-out 2}
 /* ── ONBOARDING WIZARD ─────────────────────────────────────────────── */
 .wiz-sec+.wiz-sec{margin-top:22px;padding-top:20px;border-top:1px solid var(--border)}
 .wiz-sec-title{font-size:18px;font-weight:800;color:var(--text);letter-spacing:-.01em;margin-bottom:5px;line-height:1.25}
@@ -4281,7 +4283,7 @@ function _pvBlockHTML(){
   });
   // Build the three blocks separately, then order them by whether a check-in exists.
   // After a check-in, the suggestion pops to the very top and the check-in settles below it.
-  let _checkinCard = `<div class="card"><div style="display:flex;align-items:center;justify-content:space-between"><span class="kicker" style="color:var(--sub)">Nervous-system check-in</span><i class="nsi" data-k="all">?</i></div>
+  let _checkinCard = `<div class="card" id="ns-checkin-card"><div style="display:flex;align-items:center;justify-content:space-between"><span class="kicker" style="color:var(--sub)">Nervous-system check-in</span><i class="nsi" data-k="all">?</i></div>
     <h3 class="mk-q">What state is your system in right now?</h3>
     <div class="pv-ladder">${_ladder}</div>
     <p style="font-size:11.5px;color:var(--sub);margin-top:10px;line-height:1.45">Polyvagal theory: the middle three are regulated (safe) states; the top and bottom are the activated and shut-down edges. Check in as many times a day as you like — each one shapes today's practice and builds your pattern over time.</p>`;
@@ -12486,7 +12488,7 @@ function rSupps(){
       </div></div>`;
   }
   // schedule
-  h+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><span class="kicker">Today's schedule</span><button onclick="openSuppModal()" style="background:none;border:none;color:var(--green);font-size:12px;font-weight:700;cursor:pointer">+ Add</button></div>`;
+  h+=`<div class="card" id="supp-today-card"><div style="display:flex;justify-content:space-between;align-items:center"><span class="kicker">Today's schedule</span><button onclick="openSuppModal()" style="background:none;border:none;color:var(--green);font-size:12px;font-weight:700;cursor:pointer">+ Add</button></div>`;
   if(!plan.length){
     h+=`<p style="font-size:13px;color:var(--sub);line-height:1.5;margin-top:10px">No supplements yet. Foundations first — food, sleep, and stress carry most of the load. Add one when you're ready, and we'll introduce it slowly.</p>`;
   }else{
@@ -14048,7 +14050,7 @@ window.deleteAccount = deleteAccount;
 var HEALTH_SCOPE_V = '2';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0913-7';
+var WEB_BUILD = '0913-9';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
@@ -14519,7 +14521,29 @@ function closeNotifPrefs(){
    own destination; anything unrecognised falls back to Today rather than
    going nowhere. */
 
+/* Scroll a destination into view once it exists, and flag it so arriving is
+   visible. Today and Rest both render after the page switch, so this retries
+   for a couple of seconds rather than firing once and missing. */
+function _land(selector){
+  var tries = 0;
+  (function go(){
+    var el = document.querySelector(selector);
+    if(el){
+      try{
+        el.scrollIntoView({behavior:'smooth', block:'center'});
+        el.classList.add('ms-landed');
+        setTimeout(function(){ el.classList.remove('ms-landed'); }, 3600);
+      }catch(e){}
+      _dbg('landed', selector);
+      return;
+    }
+    if(++tries < 20) setTimeout(go, 150);
+    else _dbg('land-missed', selector);
+  })();
+}
+
 function notifRoute(id, tab){
+  _dbg('reminder-route', String(id || 'none'));
   if(!id) return;
   // 'water3' -> 'water', 'supps-morning' -> 'supps', 'routine5' -> 'routine'
   var key = String(id).split('-')[0].replace(/\d+$/, '');
@@ -14534,23 +14558,27 @@ function notifRoute(id, tab){
 
   switch(key){
     case 'checkin':
-      page('today');
-      // The nervous-system ladder lives on Today; put it in view rather than
-      // making them hunt for it.
+      // The nervous-system check-in lives under Rest, not on Today.
+      page('rest');
       setTimeout(function(){
-        try{
-          var el = document.querySelector('.pv-state') || document.querySelector('[onclick^="pvAddCheckin"]');
-          if(el && el.scrollIntoView) el.scrollIntoView({behavior:'smooth', block:'center'});
-        }catch(e){}
-      }, 350);
+        try{ restGo('checkin'); }catch(e){}
+        _land('#page-rest .card');
+      }, 250);
       break;
     case 'winddown':
-    case 'listening':
+      // Rest has a dedicated wind-down view; its home screen is not it.
       page('rest');
-      setTimeout(function(){ try{ restGo(key === 'listening' ? 'practices' : 'home'); }catch(e){} }, 250);
+      setTimeout(function(){ try{ restGo('wind'); }catch(e){} _land('#page-rest .card'); }, 250);
+      break;
+    case 'listening':
+      // "Safe Inside" is the Listening view.
+      page('rest');
+      setTimeout(function(){ try{ restGo('listen'); }catch(e){} _land('#page-rest .card'); }, 250);
       break;
     case 'supps':
       page('supps');
+      // Today's doses, not the practitioner-code card that opens the page.
+      _land('#supp-today-card');
       break;
     case 'meal':
       page('food');
@@ -14562,17 +14590,24 @@ function notifRoute(id, tab){
       break;
     case 'workout':
       page('workout');
+      _land('#page-workout .card');
       break;
     case 'routine':
-      page(tab || 'today');
-      break;
     default:
-      page(tab || 'today');
+      var dest = tab || 'today';
+      if(dest === 'rest'){
+        // Otherwise the Rest page reopens on whatever sub-view was last used,
+        // which has nothing to do with the step being reminded about.
+        try{ _restView = 'home'; }catch(e){}
+      }
+      page(dest);
+      if(dest === 'rest') setTimeout(function(){ try{ restGo('home'); }catch(e){} }, 200);
   }
 }
 
 if(N.on){
   N.on('reminder-opened', function(d){
+    _dbg('reminder-event');
     try{ notifRoute(d && d.id, d && d.tab); }catch(e){}
   });
 }
@@ -14583,6 +14618,7 @@ if(N.takeHeld){
   setTimeout(function(){
     try{
       var held = N.takeHeld('reminder-opened');
+      _dbg('reminder-held', held ? String(held.id) : 'none');
       if(held) notifRoute(held.id, held.tab);
     }catch(e){}
   }, 1200);
