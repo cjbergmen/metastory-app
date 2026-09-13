@@ -13978,6 +13978,10 @@ window.deleteAccount = deleteAccount;
 /* ── Settings ────────────────────────────────────────────────────────────
    The existing modal is one big template string, so the native rows are
    appended after it renders rather than threaded through it. */
+/* Bumped whenever the set of Health types the app reads grows, so existing
+   users get asked about the new ones exactly once. */
+var HEALTH_SCOPE_V = '2';
+
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
   if(!available){ toast('Apple Health isn\'t available on this device'); return; }
@@ -13990,10 +13994,15 @@ async function connectHealth(){
   var consent = confirm(
     'Connect Apple Health?\n\n' +
     'Metastory will save the workouts you finish to Apple Health, and read ' +
-    'your weight and step count back from it.\n\n' +
-    'Your weight becomes part of the profile used to generate your ' +
-    'personalized guidance, which is produced by Google Gemini. It is never ' +
-    'used for advertising, never sold, and never used to train models.\n\n' +
+    'back what your devices already record: sleep, resting heart rate, heart ' +
+    'rate variability, breathing rate, blood oxygen, wrist temperature, ' +
+    'steps, active energy, exercise minutes, mindful minutes, weight and body ' +
+    'composition.\n\n' +
+    'You choose which of those to share on the next screen, and nothing you ' +
+    'withhold is read. Your weight and recovery markers become part of the ' +
+    'profile used to generate your personalized guidance, which is produced ' +
+    'by Google Gemini. It is never used for advertising, never sold, and ' +
+    'never used to train models.\n\n' +
     'You can turn this off any time in Settings.'
   );
   if(!consent) return;
@@ -14949,13 +14958,25 @@ function _nativeHealthSourcesHTML(){
 
 function nativeHealthRefresh(){
   toast('Reading from Health…');
-  healthSyncSources();
-  healthSyncSignals().then(function(res){
+  // Ask first, every time. Read permissions are per data type, and iOS only
+  // ever shows the sheet for types it has not been asked about — so a person
+  // who connected Health when the app read two things still has to be asked
+  // about the rest. Without this, every new type returns empty for them and
+  // the app can't tell that apart from having no data.
+  var ask = (N.health && N.health.requestAuthorization)
+    ? N.health.requestAuthorization().catch(function(){ return null; })
+    : Promise.resolve(null);
+
+  ask.then(function(){
+    lsSet('_healthScopeV', HEALTH_SCOPE_V);
+    healthSyncSources();
+    return healthSyncSignals();
+  }).then(function(res){
     if(res && res.days && res.days.length){
       N.haptics.notify('success');
       toast('Read ' + res.days.length + ' days from Health ✓', 3000);
     } else {
-      toast('Nothing came back from Health', 3000);
+      toast('Nothing came back from Health. Open iPhone Settings › Health › Data Access & Devices › Metastory and switch on what you want to share.', 7000);
     }
     try{ rSettingsModal(); }catch(e){}
   });
@@ -14969,6 +14990,20 @@ window._nativeDisconnectHealth = disconnectHealth;
 
 /* Pull weight through on launch for anyone who has already connected. */
 if(healthOn()) syncBodyMassFromHealth();
+
+/* People who connected Health before the app read sleep, HRV and the rest
+   were never asked about those types, and an unasked read type just returns
+   nothing. Ask once, quietly, the first time they open a build that reads
+   more than the last one did. */
+if(healthOn() && lsGet('_healthScopeV','') !== HEALTH_SCOPE_V && N.health && N.health.requestAuthorization){
+  setTimeout(function(){
+    N.health.requestAuthorization().catch(function(){ return null; }).then(function(){
+      lsSet('_healthScopeV', HEALTH_SCOPE_V);
+      healthSyncSources();
+      healthSyncSignals();
+    });
+  }, 2500);
+}
 
 })();
 </script>
