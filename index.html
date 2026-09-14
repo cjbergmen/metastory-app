@@ -4891,6 +4891,19 @@ const ASSESS_AA = {
 
 // ── NS PROFILE LIBRARY ────────────────────────────────────────────────────────
 const NS_PROFILES = {
+  'Regulated & Resourced': {
+    badge:'Profile 6', color:'#b7baa7',
+    tagline:'A settled system with real access to regulation',
+    summary:'Your answers describe a nervous system that is doing its job. Activation and rest are both available to you, and you recover from stress within a reasonable window. This is not the absence of stress — it is the presence of capacity. The work here is protection rather than repair: noticing what keeps this baseline in place, and catching drift early enough that it never becomes a pattern.',
+    needs:['Protecting what already works — sleep, rhythm, and the relationships that regulate you','Noticing early drift rather than waiting for symptoms','Enough challenge to keep capacity, without tipping into overload','Regular re-checks, since baselines move quietly'],
+    backfires:['Assuming the baseline is permanent and dropping the habits that built it','Stacking new stressors because there is headroom for them','Optimising a system that is already working','Reading a good score as permission to skip rest'],
+    practices:['Keep one daily regulation practice, even on good days','Weekly check-in on sleep, appetite and recovery time','Coherent breathing 5–10 min, a few times a week','Time outdoors without a task attached','Re-take this assessment every 8–12 weeks, or after any major change'],
+    exercise:'Train as you like. Your system can handle intensity — including HIIT — provided sleep and recovery hold. Keep at least one genuinely easy session a week so hard days stay hard.',
+    nutrition:'Protein at each meal, steady blood sugar, and enough total food for your training load. Nothing restrictive is indicated.',
+    hydration:'80–100 oz of water daily, with electrolytes when sweating heavily.',
+    recovery:'Consistent wake time, a real wind-down, and one unstructured block each week. Recovery is what is holding this baseline up.',
+    supplements:['None indicated by this assessment','Magnesium glycinate 200–400mg at night if sleep quality slips'],
+  },
   'High Performer Dysregulation': {
     badge:'Profile 1', color:'#c4855f',
     tagline:'Chronic sympathetic dominance — identity built around output',
@@ -5524,12 +5537,19 @@ function saveAssessResults(assess){
     const bio = [0,1,2,3,4].reduce((s,qi)=>s+(_assessAnswers['ns_3_'+qi]||0),0);
     const _total = sym+dor+ven+bio;
     result = {...result, sympathetic:sym, dorsal:dor, ventral:ven, biological:bio, total: _total };
-    // Map to 5 NS Profiles
-    if(Math.max(sym,dor,ven,bio) <= 8 && _total <= 28) result.pattern = 'Mild Situational Anxiety';
-    else if(bio >= 12 && bio >= sym && bio >= dor) result.pattern = 'Biological Anxiety';
-    else if(dor >= 10 && dor >= sym) result.pattern = 'Burnout & Collapse';
-    else if(sym >= 10 && dor >= 8) result.pattern = 'Trauma-Driven Anxiety';
-    else if(sym >= 9) result.pattern = 'High Performer Dysregulation';
+    /* Each subscale runs 0–20, so a threshold of 10 is only the midpoint —
+       which is why answering "Sometimes" to all twenty questions used to come
+       back as Burnout & Collapse, and why that one pattern covered 30% of the
+       whole score space. Elevation now starts at 13 (roughly two-thirds), and
+       a genuinely settled system gets its own pattern instead of being filed
+       under "Mild Situational Anxiety" alongside everyone unclassifiable.
+       Ventral is reverse-scored, so a LOW ventral score means good access to
+       regulation — it gates the regulated pattern rather than sitting unused. */
+    if(sym <= 7 && dor <= 7 && bio <= 7 && ven <= 9) result.pattern = 'Regulated & Resourced';
+    else if(sym >= 12 && dor >= 12) result.pattern = 'Trauma-Driven Anxiety';
+    else if(bio >= 13 && bio >= sym && bio >= dor) result.pattern = 'Biological Anxiety';
+    else if(dor >= 13 && dor >= sym) result.pattern = 'Burnout & Collapse';
+    else if(sym >= 12 && sym > dor) result.pattern = 'High Performer Dysregulation';
     else result.pattern = 'Mild Situational Anxiety';
   }
 
@@ -14107,7 +14127,7 @@ window.deleteAccount = deleteAccount;
 var HEALTH_SCOPE_V = '2';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0914-3';
+var WEB_BUILD = '0914-4';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
