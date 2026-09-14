@@ -5555,6 +5555,23 @@ function saveAssessResults(assess){
   lsSet('_assess_'+id+'_result', JSON.stringify(result));
 }
 
+
+/* The amino-acid protocols people can order, and the gut protocol. These are
+   the same Fullscript plan links metastoryhealth.com/amino-acids-assessment
+   uses, with the same thresholds — kept here in one place so the app and the
+   site can't drift apart. The plans open for someone signed in to Fullscript;
+   a signed-out visitor is sent to the dispensary storefront instead, which is
+   why the copy below says to sign in first. */
+const FS_GUT_PROTOCOL = 'https://us.fullscript.com/plans/rbergmen-gut-protocol-3-months';
+const AA_TYPES = [
+  {name:'Type 1 — Low Serotonin',        key:'serotonin',      threshold:20, link:'https://us.fullscript.com/plans/7a90803ecc', color:'#7a9aab'},
+  {name:'Type 2 — Low Norepinephrine',   key:'norepinephrine', threshold:18, link:'https://us.fullscript.com/plans/c80d97b292', color:'#b7baa7'},
+  {name:'Type 3 — Low GABA',             key:'gaba',           threshold:18, link:'https://us.fullscript.com/plans/cac0dfd1ff', color:'#ab6c52'},
+  {name:'Type 4 — Low Endorphin',        key:'endorphin',      threshold:18, link:'https://us.fullscript.com/plans/c0c44f2153', color:'#c4855f'},
+  {name:'Type 5 — Unstable Blood Sugar', key:'bloodSugar',     threshold:18, link:'https://us.fullscript.com/plans/8ef9a0a09d', color:'#b7baa7'}
+];
+const FS_SIGNIN_NOTE = 'Sign in to your Fullscript account first — protocols only open for a signed-in account.';
+
 function rAssessResults(assess){
   const result = _parseAssessResult(lsGet('_assess_'+assess.id+'_result', null)) || {};
   let h = '';
@@ -5623,6 +5640,13 @@ function rAssessResults(assess){
       <div style="font-size:13px;font-weight:700;margin-bottom:8px">What This Means</div>
       <div style="font-size:13px;color:var(--sub);line-height:1.6">${gutInterp}</div>
     </div>`;
+
+    h += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);padding:16px;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px">Gut Health Protocol</div>
+      <div style="font-size:12px;color:var(--sub);line-height:1.5;margin-bottom:12px">A foundational 3-month protocol for microbiome balance, mucosal integrity and the gut-brain axis.</div>
+      <button onclick="window.open('${FS_GUT_PROTOCOL}','_blank')" class="btn btn-o btn-f btn-sm" style="margin-bottom:8px">View protocol on Fullscript →</button>
+      <div style="font-size:11.5px;color:var(--sub);line-height:1.5">${FS_SIGNIN_NOTE}</div>
+    </div>`;
   }
 
   if(assess.id === 'aa'){
@@ -5649,9 +5673,30 @@ function rAssessResults(assess){
       </div>`).join('')}
     </div>`;
 
+    // The protocols for whichever types actually scored over threshold. These
+    // used to live only in the Insights view, which is reachable from the
+    // nervous-system results and nowhere else — so from here, the screen most
+    // people finish on, there was no way to order anything.
+    const qualifying = AA_TYPES.filter(t => (result[t.key]||0) >= t.threshold);
+    if(qualifying.length){
+      h += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);padding:16px;margin-bottom:14px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px">Your Protocols</div>
+        <div style="font-size:12px;color:var(--sub);line-height:1.5;margin-bottom:12px">${qualifying.length === 1 ? 'One type scored above threshold.' : qualifying.length + ' types scored above threshold.'} Each has its own targeted amino acid protocol.</div>
+        ${qualifying.map(t=>`
+          <div style="background:${t.color}14;border:1px solid ${t.color}55;border-radius:var(--rs);padding:12px;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px">
+              <span style="width:9px;height:9px;border-radius:50%;background:${t.color};flex:none"></span>
+              <span style="font-size:12.5px;font-weight:700;color:var(--text)">${t.name}</span>
+            </div>
+            <button onclick="window.open('${t.link}','_blank')" class="btn btn-sm" style="background:var(--surface);color:var(--text);border:1.5px solid ${t.color}80;border-radius:8px;padding:9px 12px;font-size:12px;font-weight:700;cursor:pointer;width:100%">View protocol on Fullscript →</button>
+          </div>`).join('')}
+        <div style="font-size:11.5px;color:var(--sub);line-height:1.5;margin-top:4px">${FS_SIGNIN_NOTE}</div>
+      </div>`;
+    }
+
     h += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);padding:14px;margin-bottom:14px">
       <div style="font-size:13px;font-weight:700;margin-bottom:8px">Next Step</div>
-      <div style="font-size:13px;color:var(--sub);line-height:1.6">Share these results with your Metastory Health practitioner. They can review your amino acid profile and send a targeted supplement protocol to your Fullscript account.</div>
+      <div style="font-size:13px;color:var(--sub);line-height:1.6">${qualifying.length ? 'Your practitioner can review your full amino acid profile and tailor these protocols to your clinical picture.' : 'Your scores are below threshold, so no specific protocol is indicated right now. Share these results with your Metastory Health practitioner and retake the assessment if your symptoms change.'}</div>
     </div>`;
   }
 
@@ -5798,7 +5843,7 @@ function rAssessInsights(){
         <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:12px;background:${sevColor}20;color:${sevColor}">${gutResult.severity} Severity</span>
       </div>
       <div style="font-size:13px;line-height:1.65;color:var(--text);margin-bottom:12px">Based on your gut assessment score, a foundational gut protocol can support microbiome balance, mucosal integrity, and the gut-brain axis. The protocol below is a standard 3-month starting point.</div>
-      <button onclick="window.open('https://us.fullscript.com/plans/rbergmen-gut-protocol-3-months','_blank')" class="btn btn-o btn-f btn-sm" style="margin-bottom:10px">View Gut Protocol on Fullscript →</button>
+      <button onclick="window.open('${FS_GUT_PROTOCOL}','_blank')" class="btn btn-o btn-f btn-sm" style="margin-bottom:10px">View Gut Protocol on Fullscript →</button>
       <div style="background:var(--surface2);border-radius:var(--rs);padding:10px;border-left:3px solid var(--orange)">
         <div style="font-size:11px;font-weight:700;color:var(--orange);margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em">Practitioner Note</div>
         <div style="font-size:12px;line-height:1.55;color:var(--text)">For a personalized gut protocol — especially if your score is Moderate or High — we recommend reaching out to a Metastory Health practitioner. They can tailor your protocol based on your full clinical picture.</div>
@@ -5808,21 +5853,17 @@ function rAssessInsights(){
 
   // AA Supplement Recommendations section
   if(aaResult){
-    const AA_TYPES = [
-      {name:'Type 1 — Low Serotonin', key:'serotonin', threshold:20, link:'https://us.fullscript.com/plans/7a90803ecc', color:'#7a9aab'},
-      {name:'Type 2 — Low Norepinephrine', key:'norepinephrine', threshold:18, link:'https://us.fullscript.com/plans/c80d97b292', color:'#b7baa7'},
-      {name:'Type 3 — Low GABA', key:'gaba', threshold:18, link:'https://us.fullscript.com/plans/cac0dfd1ff', color:'#ab6c52'},
-      {name:'Type 4 — Low Endorphin', key:'endorphin', threshold:18, link:'https://us.fullscript.com/plans/c0c44f2153', color:'#c4855f'},
-      {name:'Type 5 — Unstable Blood Sugar', key:'bloodSugar', threshold:18, link:'https://us.fullscript.com/plans/8ef9a0a09d', color:'#b7baa7'}
-    ];
     const qualifyingTypes = AA_TYPES.filter(t => (aaResult[t.key]||0) >= t.threshold);
     h += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:14px">
       <div style="font-size:15px;font-weight:700;margin-bottom:4px">Amino Acid Recommendations</div>
       <div style="font-size:12px;color:var(--sub);line-height:1.5;margin-bottom:12px">Based on your assessment, you may benefit from targeted amino acid support for the following neurotransmitter pathways. Supplement protocols are specific to each type.</div>
       ${qualifyingTypes.length > 0 ? qualifyingTypes.map(t=>`
-        <div style="background:${t.color}0d;border:1px solid ${t.color}30;border-radius:var(--rs);padding:12px;margin-bottom:8px">
-          <div style="font-size:12px;font-weight:700;color:${t.color};margin-bottom:6px">${t.name}</div>
-          <button onclick="window.open('${t.link}','_blank')" class="btn btn-sm" style="background:${t.color}20;color:${t.color};border:1px solid ${t.color}40;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;width:100%">View ${t.name} Protocol on Fullscript →</button>
+        <div style="background:${t.color}14;border:1px solid ${t.color}55;border-radius:var(--rs);padding:12px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px">
+            <span style="width:9px;height:9px;border-radius:50%;background:${t.color};flex:none"></span>
+            <span style="font-size:12.5px;font-weight:700;color:var(--text)">${t.name}</span>
+          </div>
+          <button onclick="window.open('${t.link}','_blank')" class="btn btn-sm" style="background:var(--surface);color:var(--text);border:1.5px solid ${t.color}80;border-radius:8px;padding:9px 12px;font-size:12px;font-weight:700;cursor:pointer;width:100%">View protocol on Fullscript →</button>
         </div>`).join('') : `<div style="font-size:13px;color:var(--sub);padding:10px 0">Your amino acid scores are below threshold — no specific protocol is indicated at this time. Retake the assessment if your symptoms change.</div>`}
       <div style="background:var(--surface2);border-radius:var(--rs);padding:10px;border-left:3px solid var(--blue);margin-top:4px">
         <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em">Practitioner Note</div>
@@ -14052,7 +14093,7 @@ window.deleteAccount = deleteAccount;
 var HEALTH_SCOPE_V = '2';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0914-1';
+var WEB_BUILD = '0914-2';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
