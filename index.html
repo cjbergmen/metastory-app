@@ -10945,6 +10945,7 @@ async function forceUpdate(){
       <button class="dr-i" id="dr-journal" onclick="drawerGo('journal')"><span class="ic" style="background:rgba(120,140,196,.18)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span><div>Reflections<small>Your prayers &amp; insights, summarized over time</small></div></button>
       <button class="dr-i" id="dr-tour" onclick="closeDrawer();setTimeout(function(){startTour();},260)"><span class="ic" style="background:rgba(171,108,82,.14)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 1 1 3.3 2.9c-.6.2-.9.8-.9 1.4v.4"/><path d="M12 17.2v.01"/></svg></span><div>How this works<small>The DRESS model &amp; a tour of the app</small></div></button>
       <button class="dr-i" id="dr-settings" onclick="closeDrawer();openSettings()"><span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1l-.4-2.6H10l-.4 2.6a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.4 2.6h3.8l.4-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5a7 7 0 0 0 .1-1z"/></svg></span><div>Settings<small>Profile, health flags, sign out</small></div></button>
+      <button class="dr-i" id="dr-feedback" onclick="closeDrawer();setTimeout(openFeedback,260)"><span class="ic" style="background:rgba(171,108,82,.14)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.3-.6L3 21l1.8-5a8.3 8.3 0 0 1-.8-3.6 8.4 8.4 0 0 1 8.5-8.4 8.4 8.4 0 0 1 8.5 8.4z"/></svg></span><div>Report a bug or idea<small>Send it straight to our team</small></div></button>
     </div>
     <div class="dr-foot">Education &amp; self-care — not medical diagnosis or treatment.</div>
   </div>
@@ -13750,6 +13751,107 @@ if(!N || !N.isNative) return;
 
 var SUPPORT_EMAIL = 'support@metastoryhealth.com';
 
+/* ── Telling us something is wrong ────────────────────────────────────────
+   A bare mailto opens an empty message, and what comes back is usually
+   "the app is broken" with no way to tell which build it broke on. This
+   composes the mail instead, and appends only the version line — never
+   anything from the person's logs, plan or assessments. */
+
+var _fbKind = 'bug';
+
+function openFeedback(){
+  var ov = document.getElementById('fb-ov');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.className = 'ov';
+    ov.id = 'fb-ov';
+    ov.innerHTML = '<div class="modal">' +
+      '<div class="mh"></div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+        '<div class="mt2" style="margin-bottom:0">Report a bug or idea</div>' +
+        '<button onclick="closeFeedback()" style="background:none;border:none;color:var(--sub);font-size:20px;cursor:pointer;padding:4px">✕</button>' +
+      '</div>' +
+      '<div id="fb-body"></div>' +
+    '</div>';
+    document.body.appendChild(ov);
+    try{ addSwipeToDismiss('fb-ov', closeFeedback); }catch(e){}
+  }
+  _fbKind = 'bug';
+  fbRender();
+  ov.classList.add('open');
+}
+
+function closeFeedback(){
+  var ov = document.getElementById('fb-ov');
+  if(ov) ov.classList.remove('open');
+}
+
+function fbSetKind(k){
+  _fbKind = k;
+  var note = document.getElementById('fb-text');
+  var kept = note ? note.value : '';
+  fbRender();
+  var again = document.getElementById('fb-text');
+  if(again){ again.value = kept; }
+}
+
+function _fbVersionLine(){
+  var parts = [];
+  try{ if(N && N.isNative) parts.push('Metastory for iPhone ' + (N.version||'?') + ' (' + (N.build||'?') + ')'); }catch(e){}
+  parts.push('web ' + (typeof WEB_BUILD !== 'undefined' ? WEB_BUILD : '?'));
+  try{ parts.push(navigator.platform || ''); }catch(e){}
+  return parts.filter(Boolean).join(' · ');
+}
+
+function fbRender(){
+  var body = document.getElementById('fb-body');
+  if(!body) return;
+  var isBug = _fbKind === 'bug';
+  var chip = function(k, label){
+    var on = _fbKind === k;
+    return '<button onclick="fbSetKind(\'' + k + '\')" style="flex:1;padding:10px 8px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700;' +
+      'border:1.5px solid ' + (on ? 'var(--green)' : 'var(--border)') + ';' +
+      'background:' + (on ? 'rgba(171,108,82,.10)' : 'var(--surface)') + ';' +
+      'color:' + (on ? 'var(--green)' : 'var(--sub)') + '">' + label + '</button>';
+  };
+
+  body.innerHTML =
+    '<div style="font-size:12.5px;color:var(--sub);line-height:1.55;margin-bottom:12px">' +
+      'This opens an email to our team. Nothing is sent until you tap send in Mail.' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;margin-bottom:12px">' + chip('bug','Something is broken') + chip('idea','I have an idea') + '</div>' +
+    '<textarea id="fb-text" rows="6" placeholder="' +
+      (isBug ? 'What happened, and what were you doing just before? Screenshots help — you can attach them in Mail.'
+             : 'What would you like Metastory to do?') +
+      '" style="width:100%;box-sizing:border-box;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:12px;font-size:16px;color:var(--text);font-family:var(--font-sans);line-height:1.5;outline:none;resize:vertical"></textarea>' +
+    '<button class="btn btn-g btn-f btn-sm" style="margin-top:12px" onclick="fbSend()">Open email to our team</button>' +
+    '<div style="font-size:11px;color:var(--sub);line-height:1.5;margin-top:10px">' +
+      'We attach your app version so we can reproduce it — ' + _fbVersionLine() + '. None of your logs, plan or assessment results are included.' +
+    '</div>';
+}
+
+function fbSend(){
+  var el = document.getElementById('fb-text');
+  var note = (el && el.value || '').trim();
+  var subject = (_fbKind === 'bug') ? 'Metastory app — bug report' : 'Metastory app — feature idea';
+  var body = note + '\n\n\n— — —\n' + _fbVersionLine() + '\n';
+  var href = 'mailto:' + SUPPORT_EMAIL +
+             '?subject=' + encodeURIComponent(subject) +
+             '&body=' + encodeURIComponent(body);
+  try{ N.haptics.impact('light'); }catch(e){}
+  // window.open rather than location.href: the native shell routes a new
+  // window straight to Mail, where a same-frame navigation can be swallowed.
+  try{ window.open(href, '_blank'); }catch(e){ location.href = href; }
+  closeFeedback();
+  toast('Opening your email app…', 2500);
+}
+
+window.openFeedback = openFeedback;
+window.closeFeedback = closeFeedback;
+window.fbSetKind = fbSetKind;
+window.fbSend = fbSend;
+
+
 document.documentElement.classList.add('native-ios');
 
 /* Re-point a global function, keeping the original behaviour and running fn
@@ -14127,7 +14229,7 @@ window.deleteAccount = deleteAccount;
 var HEALTH_SCOPE_V = '2';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0914-4';
+var WEB_BUILD = '0914-5';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
