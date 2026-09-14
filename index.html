@@ -5548,8 +5548,19 @@ function saveAssessResults(assess){
     const endo = assess.sections[3].questions.reduce((_,__,qi)=>_+(_assessAnswers['aa_3_'+qi]||0),0);
     const bsug = assess.sections[4].questions.reduce((_,__,qi)=>_+(_assessAnswers['aa_4_'+qi]||0),0);
     result = {...result, serotonin:sero, norepinephrine:nore, gaba:gaba, endorphin:endo, bloodSugar:bsug};
-    const scores = [{t:'Serotonin',v:sero/170},{t:'Norepinephrine',v:nore/60},{t:'GABA',v:gaba/60},{t:'Endorphin',v:endo/60},{t:'Blood Sugar',v:bsug/70}];
-    result.primaryType = scores.sort((a,b)=>b.v-a.v)[0].t;
+    // Rank only the types that actually cleared their threshold. Ranking all
+    // five meant someone who answered 0 to all 42 questions was still told
+    // their primary imbalance was low serotonin — every ratio tied at zero and
+    // the sort simply kept the first entry.
+    const _byKey = {serotonin:sero, norepinephrine:nore, gaba:gaba, endorphin:endo, bloodSugar:bsug};
+    const _maxes = {serotonin:170, norepinephrine:60, gaba:60, endorphin:60, bloodSugar:70};
+    const _labels = {serotonin:'Serotonin', norepinephrine:'Norepinephrine', gaba:'GABA', endorphin:'Endorphin', bloodSugar:'Blood Sugar'};
+    const over = AA_TYPES
+      .filter(t => (_byKey[t.key]||0) >= t.threshold)
+      .map(t => ({t:_labels[t.key], v:(_byKey[t.key]||0)/_maxes[t.key]}))
+      .sort((a,b)=>b.v-a.v);
+    result.primaryType = over.length ? over[0].t : null;
+    result.typesOverThreshold = over.length;
   }
 
   lsSet('_assess_'+id+'_result', JSON.stringify(result));
@@ -5650,8 +5661,11 @@ function rAssessResults(assess){
   }
 
   if(assess.id === 'aa'){
-    h += `<div style="font-size:18px;font-weight:800;color:var(--green);margin-bottom:4px">Primary: Low ${result.primaryType||'—'}</div>
-      <div style="font-size:12px;color:var(--sub)">Most significant neurotransmitter imbalance</div></div>`;
+    h += result.primaryType
+      ? `<div style="font-size:18px;font-weight:800;color:var(--green);margin-bottom:4px">Primary: Low ${result.primaryType}</div>
+         <div style="font-size:12px;color:var(--sub)">Most significant neurotransmitter imbalance</div></div>`
+      : `<div style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:4px">No significant imbalance</div>
+         <div style="font-size:12px;color:var(--sub)">Every type scored below its threshold</div></div>`;
 
     const aaScores = [
       {label:'Serotonin (Type 1)',val:result.serotonin||0,max:170,pct:Math.round((result.serotonin||0)/170*100)},
@@ -14093,7 +14107,7 @@ window.deleteAccount = deleteAccount;
 var HEALTH_SCOPE_V = '2';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0914-2';
+var WEB_BUILD = '0914-3';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
