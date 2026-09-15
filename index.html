@@ -2170,6 +2170,11 @@ let _woExList=[];  // maps index → exercise name; rebuilt each rWorkout call
 let _woState={};   // {exName: {selW:number|null, rep:string}} — persists across re-renders
 let _exFlipped={}; // {idx: bool} — tracks which exercise cards are showing how-to back
 let _woPendingSwaps={}; // {idx: newExObj} — swaps not yet saved to _customWorkouts
+// {idx: originalName} — the name the PLAN knows each swapped slot by. Kept apart
+// from _woExList because that list is the RENDER order (done exercises sink to the
+// bottom) and is overwritten with the new name the moment a swap is applied. Without
+// this, saving a swap replaced whichever exercise happened to sit at the same index.
+let _woSwapFrom={};
 let _swapModalIdx=null; // which exercise index the swap modal is open for
 let _swapMuscleFilter=''; // current muscle tab in swap modal
 let _swapCandidates=[]; // current list of swap options shown in modal
@@ -2701,6 +2706,7 @@ function _renderSwapListOrig(){
   const items=EX_LIBRARY[_swapMuscleFilter]||[];
   _swapCandidates=items.slice();
   let h='';
+  h+='<div class="swap-item" style="border-color:var(--orange)" onclick="closeSwapModal();openWoBuilder(true)"><div class="swap-item-name">✎ Edit the whole workout</div><div class="swap-item-tag">Add or drop moves, reorder them, or turn the day into a timed circuit.</div></div>';
   h+='<div class="swap-item" style="border-color:var(--green)"><div style="display:flex;gap:8px;align-items:center"><input id="swap-manual" placeholder="Type your own exercise…" style="flex:1;border:1px solid var(--border);border-radius:8px;padding:7px 9px;font-size:16px" onclick="event.stopPropagation()"><button class="btn btn-b btn-sm" style="white-space:nowrap" onclick="event.stopPropagation();applyManualSwap()">Use this</button></div></div>';
   items.forEach((ex,ci)=>{
     const isCurrent=ex.n===currentName;
@@ -2720,6 +2726,9 @@ function applySwap(idx, ci){_applySwapOrig(idx,ci);try{saveWorkoutToday();}catch
 function _applySwapOrig(idx, ci){
   const newEx=_swapCandidates[ci]; if(!newEx)return;
   closeSwapModal();
+  // Capture the origin once per slot: swapping the same card twice must still point
+  // back at what the saved plan actually holds, not at the intermediate pick.
+  if(!(idx in _woSwapFrom))_woSwapFrom[idx]=_woExList[idx];
   _woPendingSwaps[idx]=newEx;
   _woExList[idx]=newEx.n;
   const card=document.getElementById('wo-ex-'+idx);
@@ -2742,7 +2751,7 @@ function _applySwapOrig(idx, ci){
       if(timerDiv&&timerDiv.parentElement){
         const newBar=document.createElement('div');
         newBar.className='swap-save-bar';
-        newBar.innerHTML=`<div class="swap-save-label">↔ ${pc} change${pc!==1?'s':''} pending</div><button class="swap-save-day" onclick="saveWorkoutToday()">Save Today</button><button class="swap-save-week" onclick="saveWorkoutWeek()">Save Week</button>`;
+        newBar.innerHTML=`<div class="swap-save-label">↔ ${pc} change${pc!==1?'s':''} pending</div>`+_woSaveBarBtns();
         timerDiv.parentElement.insertBefore(newBar,timerDiv.parentElement.firstChild);
       }
     } else if(bar){
@@ -2750,54 +2759,71 @@ function _applySwapOrig(idx, ci){
     }
   },180);
 }
+// Apply pending swaps to a workout object; returns a new copy. Matching is by the
+// ORIGINAL exercise name recorded at swap time, across ex and then pm — an index
+// match is wrong the moment anything is ticked done (the list re-sorts) and it can
+// never reach the PM boost at all, which is how a swap used to land on the wrong
+// exercise, or vanish, leaving the one being replaced still sitting there.
 function _buildSwappedWorkout(wo){
-  // Apply pending swaps to a workout object, returns new copy
   const copy=JSON.parse(JSON.stringify(wo));
-  Object.entries(_woPendingSwaps).forEach(([idxStr,newEx])=>{
-    const idx=parseInt(idxStr);
-    const origName=_woExList[idx];
-    // Replace in ex array
-    const ei=copy.ex.findIndex((_,i)=>i===idx||copy.ex[i].n===origName);
-    if(ei>=0)copy.ex[ei]=newEx;
-    else if(copy.pm){const pi=copy.pm.findIndex((_,i)=>copy.pm[i].n===origName);if(pi>=0)copy.pm[pi]=newEx;}
+  Object.keys(_woPendingSwaps).forEach(function(idxStr){
+    const newEx=_woPendingSwaps[idxStr];
+    if(!newEx)return;
+    const from=_woSwapFrom[idxStr];
+    const put=function(arr){
+      if(!arr)return false;
+      for(var i=0;i<arr.length;i++){ if(arr[i].n===from){ arr[i]=newEx; return true; } }
+      return false;
+    };
+    if(from&&(put(copy.ex)||put(copy.pm)))return;
+    // Already in place (the same slot swapped more than once) — nothing to do.
+    const has=function(arr){ return !!arr&&arr.some(function(x){return x.n===newEx.n;}); };
+    if(has(copy.ex)||has(copy.pm))return;
+    // Last resort: a slot with no recorded origin, e.g. state left over from a reload.
+    const idx=parseInt(idxStr,10);
+    if(copy.ex&&idx<copy.ex.length)copy.ex[idx]=newEx;
+    else if(copy.pm&&copy.ex&&idx-copy.ex.length<copy.pm.length)copy.pm[idx-copy.ex.length]=newEx;
   });
   return copy;
 }
+const DAY_NAMES=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function _woDayName(){ return DAY_NAMES[vdDate().getDay()]; }
+// The two buttons on the pending-changes bar. Kept in one place because the bar is
+// built from three different spots and they used to drift apart.
+function _woSaveBarBtns(){
+  return '<button class="swap-save-day" onclick="saveWorkoutToday()">Just today</button>'
+       + '<button class="swap-save-week" onclick="saveWorkoutForever()">Every '+_woDayName()+'</button>';
+}
+// Just today: a one-week adjustment. The saved plan is untouched, and next week this
+// weekday comes back exactly as it was.
 function saveWorkoutToday(){
-  const d=vdDate().getDay();
   const wo=getWO(); if(!wo)return;
-  const updated=_buildSwappedWorkout(wo);
-  let cw={};
-  try{const raw=lsGet('_customWorkouts','');if(raw)cw=JSON.parse(raw);}catch(e){}
-  cw[d]=updated;
-  lsSet('_customWorkouts',JSON.stringify(cw));
-  _woPendingSwaps={};
-  showToast('Plan saved! ✅');
-  rWorkout();
-}
-function saveWorkoutWeek(){
   const d=vdDate().getDay();
-  let cw={};
-  try{const raw=lsGet('_customWorkouts','');if(raw)cw=JSON.parse(raw);}catch(e){}
-  // Iterate the user's actual training days when they have a custom schedule,
-  // so saving the week never re-adds days they've moved away from.
-  const _existing=Object.keys(cw).map(Number).filter(n=>!isNaN(n)&&n>=0&&n<=6);
-  const _days=_existing.length?_existing:[1,2,4,5];
-  _days.forEach(day=>{
-    const base=cw[day]||WORKOUTS[day];
-    if(!base)return;
-    if(day===d){
-      const wo=getWO();
-      cw[day]=_buildSwappedWorkout(wo);
-    } else {
-      cw[day]=cw[day]||JSON.parse(JSON.stringify(WORKOUTS[day]));
-    }
-  });
-  lsSet('_customWorkouts',JSON.stringify(cw));
-  _woPendingSwaps={};
-  showToast('Full week saved! ✅');
+  const plan=JSON.parse(JSON.stringify(_effectivePlan(viewDate)));
+  plan[d]=_buildSwappedWorkout(wo);
+  _saveWeekAdjust(plan);
+  _woPendingSwaps={};_woSwapFrom={};
+  showToast('Saved for today \u2705');
   rWorkout();
 }
+// Every <weekday>, permanently — written through _durableSaveBasePlan so it reaches
+// Firestore too and holds on his other devices.
+function saveWorkoutForever(){
+  const wo=getWO(); if(!wo)return;
+  const d=vdDate().getDay();
+  const base=_basePlan();
+  const next={};
+  Object.keys(base).forEach(function(k){
+    var kn=Number(k);
+    if(!isNaN(kn)&&kn>=0&&kn<=6&&base[k])next[kn]=JSON.parse(JSON.stringify(base[k]));
+  });
+  next[d]=_buildSwappedWorkout(wo);
+  _durableSaveBasePlan(next);
+  _woPendingSwaps={};_woSwapFrom={};
+  showToast('Saved to every '+_woDayName()+' \u2705');
+  rWorkout();
+}
+function saveWorkoutWeek(){ return saveWorkoutForever(); }
 // ── BUILD A WORKOUT ───────────────────────────────────────────────────────────
 // Swapping only ever trades one exercise for another inside a plan the app wrote.
 // This builds a session from nothing: pick the moves, pick the shape. Two shapes,
@@ -2811,10 +2837,32 @@ var _wobGroup='core';
 var WOB_GROUPS=['core','chest','back','shoulders','biceps','triceps','legs'];
 var WOB_LABELS={core:'Core',chest:'Chest',back:'Back',shoulders:'Shoulders',biceps:'Biceps',triceps:'Triceps',legs:'Legs'};
 
-function openWoBuilder(){
+// seed=true opens the builder loaded with the day's current workout, so "edit this
+// whole thing" and "start from nothing" are the same sheet.
+function openWoBuilder(seed){
   _wobPicks=[];_wobGroup='core';
   var n=document.getElementById('wob-name');if(n)n.value='';
   wobSetFormat('timed');
+  if(seed){
+    var _sw=null;
+    try{_sw=getWO();}catch(e){}
+    if(_sw){
+      if(n)n.value=_sw.name||'';
+      if(_sw.type==='circuit'&&_sw.moves&&_sw.moves.length){
+        _wobPicks=_sw.moves.map(function(m){return {n:m.n,i:m.i||'',muscles:m.muscles||'',eq:'bw',tag:'3 \u00d7 12',rest:'60 sec'};});
+        var _w=document.getElementById('wob-work');if(_w)_w.value=_sw.work;
+        var _r=document.getElementById('wob-rest');if(_r)_r.value=_sw.rest;
+        var _ro=document.getElementById('wob-rounds');if(_ro)_ro.value=_sw.rounds;
+      } else if(_sw.ex||_sw.pm){
+        _wobPicks=[].concat(_sw.ex||[],_sw.pm||[]).map(function(e){return JSON.parse(JSON.stringify(e));});
+        wobSetFormat('reps');
+      }
+      if(_wobPicks.length){
+        var _g=(typeof EX_MUSCLE_MAP!=='undefined')?EX_MUSCLE_MAP[_wobPicks[0].n]:null;
+        if(_g&&WOB_LABELS[_g])_wobGroup=_g;
+      }
+    }
+  }
   wobRenderTabs();wobRenderList();wobRenderPicked();
   document.getElementById('wob-overlay').classList.add('open');
   document.getElementById('wob-sheet').classList.add('open');
@@ -2940,7 +2988,7 @@ function wobApply(scope){
     _saveWeekAdjust(plan);
     try{showToast('Loaded for today ✅');}catch(e){}
   }
-  _woPendingSwaps={};
+  _woPendingSwaps={};_woSwapFrom={};
   try{lsSet('wd_'+viewDate,'0');}catch(e){}
   closeWoBuilder();
   try{rWorkout();}catch(e){}
@@ -3188,7 +3236,7 @@ function saveExEdit(){
   // Persist the edit straight to the saved plan so it's permanent and survives
   // logging, re-renders, and reloads (fixes the "timer reverts after logging" bug).
   if(_persistExEditToPlan(vdDate().getDay(),_origName,ne)){
-    delete _woPendingSwaps[idx];
+    delete _woPendingSwaps[idx];delete _woSwapFrom[idx];
     _woExList[idx]=ne.n;
     closeExEdit();
     try{showToast('Saved to your plan ✓'+_renameNote);}catch(_){}
@@ -3197,6 +3245,7 @@ function saveExEdit(){
   }
   // Fallback (e.g. a rest day, or the exercise isn't in the base plan): stage it as
   // a pending change the user can Save Today / Save Week.
+  if(!(idx in _woSwapFrom))_woSwapFrom[idx]=_origName;
   _woPendingSwaps[idx]=ne;
   _woExList[idx]=ne.n;
   closeExEdit();
@@ -3231,7 +3280,7 @@ function _updatePendingBar(){
     if(timerDiv&&timerDiv.parentElement){
       var nb=document.createElement('div');
       nb.className='swap-save-bar';
-      nb.innerHTML='<div class="swap-save-label">✎ '+pc+' change'+(pc!==1?'s':'')+' pending</div><button class="swap-save-day" onclick="saveWorkoutToday()">Save Today</button><button class="swap-save-week" onclick="saveWorkoutWeek()">Save Week</button>';
+      nb.innerHTML='<div class="swap-save-label">✎ '+pc+' change'+(pc!==1?'s':'')+' pending</div>'+_woSaveBarBtns();
       timerDiv.parentElement.insertBefore(nb,timerDiv.parentElement.firstChild);
     }
   } else if(bar){
@@ -4512,7 +4561,7 @@ function rWorkout(){
         <div style="font-size:12px;color:var(--sub);flex:none;font-variant-numeric:tabular-nums">${wo.work}s</div>
       </div>`;
     });
-    h+=`<button class="btn btn-o" style="width:100%;margin-top:12px" onclick="openWoBuilder()">Build a different one</button>`;
+    h+=`<button class="btn btn-o" style="width:100%;margin-top:12px" onclick="openWoBuilder(true)">Edit this circuit</button>`;
     if(!wdone){
       h+=`<button class="btn btn-g" style="width:100%;margin-top:9px" onclick="setWODone(true)">✓ Mark Session Complete</button>`;
     }
@@ -4581,8 +4630,7 @@ function rWorkout(){
   if(pendingCount>0){
     h+=`<div class="swap-save-bar">
       <div class="swap-save-label">↔ ${pendingCount} change${pendingCount!==1?'s':''} pending</div>
-      <button class="swap-save-day" onclick="saveWorkoutToday()">Save Today</button>
-      <button class="swap-save-week" onclick="saveWorkoutWeek()">Save Week</button>
+      ${_woSaveBarBtns()}
     </div>`;
   }
   document.getElementById('page-workout').innerHTML=h;
@@ -14723,7 +14771,7 @@ window.deleteAccount = deleteAccount;
 var HEALTH_SCOPE_V = '2';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0915-2';
+var WEB_BUILD = '0915-3';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
