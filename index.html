@@ -13537,8 +13537,8 @@ function _detHandoff(text,q){
   return {text:out,forceAction:false};
 }
 
-const CRISIS_RX=/\b(suicid|kill myself|killing myself|end my life|don'?t want to (be alive|live|wake up)|want to die|hurt myself|harm myself|self[\s-]?harm|hopeless|no reason to (live|go on)|better off dead|can'?t go on)\b/i;
-const REDFLAG_RX=/\b(blood in (my |the )?stool|black,? tarry|tarry stool|vomit(ing|ed)? blood|coughing up blood|chest pain|chest pressure|can'?t breathe|trouble breathing|short(ness)? of breath|one[\s-]?sided weakness|face droop|slurred speech|worst headache|sudden severe|severe abdominal|passed out|fainted|unexplained weight loss|losing weight without|coffee[\s-]?ground|(trouble|difficulty|hard|painful|pain) swallowing|swallowing (is )?(hard|painful|difficult)|(food|it) (keeps? |is )?(get(s|ting)? )?stuck when i swallow|food (gets|getting|keeps getting) stuck|can'?t swallow|dysphagia|throwing up blood)\b/i;
+const CRISIS_RX=/\b(suicid|kill myself|killing myself|end my life|don'?t want to (be alive|live|wake up)|want to die|hurt myself|harm myself|self[\s-]?harm|hopeless|no reason to (live|go on)|better off dead|can'?t go on|(can'?t|cannot|don'?t) see the point (in|to|of) (much|anything|living|life|going on|any of it)|no point (in )?(living|going on|life|any of it)|nothing matters anymore|wish i (was|were) dead|wish i could disappear|don'?t want to be here( anymore)?|(everyone|everybody|they'?d all) (would )?be better off without me|tired of (living|being alive))\b/i;
+const REDFLAG_RX=/\b(blood in (my |the )?stool|black,? tarry|tarry stool|vomit(ing|ed)? blood|coughing up blood|chest pain|chest pressure|can'?t breathe|trouble breathing|short(ness)? of breath|one[\s-]?sided weakness|face droop|slurred speech|worst headache|sudden severe|severe abdominal|passed out|fainted|unexplained weight loss|(lost|losing|dropped|down)\s+[\d.]+\+?\s*(pounds?|lbs?|kilos?|kg)[^.]{0,45}(without (even )?(trying|meaning)|unintentional(ly)?|not trying|no idea why|didn'?t try)|(without (even )?trying|unintentionally)[^.]{0,45}(lost|losing|dropped)\s+[\d.]+\+?\s*(pounds?|lbs?|kilos?|kg)|losing weight without|coffee[\s-]?ground|(trouble|difficulty|hard|painful|pain) swallowing|swallowing (is )?(hard|painful|difficult)|(food|it) (keeps? |is )?(get(s|ting)? )?stuck when i swallow|food (gets|getting|keeps getting) stuck|can'?t swallow|dysphagia|throwing up blood)\b/i;
 const OUT_MED_RX=/\b(stop|start|increase|raise|decrease|lower|change|adjust|come off|wean off|double)\s+((taking|your|the|off|on)\s+)*(dose|medication|meds|prescription|antidepressant|ssri|ppi|insulin|metformin|levothyroxine|blood ?pressure)/i;
 const OUT_DX_RX=/\byou (likely |probably |may |might )?have (a |an )?(thyroid (problem|condition|disorder)|hypothyroid|hyperthyroid|diabet|cancer|depression|anxiety disorder|ibs|sibo|adrenal fatigue|autoimmune)/i;
 
@@ -14896,7 +14896,7 @@ window.deleteAccount = deleteAccount;
 var HEALTH_SCOPE_V = '2';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0915-15';
+var WEB_BUILD = '0915-17';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
