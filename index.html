@@ -2971,7 +2971,15 @@ function getWO(){
   return (plan&&plan[d])||null;
 }
 function isWODone(){return lsGet('wd_'+viewDate,'0')==='1'}
-function setWODone(v){lsSet('wd_'+viewDate,v?'1':'0');refresh();}
+function setWODone(v){
+  const was = lsGet('wd_'+viewDate,'0')==='1';
+  lsSet('wd_'+viewDate,v?'1':'0');
+  // Only on the transition into done — not on every re-render, and not when
+  // someone un-ticks it. Marking complete is always a tap, so the audio
+  // context is already unlocked by the gesture that got us here.
+  if(v && !was){ try{ _unlockAudio(); }catch(e){} playSessionComplete(); }
+  refresh();
+}
 function getTgt(){
   const custom=lsGet('_userTargets','');
   if(custom){try{const t=JSON.parse(custom);if(t&&t.train&&t.rest)return isTrain()?t.train:t.rest;}catch(e){}}
@@ -8030,6 +8038,43 @@ function playAlarm(){
       beep(t+0.5,0.32,1100);
     };
     // resume() is required if context was suspended (iOS default state)
+    if(ctx.state==='suspended'){ctx.resume().then(play).catch(()=>{});}
+    else{play();}
+  }catch(e){}
+}
+
+/* Finishing the session gets its own sound. The rest-timer alarm is three
+   urgent beeps on one note — "get back to it". This is the opposite message,
+   so it rises and resolves instead: D5 to A5 to D6, each note softer and
+   longer than the last. Anyone who trains with the phone across the room
+   should be able to tell the two apart without looking.
+
+   This follows the ringer switch: on silent, the phone stays quiet and the
+   haptic carries it. That is the iOS audio session's doing, not ours. */
+function playSessionComplete(){
+  try{ N.haptics.notify('success'); }catch(e){
+    if(navigator.vibrate) navigator.vibrate([40,60,40,60,120]);
+  }
+  try{
+    const ctx=_getAudioCtx();
+    if(!ctx)return;
+    const play=()=>{
+      const note=(start,dur,freq,peak)=>{
+        const o=ctx.createOscillator();
+        const g=ctx.createGain();
+        o.connect(g);g.connect(ctx.destination);
+        o.type='sine';o.frequency.value=freq;
+        g.gain.setValueAtTime(0,start);
+        g.gain.linearRampToValueAtTime(peak,start+0.03);
+        // Exponential tail reads as a struck bell rather than a buzzer.
+        g.gain.exponentialRampToValueAtTime(0.0001,start+dur);
+        o.start(start);o.stop(start+dur+0.02);
+      };
+      const t=ctx.currentTime;
+      note(t,       0.30, 587.33, 0.34);   // D5
+      note(t+0.14,  0.34, 880.00, 0.30);   // A5
+      note(t+0.30,  0.80, 1174.66,0.26);   // D6, left to ring
+    };
     if(ctx.state==='suspended'){ctx.resume().then(play).catch(()=>{});}
     else{play();}
   }catch(e){}
@@ -13803,6 +13848,18 @@ function _fbVersionLine(){
   return parts.filter(Boolean).join(' · ');
 }
 
+function _fbReplyRowHTML(){
+  var known = '';
+  try{ known = (fbUser && fbUser.email) || ''; }catch(e){}
+  if(known){
+    return '<div style="font-size:11.5px;color:var(--sub);line-height:1.5;margin-top:10px">' +
+      'We\u2019ll reply to <b style="color:var(--text)">' + known + '</b>.</div>';
+  }
+  return '<input id="fb-email" type="email" inputmode="email" autocomplete="email" placeholder="Your email (optional, so we can reply)" ' +
+    'style="width:100%;box-sizing:border-box;margin-top:10px;background:var(--surface);border:1.5px solid var(--border);' +
+    'border-radius:12px;padding:12px;font-size:16px;color:var(--text);font-family:var(--font-sans);outline:none">';
+}
+
 function fbRender(){
   var body = document.getElementById('fb-body');
   if(!body) return;
@@ -13817,33 +13874,100 @@ function fbRender(){
 
   body.innerHTML =
     '<div style="font-size:12.5px;color:var(--sub);line-height:1.55;margin-bottom:12px">' +
-      'This opens an email to our team. Nothing is sent until you tap send in Mail.' +
+      'Goes straight to our team. Screenshots help — if you have one, mention it and we\u2019ll follow up for it.' +
     '</div>' +
     '<div style="display:flex;gap:8px;margin-bottom:12px">' + chip('bug','Something is broken') + chip('idea','I have an idea') + '</div>' +
     '<textarea id="fb-text" rows="6" placeholder="' +
       (isBug ? 'What happened, and what were you doing just before? Screenshots help — you can attach them in Mail.'
              : 'What would you like Metastory to do?') +
       '" style="width:100%;box-sizing:border-box;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:12px;font-size:16px;color:var(--text);font-family:var(--font-sans);line-height:1.5;outline:none;resize:vertical"></textarea>' +
-    '<button class="btn btn-g btn-f btn-sm" style="margin-top:12px" onclick="fbSend()">Open email to our team</button>' +
+    _fbReplyRowHTML() +
+    '<button class="btn btn-g btn-f btn-sm" id="fb-send" style="margin-top:12px" onclick="fbSend()">Send to our team</button>' +
     '<div style="font-size:11px;color:var(--sub);line-height:1.5;margin-top:10px">' +
       'We attach your app version so we can reproduce it — ' + _fbVersionLine() + '. None of your logs, plan or assessment results are included.' +
     '</div>';
 }
 
-function fbSend(){
-  var el = document.getElementById('fb-text');
-  var note = (el && el.value || '').trim();
-  var subject = (_fbKind === 'bug') ? 'Metastory app — bug report' : 'Metastory app — feature idea';
-  var body = note + '\n\n\n— — —\n' + _fbVersionLine() + '\n';
-  var href = 'mailto:' + SUPPORT_EMAIL +
-             '?subject=' + encodeURIComponent(subject) +
-             '&body=' + encodeURIComponent(body);
-  try{ N.haptics.impact('light'); }catch(e){}
+/* The Worker that turns this into mail in the support inbox. Until it is
+   deployed — and any time it is unreachable — we fall back to composing the
+   message in Mail rather than losing it, because a send button that silently
+   does nothing is worse than one that opens a draft. */
+var FEEDBACK_ENDPOINT = 'https://metastory-feedback.cjbergmen.workers.dev';
+
+function _fbSubject(){
+  return (_fbKind === 'bug') ? 'Metastory app — bug report' : 'Metastory app — feature idea';
+}
+
+function _fbMailto(note){
+  return 'mailto:' + SUPPORT_EMAIL +
+         '?subject=' + encodeURIComponent(_fbSubject()) +
+         '&body=' + encodeURIComponent(note + '\n\n\n— — —\n' + _fbVersionLine() + '\n');
+}
+
+function _fbOpenMail(note){
+  var href = _fbMailto(note);
   // window.open rather than location.href: the native shell routes a new
   // window straight to Mail, where a same-frame navigation can be swallowed.
   try{ window.open(href, '_blank'); }catch(e){ location.href = href; }
-  closeFeedback();
-  toast('Opening your email app…', 2500);
+}
+
+function fbSend(){
+  var el = document.getElementById('fb-text');
+  var note = (el && el.value || '').trim();
+  if(!note){ toast('Add a line or two first so we know what to look at.', 3000); return; }
+
+  var reply = '';
+  var rel = document.getElementById('fb-email');
+  if(rel && rel.value) reply = rel.value.trim();
+  if(!reply){ try{ reply = (fbUser && fbUser.email) || ''; }catch(e){} }
+
+  var btn = document.getElementById('fb-send');
+  if(btn){ btn.disabled = true; btn.textContent = 'Sending…'; }
+  try{ N.haptics.impact('light'); }catch(e){}
+
+  var payload = {
+    kind: _fbKind,
+    subject: _fbSubject(),
+    message: note,
+    replyTo: reply,
+    version: _fbVersionLine(),
+    sentAt: new Date().toISOString()
+  };
+
+  var done = false;
+  var finish = function(ok){
+    if(done) return; done = true;
+    if(btn){ btn.disabled = false; btn.textContent = 'Send to our team'; }
+    if(ok){
+      closeFeedback();
+      try{ N.haptics.notify('success'); }catch(e){}
+      toast('Sent — thank you. We read every one of these.', 3500);
+    } else {
+      closeFeedback();
+      _fbOpenMail(note);
+      toast('Couldn\u2019t send directly — opening your email app instead.', 4000);
+    }
+  };
+
+  // Never leave the button spinning on a hung request.
+  var bail = setTimeout(function(){ finish(false); }, 8000);
+
+  try{
+    fetch(FEEDBACK_ENDPOINT, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    }).then(function(r){
+      clearTimeout(bail);
+      finish(r && r.ok);
+    }).catch(function(){
+      clearTimeout(bail);
+      finish(false);
+    });
+  }catch(e){
+    clearTimeout(bail);
+    finish(false);
+  }
 }
 
 window.openFeedback = openFeedback;
@@ -14229,7 +14353,7 @@ window.deleteAccount = deleteAccount;
 var HEALTH_SCOPE_V = '2';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0914-5';
+var WEB_BUILD = '0915-1';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
