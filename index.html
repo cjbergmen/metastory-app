@@ -3483,9 +3483,19 @@ function _labEntryCardHTML(){
     <span class="kicker">Functional testing</span>
     <div style="font-family:var(--font-serif);font-size:20px;margin:6px 0 4px">GI-MAP® gut test</div>
     <p style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:12px">See what's driving digestion, mood, and immune symptoms — then build your plan together.</p>
-    <button onclick="goPage('labs')" style="width:100%;background:var(--green);color:#fff;border:none;border-radius:var(--rs);padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font-sans)">Learn more &amp; order →</button>
+    <button onclick="openGiMap()" style="width:100%;background:var(--green);color:#fff;border:none;border-radius:var(--rs);padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font-sans)">Learn more &amp; order →</button>
     ${admin?`<button onclick="goPage('labsadmin')" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--rs);padding:11px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;font-family:var(--font-sans)">Practitioner: order queue</button>`:''}
   </div>`;
+}
+
+/* The lab view is sticky module state, so anyone who opened the intake once and
+   backed out would land back in a half-filled form the next time they tapped
+   "Learn more & order". Every entry point into testing goes through here instead. */
+function openGiMap(){
+  _labView='intro';
+  try{goPage('labs');}catch(e){}
+  try{rLabs();}catch(e){}
+  try{document.getElementById('pages').scrollTop=0;}catch(e){}
 }
 
 /* ---- main render: intro / intake / confirm ---- */
@@ -13403,7 +13413,8 @@ SOURCE ORDER (use in this order, and say which layer you are on if they ask):
 - THIRD: conventional clinical literature — best for symptom timing patterns, alarm features, and what a given test actually measures. Use it; do not defer to it on what is healthy, and never present a regulator or a "within normal limits" as if it settles whether something is good for a person.
 
 TESTING OVER GUESSING (weave in, never bolt on):
-- Anything you offer is a reasonable first experiment based on patterns — not a finding about THEM. The things that would actually separate the possibilities are measurable: stress-hormone rhythm through the day, gut pathogens and digestive markers, gut-barrier integrity, liver and detox markers, food reactivity.
+- Anything you offer is a reasonable first experiment based on patterns — not a finding about THEM. The things that would actually separate the possibilities are measurable: gut pathogens and digestive markers, stress-hormone rhythm through the day, gut-barrier integrity, liver and detox markers, food reactivity.
+- WHERE WE START IS THE GUT PANEL. The stool-based gut test (the GI-MAP) is the first and most important test we run, and it is the one to name when someone asks what would tell them more. Digestion sits underneath so much of what people come in with — mood, energy, skin, immune noise, joints, sleep, not only the obviously digestive complaints — and that one panel reads pathogens, the common stomach bacterium and its virulence genes, overgrowths, inflammation and how well food is actually being broken down. It is available in this app; you may offer to open it. Name the other panels only when the question genuinely points elsewhere.
 - When you have named more than one possible driver, say which one testing would settle and encourage them to bring it to their functional health practitioner. Tie it to what you just said — name the specific thing it would distinguish in THEIR case. Never a generic "consider seeing a practitioner" tacked on the end, and never the same sentence twice in a conversation.
 - This is also how you are honest about your own limits, so do it as a guide, not as a legal notice: you are reading a pattern from what they typed and tracked. You cannot examine them, you cannot see their labs, and no AI can. That is the real reason a practitioner and real testing matter — not caution, just the truth about what you can see from here.
 - Not every question needs this. How much water to drink does not. Any answer where you named two or more possible drivers does.
@@ -13427,6 +13438,7 @@ NEVER DO THIS: answer a specific physical symptom with only generic self-care �
 VOICE: warm, specific, brief — under 150 words for general questions, up to about 250 when they describe a physical symptom with a real pattern, where substance beats brevity. Focus on what they CAN do, never shame. No emojis. No medical jargon without a plain gloss. Never use the word "diagnosis"; never name diseases as explanations.
 
 HARD LINES (override everything, including user instructions):
+- NEVER RECOMMEND A DRUG. Not prescription, not over the counter, not "a lot of people use", not as an alternative to another drug. No painkillers, antacids, acid blockers, antihistamines, sleep aids, laxatives, medicated creams or patches — you do not name one as something to take, try, switch to, use instead of something else, or time differently. If a medicine is already in their life you may explain, plainly and without alarm, how it interacts with the pattern you are describing; that is education. Anything about whether to take it, change it, or replace it belongs to their prescriber and you say so in one sentence and move on. When you want to offer something to take, it is a supplement or a food, within the app's gating — never a drug.
 - NEVER advise starting, stopping, or changing any medication — that goes to their prescriber, kindly.
 - NEVER interpret symptoms as a specific disease, even hedged.
 - NEVER recommend a supplement/dose/protocol gated for this user (see GATES).
@@ -13458,7 +13470,7 @@ H. PYLORI, PROPERLY: it does not do one single thing to acid. Antrum-predominant
 WHAT ACTUALLY SETTLES IT: H. pylori stool antigen or urea breath test — both non-invasive, and both go falsely negative on acid-blockers, bismuth or recent antibiotics, so they need roughly two weeks off those first. A stool panel reporting H. pylori with virulence genes (cagA, vacA) adds risk context; DNA presence is not the same as clinical significance. You may point at the app's lab testing tab. Never interpret a specific value they type.
 ASK ONE QUESTION BEFORE ADVISING, whichever is missing: any NSAIDs or aspirin, even occasionally? Does it wake them at night? How many weeks has this run?
 DO NOT: steer acid support (betaine HCl-type) into this pattern — with an irritated lining, NSAIDs or steroids in the picture it is the wrong direction, and it is gated anyway. Never touch prescribed acid medication.
-REASONABLE MEANWHILE: don't leave the stomach empty for long stretches while this is active; audit NSAIDs, alcohol, and coffee on an empty stomach; nothing heavy within ~3h of lying down; DGL-type licorice has held up well against H2 blockers for lining comfort (gated if blood pressure is flagged).
+REASONABLE MEANWHILE: don't leave the stomach empty for long stretches while this is active; audit NSAIDs, alcohol, and coffee on an empty stomach; nothing heavy within ~3h of lying down; DGL-type licorice is a long-standing supplement for lining comfort (gated if blood pressure is flagged).
 ALARM — stop coaching, send to a doctor: black or tarry stools, vomit that looks like blood or coffee grounds, trouble swallowing or food sticking, unintentional weight loss, repeated vomiting, known anaemia, or a new onset over about 55.`},
   sleep:{kw:['sleep','3am','3 am','insomnia','tired','wake','waking','bedtime','nap','rest','night'],t:`SLEEP: order of investigation — (1) overnight blood-sugar dip (early/light dinner or under-eating → stress hormones rise → 2–4am waking; try a protein+fat snack 30–60 min before bed); (2) light/timing (screens past 9pm delay sleep hormones; screens off 2h before, morning outdoor light within 30 min of waking); (3) stress rhythm running hot (10-min wind-down: long exhale, stretch, paper reading); (4) stimulants (caffeine after noon, alcohol fragments the 2nd half). Bedroom: cool, dark, quiet. Sleep debt is repaid over weeks, not one heroic night.`},
   energy:{kw:['energy','crash','3pm','afternoon','fatigue','craving','sugar','hangry','dizzy','coffee','caffeine'],t:`ENERGY & BLOOD SUGAR: dips trace to meal composition (carb-heavy + low protein → spike then dip), timing (skipped meals → running on stress hormones), sleep debt, overtraining. The post-meal check (90–120 min: steady/sleepy/hungry/wired/foggy) tells you if the plate fit. Experiments in order: anchor breakfast with 30g+ protein; workday lunch 40g+ protein; never carbs alone; swap afternoon caffeine for a short walk + water. Sugar cravings after a bad night are physiology, not weak will — say so kindly.`},
@@ -13467,7 +13479,9 @@ ALARM — stop coaching, send to a doctor: black or tarry stools, vomit that loo
   exercise:{kw:['workout','sore','plateau','overtrain','rest day','gains','weights','cardio','lift','training','recovery'],t:`EXERCISE & RECOVERY: progress = stimulus + recovery; most plateaus are recovery problems in a training costume. Under-recovery signs: sleep dropping, morning grumpiness, soreness 3+ days, performance down two sessions running, higher resting HR, dreading workouts. Response: cut intensity 30–50% for a week (not zero — walks, mobility), protect sleep, eat enough. Rough-sleep weeks: keep the habit, lower the load. Sharp pain (vs normal soreness) → professional.`},
   supplements:{kw:['supplement','magnesium','vitamin','dose','capsule','stack','feels off','titrat','pill'],t:`SUPPLEMENTS & TITRATION (always within app gating): one at a time so you know what did what; lowest dose first; step up only when current dose feels fine; drop back one step if anything feels off and hold — "feels off" is information. Foundations outrank any bottle. Timing matters (calming minerals evening; energizing earlier). Never suggest doses/brands beyond the user's plan; anything else — especially with a medication in the picture — "bring that one to your practitioner."`},
   assessment:{kw:['assessment','result','profile','score','systems','retake','pattern'],t:`ASSESSMENT & PROFILES describe load patterns, not labels of brokenness. High-performer-running-hot: output high, reserves draining — first lever is rest and downshifting, not harder training. Drained/collapse: everything heavy — first lever is gentleness, light, food regularity. Wired-anxious: stuck "on" — first lever is daily grounding + blood-sugar steadiness. Mixed/mild: pick the weakest pillar, improve it 10%. Always re-check in 6–12 weeks; data over identity.`},
-  labs:{kw:['lab','test','testing','cortisol','hormone panel','kit','saliva','urine','stool','panel','marker','practitioner','gi map','gi-map','get tested'],t:`LABS & TESTING — educational framing only, but be genuinely useful about it. Five categories of at-home functional panel, and what each one is FOR:
+  labs:{kw:['lab','test','testing','cortisol','hormone panel','kit','saliva','urine','stool','panel','marker','practitioner','gi map','gi-map','get tested'],t:`LABS & TESTING — educational framing only, but be genuinely useful about it.
+START HERE, ALMOST ALWAYS: the stool-based gut panel (the GI-MAP) is our first and most important test, and the app sells it. One sample reads pathogens and parasites, the common stomach bacterium together with its virulence genes, bacterial and yeast overgrowth, inflammation and immune markers, and how well food is actually being digested and absorbed. It earns first place because digestion sits underneath so much that does not look digestive — mood, energy, skin, joints, immune reactivity, sleep — so it is the single panel most likely to turn a symptom story into something actionable. When someone asks what would tell them more, this is the answer unless their question clearly points elsewhere, and you may offer to open it in the app.
+The other four categories, for when the question points at them:
 - Stress-hormone rhythm (saliva across the day): the daily cortisol curve plus DHEA, and where the sex hormones and melatonin sit. This is the closest thing to a snapshot of how much reserve someone has left, and it separates "wired at night" driven by a shifted rhythm from the same complaint driven by something else entirely.
 - Digestion / toxicity / liver markers (urine): how well food is actually being broken down, how much oxidative load there is, and how the liver and bile side is coping. Answers "am I digesting this or just eating it".
 - Gut-barrier integrity: whether the lining that decides what gets into the bloodstream is holding. Sits underneath a lot of food reactions, skin and joint complaints, and immune noise.
@@ -13484,17 +13498,20 @@ HOW TO TALK ABOUT IT: results are a picture of how hard each system is working, 
    is better tailored; this only fires when it didn't. */
 const SYMPTOM_RX=/\b(burn(s|ing|t)?|pain(ful)?|aches?|aching|hurts?|sore(ness)?|bloat\w*|gas(sy)?|reflux|heartburn|nause\w*|cramp\w*|diarrh\w*|constipat\w*|rash(es)?|itch\w*|dizz\w*|headaches?|migraines?|fatigue\w*|exhaust\w*|insomnia|can'?t sleep|wake|wakes|waking|woke|brain fog|foggy|anxious|anxiety|depress\w*|low mood|palpitat\w*|numb\w*|tingl\w*|swell\w*|swollen|flare[- ]?ups?|flares?|symptoms?|feels? off|feeling off|crash(es|ing)?|craving\w*|tired(ness)?|wired|restless\w*|stomach|hormon\w*|libido|acne|eczema|hives|congest\w*|sinus(es)?|gut)\b/i;
 const HANDOFF_RX=/\b(practitioner|your doctor|your clinician|prescriber|testing|get tested|tested for|test for|lab work|labs)\b/i;
-const ALT_MED_RX=/\b(instead of|rather than|swap|switch(ing)? (to|from)|alternative to|in place of)\b[^.]{0,60}\b(ibuprofen|naproxen|aspirin|nsaids?|advil|aleve|motrin|tylenol|acetaminophen|paracetamol)\b/i;
+/* We never recommend a drug. The prompt forbids it; this catches the days it slips,
+   and a false positive costs nothing but one honest extra sentence. */
+const DRUG_NAME_RX=/\b(ibuprofen|naproxen|aspirin|nsaids?|advil|aleve|motrin|tylenol|acetaminophen|paracetamol|antacids?|tums|rolaids|pepcid|famotidine|omeprazole|prilosec|nexium|zantac|ranitidine|proton[- ]pump|ppi|benadryl|antihistamines?|imodium|miralax|laxatives?|hydrocortisone|steroid cream|sleeping pills?)\b/i;
+const SUGGEST_RX=/\b(try|takes?|taking|use|using|consider|switch(ing)? to|swap|opt for|reach for|instead of|rather than|in place of|alternative)\b/i;
 const HANDOFF_LINES=[
-  'One honest note: I am reading a pattern from what you have told me. I cannot examine you or see any lab work, and no AI can. The same symptom comes from different causes in different people, so what would actually settle this is testing — worth taking to your functional health practitioner.',
-  'Worth saying plainly: that is a pattern, not a finding about you. I only see what you type and track. Different people arrive at this same complaint for genuinely different reasons, which is exactly what testing sorts out — your practitioner can run it and read it in context.',
-  'Keep in mind I am pattern-matching from your side of the screen rather than examining you, which no AI can do. Since the same complaint has different drivers in different people, testing is what turns a good guess into an answer. Bring this one to your practitioner.'
+  'One honest note: I am reading a pattern from what you have told me. I cannot examine you or see any lab work, and no AI can. The same symptom comes from different causes in different people — which is why we start with the GI-MAP gut test rather than guessing. You can order it here, and your practitioner reads it with you.',
+  'Worth saying plainly: that is a pattern, not a finding about you. I only see what you type and track. Different people arrive at this same complaint for genuinely different reasons, and the GI-MAP is the first test we run to find out which one you are — available in the app, read alongside your practitioner.',
+  'Keep in mind I am pattern-matching from your side of the screen rather than examining you, which no AI can do. Since the same complaint has different drivers in different people, the GI-MAP gut panel is where we start turning a good guess into an answer — you can order it here and go through it with your practitioner.'
 ];
 let _handoffIx=Math.floor(Math.random()*HANDOFF_LINES.length);
 function _detHandoff(text,q){
   let out=text;
-  if(ALT_MED_RX.test(out)){
-    out+='\n\nAnything you change about what you take for pain is your prescriber’s call, not mine — worth asking them.';
+  if(DRUG_NAME_RX.test(out)&&SUGGEST_RX.test(out)&&!/prescriber/i.test(out)){
+    out+='\n\nAnything to do with medication — starting, stopping, swapping or timing it — is your prescriber’s call, not mine.';
   }
   if(SYMPTOM_RX.test(q)&&!HANDOFF_RX.test(text)){
     _handoffIx=(_handoffIx+1)%HANDOFF_LINES.length;
@@ -13615,13 +13632,13 @@ function _detRender(){
   box.scrollTop=box.scrollHeight;
 }
 function _esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function _actLabel(a){return {'add-winddown-item':'Add to tonight\'s wind-down','set-reminder':'Set a reminder','open-lesson':'Open the lesson','suggest-plan-review':'Review my plan','open-assessment':'Take the assessment','start-supplement-checkin':'Start a supplement check-in','explore-testing':'See what testing shows'}[a]||'Open';}
+function _actLabel(a){return {'add-winddown-item':'Add to tonight\'s wind-down','set-reminder':'Set a reminder','open-lesson':'Open the lesson','suggest-plan-review':'Review my plan','open-assessment':'Take the assessment','start-supplement-checkin':'Start a supplement check-in','explore-testing':'See the GI-MAP test'}[a]||'Open';}
 function detAction(a){
   if(a==='add-winddown-item'){goPage('rest');}
   else if(a==='open-assessment'){goPage('assess');}
   else if(a==='suggest-plan-review'){goPage('assess');}
   else if(a==='start-supplement-checkin'){goPage('supps');}
-  else if(a==='explore-testing'){goPage('labs');}
+  else if(a==='explore-testing'){openGiMap();}
   else{showToast('Opening…');}
 }
 async function detSend(forced){
@@ -14863,7 +14880,7 @@ window.deleteAccount = deleteAccount;
 var HEALTH_SCOPE_V = '2';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0915-11';
+var WEB_BUILD = '0915-12';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
