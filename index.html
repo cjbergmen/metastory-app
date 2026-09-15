@@ -13497,6 +13497,7 @@ HOW TO TALK ABOUT IT: results are a picture of how hard each system is working, 
    from here. The prompt still asks for it, because a handoff the model writes itself
    is better tailored; this only fires when it didn't. */
 const SYMPTOM_RX=/\b(burn(s|ing|t)?|pain(ful)?|aches?|aching|hurts?|sore(ness)?|bloat\w*|gas(sy)?|reflux|heartburn|nause\w*|cramp\w*|diarrh\w*|constipat\w*|rash(es)?|itch\w*|dizz\w*|headaches?|migraines?|fatigue\w*|exhaust\w*|insomnia|can'?t sleep|wake|wakes|waking|woke|brain fog|foggy|anxious|anxiety|depress\w*|low mood|palpitat\w*|numb\w*|tingl\w*|swell\w*|swollen|flare[- ]?ups?|flares?|symptoms?|feels? off|feeling off|crash(es|ing)?|craving\w*|tired(ness)?|wired|restless\w*|stomach|hormon\w*|libido|acne|eczema|hives|congest\w*|sinus(es)?|gut)\b/i;
+const GIMAP_RX=/GI[‑\-– ]?MAP/i;
 const HANDOFF_RX=/\b(practitioner|your doctor|your clinician|prescriber|testing|get tested|tested for|test for|lab work|labs)\b/i;
 /* We never recommend a drug. The prompt forbids it; this catches the days it slips,
    and a false positive costs nothing but one honest extra sentence. */
@@ -13513,9 +13514,18 @@ function _detHandoff(text,q){
   if(DRUG_NAME_RX.test(out)&&SUGGEST_RX.test(out)&&!/prescriber/i.test(out)){
     out+='\n\nAnything to do with medication — starting, stopping, swapping or timing it — is your prescriber’s call, not mine.';
   }
-  if(SYMPTOM_RX.test(q)&&!HANDOFF_RX.test(text)){
-    _handoffIx=(_handoffIx+1)%HANDOFF_LINES.length;
-    out+='\n\n'+HANDOFF_LINES[_handoffIx];
+  // Two tiers. The model often writes its own practitioner-and-testing close, which
+  // is better tailored than anything canned - but it names the panel only sometimes,
+  // and the gut test is the one we actually want in front of people. So: if it named
+  // the panel, leave it alone; if it handed off without naming it, add the pointer
+  // only; if it did neither, add the full line, which carries the honest limit too.
+  if(SYMPTOM_RX.test(q)&&!GIMAP_RX.test(text)){
+    if(HANDOFF_RX.test(text)){
+      out+='\n\nWhen you are ready to stop guessing, the GI-MAP gut panel is where we start — you can order it right here in the app.';
+    } else {
+      _handoffIx=(_handoffIx+1)%HANDOFF_LINES.length;
+      out+='\n\n'+HANDOFF_LINES[_handoffIx];
+    }
     return {text:out,forceAction:true};
   }
   return {text:out,forceAction:false};
@@ -14880,7 +14890,7 @@ window.deleteAccount = deleteAccount;
 var HEALTH_SCOPE_V = '2';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0915-12';
+var WEB_BUILD = '0915-13';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
