@@ -13476,6 +13476,34 @@ ALARM — stop coaching, send to a doctor: black or tarry stools, vomit that loo
 HOW TO TALK ABOUT IT: results are a picture of how hard each system is working, not a label. A finding is still not "the problem" — it is another result of the problem, and it is read in context with everything else. NEVER interpret a specific value the user types; that reading belongs to their practitioner, who can see the whole panel. A test they can act on beats another month of guessing, and it is also the honest answer to what you cannot see from here. You may point at the app's testing tab. Testing sharpens the plan; it is never a prerequisite for starting the foundations.`}
 };
 
+/* The practitioner-and-testing close is a PRODUCT RULE, so it is enforced in code
+   rather than asked for in the prompt. Across repeated runs the model would name a
+   driver and then finish on a self-care tip perhaps a third of the time — fine odds
+   for a writing style, useless odds for the one line that says what we cannot see
+   from here. The prompt still asks for it, because a handoff the model writes itself
+   is better tailored; this only fires when it didn't. */
+const SYMPTOM_RX=/\b(burn(s|ing|t)?|pain(ful)?|aches?|aching|hurts?|sore(ness)?|bloat\w*|gas(sy)?|reflux|heartburn|nause\w*|cramp\w*|diarrh\w*|constipat\w*|rash(es)?|itch\w*|dizz\w*|headaches?|migraines?|fatigue\w*|exhaust\w*|insomnia|can'?t sleep|wake|wakes|waking|woke|brain fog|foggy|anxious|anxiety|depress\w*|low mood|palpitat\w*|numb\w*|tingl\w*|swell\w*|swollen|flare[- ]?ups?|flares?|symptoms?|feels? off|feeling off|crash(es|ing)?|craving\w*|tired(ness)?|wired|restless\w*|stomach|hormon\w*|libido|acne|eczema|hives|congest\w*|sinus(es)?|gut)\b/i;
+const HANDOFF_RX=/\b(practitioner|your doctor|your clinician|prescriber|testing|get tested|tested for|test for|lab work|labs)\b/i;
+const ALT_MED_RX=/\b(instead of|rather than|swap|switch(ing)? (to|from)|alternative to|in place of)\b[^.]{0,60}\b(ibuprofen|naproxen|aspirin|nsaids?|advil|aleve|motrin|tylenol|acetaminophen|paracetamol)\b/i;
+const HANDOFF_LINES=[
+  'One honest note: I am reading a pattern from what you have told me. I cannot examine you or see any lab work, and no AI can. The same symptom comes from different causes in different people, so what would actually settle this is testing — worth taking to your functional health practitioner.',
+  'Worth saying plainly: that is a pattern, not a finding about you. I only see what you type and track. Different people arrive at this same complaint for genuinely different reasons, which is exactly what testing sorts out — your practitioner can run it and read it in context.',
+  'Keep in mind I am pattern-matching from your side of the screen rather than examining you, which no AI can do. Since the same complaint has different drivers in different people, testing is what turns a good guess into an answer. Bring this one to your practitioner.'
+];
+let _handoffIx=Math.floor(Math.random()*HANDOFF_LINES.length);
+function _detHandoff(text,q){
+  let out=text;
+  if(ALT_MED_RX.test(out)){
+    out+='\n\nAnything you change about what you take for pain is your prescriber’s call, not mine — worth asking them.';
+  }
+  if(SYMPTOM_RX.test(q)&&!HANDOFF_RX.test(text)){
+    _handoffIx=(_handoffIx+1)%HANDOFF_LINES.length;
+    out+='\n\n'+HANDOFF_LINES[_handoffIx];
+    return {text:out,forceAction:true};
+  }
+  return {text:out,forceAction:false};
+}
+
 const CRISIS_RX=/\b(suicid|kill myself|killing myself|end my life|don'?t want to (be alive|live|wake up)|want to die|hurt myself|harm myself|self[\s-]?harm|hopeless|no reason to (live|go on)|better off dead|can'?t go on)\b/i;
 const REDFLAG_RX=/\b(blood in (my |the )?stool|black,? tarry|tarry stool|vomit(ing|ed)? blood|coughing up blood|chest pain|chest pressure|can'?t breathe|trouble breathing|short(ness)? of breath|one[\s-]?sided weakness|face droop|slurred speech|worst headache|sudden severe|severe abdominal|passed out|fainted|unexplained weight loss|losing weight without|coffee[\s-]?ground|trouble swallowing|difficulty swallowing|food (gets |getting )?stuck|throwing up blood)\b/i;
 const OUT_MED_RX=/\b(stop|start|increase|raise|decrease|lower|change|adjust|come off|wean off|double)\s+((taking|your|the|off|on)\s+)*(dose|medication|meds|prescription|antidepressant|ssri|ppi|insulin|metformin|levothyroxine|blood ?pressure)/i;
@@ -13635,6 +13663,9 @@ async function detSend(forced){
       text="That edges into territory I should leave to your doctor — specific medication changes and naming conditions aren't mine to do. What I can say: keep your prescriber in the loop, and let's focus on the daily foundations. Want to start with sleep or with steadier meals this week?";
       sources=[];action='none';
     }
+    const _ho=_detHandoff(text,q);
+    text=_ho.text;
+    if(_ho.forceAction&&action==='none')action='explore-testing';
     _detHist[_detHist.length-1]={role:'assistant',text,sources,action};
     _detRender();
   }catch(e){
@@ -14832,7 +14863,7 @@ window.deleteAccount = deleteAccount;
 var HEALTH_SCOPE_V = '2';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0915-8';
+var WEB_BUILD = '0915-11';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
