@@ -1,4 +1,4 @@
-const VERSION = '20260913-fresh3';
+const VERSION = '20260915-builder';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately

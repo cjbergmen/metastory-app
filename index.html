@@ -243,6 +243,26 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .swap-ai-btn{margin:8px 16px 16px;background:var(--green);border:none;border-radius:var(--rs);color:#fff;font-size:13px;font-weight:600;padding:12px;cursor:pointer;text-align:center;flex-shrink:0;font-family:var(--font-sans)}
 /* ── SAVE BAR ───────────────────────────────────────────────── */
 .swap-save-bar{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--rs);padding:11px 14px;margin-top:14px;display:flex;align-items:center;gap:8px}
+/* ── BUILD-A-WORKOUT + CIRCUIT ──────────────────────────────── */
+.cb-chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface2);border:1.5px solid var(--border);border-radius:16px;padding:5px 10px;font-size:12px;font-weight:600;color:var(--text)}
+.cb-chip .x{color:var(--sub);font-size:13px;cursor:pointer;line-height:1;padding:0 2px}
+.cb-seg{display:flex;gap:6px;margin-bottom:12px}
+.cb-seg button{flex:1;-webkit-appearance:none;appearance:none;background:transparent;border:1.5px solid var(--border);border-radius:var(--rs);color:var(--sub);font-size:12.5px;font-weight:700;padding:10px 6px;cursor:pointer;font-family:var(--font-sans)}
+.cb-seg button.active{background:var(--green);border-color:var(--green);color:#fff}
+.cb-num{width:100%;border:1.5px solid var(--border);border-radius:var(--rs);padding:9px 10px;font-size:16px;font-family:var(--font-sans);background:var(--bg);color:var(--text);-webkit-appearance:none;appearance:none}
+.cb-row{display:flex;gap:8px}
+.cb-row>div{flex:1;min-width:0}
+.circ-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--rs);padding:11px 13px;margin-bottom:7px;display:flex;align-items:center;gap:11px}
+.circ-num{width:24px;height:24px;border-radius:50%;background:var(--surface2);color:var(--sub);font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+.circ-run{position:fixed;inset:0;z-index:400;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
+.circ-run.open{display:flex}
+.circ-run .rd{font-size:11.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--sub)}
+.circ-run .mv{font-size:26px;font-weight:700;margin:10px 0 5px;color:var(--text);line-height:1.2;max-width:340px}
+.circ-run .cue{font-size:13px;color:var(--sub);max-width:320px;line-height:1.45;min-height:19px}
+.circ-run .cd{font-size:76px;font-weight:700;font-variant-numeric:tabular-nums;margin:16px 0 6px;color:var(--text);line-height:1}
+.circ-run .nx{font-size:12.5px;color:var(--sub);margin-bottom:26px;min-height:17px}
+.circ-run .btns{display:flex;gap:10px}
+.circ-run .btns button{-webkit-appearance:none;appearance:none;border-radius:var(--rs);border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-weight:700;padding:12px 22px;font-family:var(--font-sans);cursor:pointer}
 .swap-save-label{font-size:12px;color:var(--sub);flex:1}
 .swap-save-day{background:var(--green);border:none;color:#fff;font-size:12px;font-weight:600;border-radius:8px;padding:7px 13px;cursor:pointer;font-family:var(--font-sans)}
 .swap-save-week{background:var(--surface2);border:1.5px solid var(--border);color:var(--text);font-size:12px;font-weight:600;border-radius:8px;padding:7px 13px;cursor:pointer;font-family:var(--font-sans)}
@@ -926,6 +946,50 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       <div style="font-size:11px;color:var(--sub);margin-top:5px">Pre-fills the weight picker when you start logging (your last logged weight still wins once you have history).</div>
     </div>
     <button class="wo-add-btn" style="width:100%" onclick="saveExEdit()">Apply changes</button>
+  </div>
+</div>
+
+<!-- Build a Workout -->
+<div class="swap-overlay" id="wob-overlay" onclick="closeWoBuilder()"></div>
+<div class="swap-sheet" id="wob-sheet">
+  <div class="swap-handle"></div>
+  <div class="swap-header">
+    <div class="swap-title" id="wob-title">Build a workout</div>
+    <button class="swap-close" onclick="closeWoBuilder()">&#10005;</button>
+  </div>
+  <div class="swap-divider"></div>
+  <div style="padding:12px 16px 0;flex:none">
+    <input id="wob-name" class="cb-num" type="text" maxlength="40" placeholder="Name it &mdash; e.g. Ab Circuit" style="margin-bottom:10px">
+    <div class="cb-seg">
+      <button id="wob-fmt-timed" onclick="wobSetFormat('timed')">Timed circuit</button>
+      <button id="wob-fmt-reps" onclick="wobSetFormat('reps')">Sets &times; reps</button>
+    </div>
+    <div id="wob-timed-fields" class="cb-row" style="margin-bottom:10px">
+      <div><label class="fl">Work (sec)</label><input id="wob-work" class="cb-num" type="number" inputmode="numeric" min="5" max="600" value="45"></div>
+      <div><label class="fl">Rest (sec)</label><input id="wob-rest" class="cb-num" type="number" inputmode="numeric" min="0" max="600" value="15"></div>
+      <div><label class="fl">Rounds</label><input id="wob-rounds" class="cb-num" type="number" inputmode="numeric" min="1" max="12" value="3"></div>
+    </div>
+    <div id="wob-picked" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+  </div>
+  <div class="swap-tabs" id="wob-tabs"></div>
+  <div class="swap-list" id="wob-list"></div>
+  <div style="padding:10px 16px 16px;display:flex;gap:8px;flex:none;border-top:0.5px solid var(--border)">
+    <button class="btn btn-o" style="flex:1" onclick="wobApply('week')">Just today</button>
+    <button class="btn btn-g" style="flex:1" onclick="wobApply('plan')">Save to my plan</button>
+  </div>
+</div>
+
+<!-- Circuit Runner -->
+<div class="circ-run" id="circ-run">
+  <div class="rd" id="circ-round">Round 1</div>
+  <div class="mv" id="circ-move">&mdash;</div>
+  <div class="cue" id="circ-cue"></div>
+  <div class="cd" id="circ-count">00:45</div>
+  <div class="nx" id="circ-next"></div>
+  <div class="btns">
+    <button id="circ-pause" onclick="circPause()">Pause</button>
+    <button onclick="circSkip()">Skip</button>
+    <button onclick="circEnd()">End</button>
   </div>
 </div>
 
@@ -2734,6 +2798,285 @@ function saveWorkoutWeek(){
   showToast('Full week saved! ✅');
   rWorkout();
 }
+// ── BUILD A WORKOUT ───────────────────────────────────────────────────────────
+// Swapping only ever trades one exercise for another inside a plan the app wrote.
+// This builds a session from nothing: pick the moves, pick the shape. Two shapes,
+// because they are genuinely different things — a strength session logs weight and
+// reps per set, a circuit is a clock you follow. The circuit is its own workout
+// type rather than a strength session with "45 sec" written in the reps field, so
+// the runner can drive it hands-free instead of asking for numbers nobody logs.
+var _wobFormat='timed';
+var _wobPicks=[];
+var _wobGroup='core';
+var WOB_GROUPS=['core','chest','back','shoulders','biceps','triceps','legs'];
+var WOB_LABELS={core:'Core',chest:'Chest',back:'Back',shoulders:'Shoulders',biceps:'Biceps',triceps:'Triceps',legs:'Legs'};
+
+function openWoBuilder(){
+  _wobPicks=[];_wobGroup='core';
+  var n=document.getElementById('wob-name');if(n)n.value='';
+  wobSetFormat('timed');
+  wobRenderTabs();wobRenderList();wobRenderPicked();
+  document.getElementById('wob-overlay').classList.add('open');
+  document.getElementById('wob-sheet').classList.add('open');
+}
+function closeWoBuilder(){
+  var o=document.getElementById('wob-overlay');if(o)o.classList.remove('open');
+  var s=document.getElementById('wob-sheet');if(s)s.classList.remove('open');
+}
+function wobSetFormat(f){
+  _wobFormat=(f==='reps')?'reps':'timed';
+  var a=document.getElementById('wob-fmt-timed'),b=document.getElementById('wob-fmt-reps');
+  if(a)a.className=(_wobFormat==='timed')?'active':'';
+  if(b)b.className=(_wobFormat==='reps')?'active':'';
+  var tf=document.getElementById('wob-timed-fields');
+  if(tf)tf.style.display=(_wobFormat==='timed')?'flex':'none';
+}
+function wobRenderTabs(){
+  var h='';
+  WOB_GROUPS.forEach(function(g){
+    h+='<button class="swap-tab'+(_wobGroup===g?' active':'')+'" onclick="wobSetGroup(\''+g+'\')">'+WOB_LABELS[g]+'</button>';
+  });
+  var el=document.getElementById('wob-tabs');if(el)el.innerHTML=h;
+}
+function wobSetGroup(g){_wobGroup=g;wobRenderTabs();wobRenderList();}
+function _wobHas(name){return _wobPicks.some(function(p){return p.n===name;});}
+function wobRenderList(){
+  var items=EX_LIBRARY[_wobGroup]||[];
+  var h='<div class="swap-item" style="border-color:var(--green)"><div style="display:flex;gap:8px;align-items:center"><input id="wob-manual" placeholder="Type your own move…" style="flex:1;border:1px solid var(--border);border-radius:8px;padding:7px 9px;font-size:16px" onclick="event.stopPropagation()"><button class="btn btn-b btn-sm" style="white-space:nowrap" onclick="event.stopPropagation();wobAddManual()">Add</button></div></div>';
+  items.forEach(function(ex,i){
+    var on=_wobHas(ex.n);
+    h+='<div class="swap-item" style="'+(on?'border-color:var(--green);background:var(--surface2);':'')+'" onclick="wobToggle(\''+_wobGroup+'\','+i+')">'
+      +'<div class="swap-item-name">'+(on?'✓ ':'')+ex.n+'</div>'
+      +'<div style="margin-bottom:3px"><span class="swap-item-muscle" style="background:var(--surface2);color:var(--sub)">'+(ex.muscles||'')+'</span></div>'
+      +'<div class="swap-item-tag">'+(ex.i||'')+'</div></div>';
+  });
+  var el=document.getElementById('wob-list');if(el)el.innerHTML=h;
+}
+function wobToggle(group,i){
+  var ex=(EX_LIBRARY[group]||[])[i];if(!ex)return;
+  var at=-1;
+  _wobPicks.forEach(function(p,j){if(p.n===ex.n)at=j;});
+  if(at>=0)_wobPicks.splice(at,1);
+  else _wobPicks.push(JSON.parse(JSON.stringify(ex)));
+  wobRenderList();wobRenderPicked();
+}
+function wobAddManual(){
+  var inp=document.getElementById('wob-manual');
+  var name=((inp&&inp.value)||'').trim();
+  if(!name){try{showToast('Type a move first');}catch(e){}return;}
+  if(_wobHas(name)){try{showToast('Already in the list');}catch(e){}return;}
+  _wobPicks.push({n:name,eq:'bw',tag:'3 × 12',i:'',muscles:'',rest:'60 sec',manual:true});
+  if(inp)inp.value='';
+  wobRenderList();wobRenderPicked();
+}
+function wobRemove(i){_wobPicks.splice(i,1);wobRenderList();wobRenderPicked();}
+function wobRenderPicked(){
+  var el=document.getElementById('wob-picked');if(!el)return;
+  if(!_wobPicks.length){
+    el.innerHTML='<div style="font-size:11.5px;color:var(--sub);line-height:1.4">Tap moves below to add them. They run in the order you tap.</div>';
+    return;
+  }
+  var h='';
+  _wobPicks.forEach(function(p,i){
+    h+='<span class="cb-chip">'+(i+1)+'. '+p.n+' <span class="x" onclick="wobRemove('+i+')">✕</span></span>';
+  });
+  el.innerHTML=h;
+}
+function _wobInt(id,dflt,min){
+  var el=document.getElementById(id);
+  var v=parseInt((el&&el.value)||'',10);
+  if(isNaN(v))v=dflt;
+  return Math.max(min,v);
+}
+function _wobBuild(){
+  if(!_wobPicks.length){try{showToast('Pick at least one move');}catch(e){}return null;}
+  var nameEl=document.getElementById('wob-name');
+  var name=((nameEl&&nameEl.value)||'').trim();
+  var stamp='Built '+new Date().toLocaleDateString();
+  if(_wobFormat==='timed'){
+    var work=_wobInt('wob-work',45,5);
+    var rest=_wobInt('wob-rest',15,0);
+    var rounds=_wobInt('wob-rounds',3,1);
+    var total=rounds*_wobPicks.length*(work+rest);
+    var mins=Math.max(1,Math.round(total/60));
+    return {
+      name:name||'Custom circuit',
+      col:'var(--orange)',
+      type:'circuit',work:work,rest:rest,rounds:rounds,
+      dur:'~'+mins+' min',
+      moves:_wobPicks.map(function(p){return {n:p.n,i:p.i||'',muscles:p.muscles||''};}),
+      info:{
+        tip:_wobPicks.length+' moves · '+work+' sec on'+(rest?' / '+rest+' sec off':'')+' · '+rounds+' round'+(rounds!==1?'s':'')+'.',
+        role:'A circuit you built yourself. Same order every round — start it and follow the clock.',
+        goal:stamp
+      }
+    };
+  }
+  return {
+    name:name||'Custom session',
+    col:'var(--orange)',
+    dur:'~'+Math.max(10,_wobPicks.length*7)+' min',
+    ex:_wobPicks.map(function(p){return {n:p.n,eq:p.eq||'bw',tag:p.tag||'3 × 10',i:p.i||'',rest:p.rest||'60 sec',muscles:p.muscles||''};}),
+    info:{
+      tip:_wobPicks.length+' exercise'+(_wobPicks.length!==1?'s':'')+' you picked yourself.',
+      role:'A session you built yourself — logged like any other strength day.',
+      goal:stamp
+    }
+  };
+}
+// "Just today" writes a one-week adjustment, so the saved plan is untouched and
+// the day reverts on its own next week. "Save to my plan" is the durable write.
+function wobApply(scope){
+  var wo=_wobBuild();if(!wo)return;
+  var d=vdDate().getDay();
+  if(scope==='plan'){
+    var base=JSON.parse(JSON.stringify(_basePlan()));
+    base[d]=wo;
+    _durableSaveBasePlan(base);
+    try{showToast('Saved to your plan ✅');}catch(e){}
+  } else {
+    var plan=JSON.parse(JSON.stringify(_effectivePlan(viewDate)));
+    plan[d]=wo;
+    _saveWeekAdjust(plan);
+    try{showToast('Loaded for today ✅');}catch(e){}
+  }
+  _woPendingSwaps={};
+  try{lsSet('wd_'+viewDate,'0');}catch(e){}
+  closeWoBuilder();
+  try{rWorkout();}catch(e){}
+}
+
+// ── CIRCUIT RUNNER ────────────────────────────────────────────────────────────
+// Deliberately not built on the rest timer: that one is a single countdown the
+// user starts by hand between sets. This one owns the whole session and advances
+// itself, so the phone can sit on the floor. Time comes from the wall clock
+// (endMs), never from counting interval ticks, because iOS throttles timers the
+// moment the screen dims — a tick-counted circuit silently runs long.
+var _circ=null;
+function circStart(){
+  var wo=getWO();
+  if(!wo||wo.type!=='circuit'||!wo.moves||!wo.moves.length)return;
+  try{_unlockAudio();}catch(e){}
+  _circ={wo:wo,round:1,idx:0,phase:'work',left:wo.work,paused:false,wake:null,iv:null};
+  _circ.endMs=Date.now()+wo.work*1000;
+  try{
+    if(navigator.wakeLock&&navigator.wakeLock.request){
+      navigator.wakeLock.request('screen').then(function(s){if(_circ)_circ.wake=s;}).catch(function(){});
+    }
+  }catch(e){}
+  var el=document.getElementById('circ-run');if(el)el.classList.add('open');
+  var pb=document.getElementById('circ-pause');if(pb)pb.textContent='Pause';
+  _circPaint();
+  _circ.iv=setInterval(_circTick,200);
+}
+function _circIsLast(){
+  var c=_circ;if(!c)return true;
+  return c.round>=c.wo.rounds&&c.idx>=c.wo.moves.length-1;
+}
+function _circPeek(){
+  var c=_circ;if(!c)return '';
+  var wo=c.wo;
+  if(c.phase==='work'&&wo.rest>0&&!_circIsLast())return 'Rest '+wo.rest+' sec';
+  if(_circIsLast()&&c.phase==='work')return '';
+  var i=c.idx+1,r=c.round;
+  if(i>=wo.moves.length){i=0;r++;}
+  if(r>wo.rounds)return '';
+  return wo.moves[i].n;
+}
+function _circPaint(){
+  var c=_circ;if(!c)return;
+  var wo=c.wo,mv=wo.moves[c.idx]||{n:'',i:''},isWork=(c.phase==='work');
+  var set=function(id,txt){var el=document.getElementById(id);if(el)el.textContent=txt;};
+  set('circ-round','Round '+c.round+' of '+wo.rounds+' · move '+(c.idx+1)+' of '+wo.moves.length);
+  set('circ-move',isWork?mv.n:'Rest');
+  set('circ-cue',isWork?(mv.i||''):'Shake it out');
+  var s=Math.max(0,Math.ceil(c.left));
+  set('circ-count',String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'));
+  var nx=_circPeek();
+  set('circ-next',nx?('Next: '+nx):'Last one — finish strong');
+  var cd=document.getElementById('circ-count');
+  if(cd)cd.style.color=isWork?'var(--text)':'var(--sub)';
+}
+function _circAdvance(){
+  var c=_circ;if(!c)return;
+  var wo=c.wo;
+  if(c.phase==='work'&&wo.rest>0&&!_circIsLast()){
+    c.phase='rest';c.left=wo.rest;
+  } else {
+    if(_circIsLast()&&c.phase==='work'){circFinish();return;}
+    c.phase='work';
+    c.idx++;
+    if(c.idx>=wo.moves.length){c.idx=0;c.round++;}
+    if(c.round>wo.rounds){circFinish();return;}
+    c.left=wo.work;
+  }
+  c.endMs=Date.now()+c.left*1000;
+}
+function _circTick(){
+  var c=_circ;if(!c||c.paused)return;
+  var n=0;
+  // One loop, not one advance per tick: coming back from a locked screen can owe
+  // several phases at once, and they should all be caught up before the repaint.
+  while(_circ&&(_circ.endMs-Date.now())<=0&&n<500){_circAdvance();n++;}
+  if(!_circ)return;
+  if(n>0)_circBeep(_circ.phase==='work'?880:523.25);
+  _circ.left=(_circ.endMs-Date.now())/1000;
+  _circPaint();
+}
+function _circBeep(freq){
+  try{
+    var ctx=_getAudioCtx();
+    if(ctx){
+      var go=function(){
+        var o=ctx.createOscillator(),g=ctx.createGain();
+        o.connect(g);g.connect(ctx.destination);
+        o.type='sine';o.frequency.value=freq;
+        var t=ctx.currentTime;
+        g.gain.setValueAtTime(0,t);
+        g.gain.linearRampToValueAtTime(0.4,t+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001,t+0.35);
+        o.start(t);o.stop(t+0.37);
+      };
+      if(ctx.state==='suspended')ctx.resume().then(go).catch(function(){});
+      else go();
+    }
+  }catch(e){}
+  try{if(navigator.vibrate)navigator.vibrate(60);}catch(e){}
+}
+function circPause(){
+  var c=_circ;if(!c)return;
+  c.paused=!c.paused;
+  if(!c.paused)c.endMs=Date.now()+c.left*1000;
+  var pb=document.getElementById('circ-pause');
+  if(pb)pb.textContent=c.paused?'Resume':'Pause';
+}
+function circSkip(){
+  if(!_circ)return;
+  _circAdvance();
+  if(!_circ)return;
+  _circBeep(_circ.phase==='work'?880:523.25);
+  _circPaint();
+}
+function circEnd(){_circStop();}
+function _circStop(){
+  if(_circ){
+    if(_circ.iv)clearInterval(_circ.iv);
+    try{if(_circ.wake&&_circ.wake.release)_circ.wake.release();}catch(e){}
+  }
+  _circ=null;
+  var el=document.getElementById('circ-run');if(el)el.classList.remove('open');
+  var pb=document.getElementById('circ-pause');if(pb)pb.textContent='Pause';
+}
+function circFinish(){
+  _circStop();
+  try{setWODone(true);}catch(e){}
+  try{showToast('Circuit complete 🎉');}catch(e){}
+}
+// A circuit that was mid-run when the app backgrounded should catch up, not drift.
+document.addEventListener('visibilitychange',function(){
+  if(!document.hidden&&_circ&&!_circ.paused)_circTick();
+});
+
 // ── EDIT EXERCISE (reps / rest timer / default weight) ────────────────────────
 var _exEditIdx=null;
 function _curEx(idx){
@@ -3894,7 +4237,8 @@ function _weekSourcePlan(){
 function _planControlsHTML(){
     const link='font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer';
     const dot='<span style="color:var(--sub);opacity:.4;margin:0 7px">·</span>';
-    let h='<span onclick="openPlanEditor()" style="'+link+'">Edit my week</span>'+dot
+    let h='<span onclick="openWoBuilder()" style="'+link+'">+ Build</span>'+dot
+         +'<span onclick="openPlanEditor()" style="'+link+'">Edit my week</span>'+dot
          +'<span onclick="openMoveDay()" style="'+link+'">Move a day</span>'+dot
          +'<span onclick="openShiftWeek()" style="'+link+'">Shift week</span>';
     if(_hasWeekAdjust()) h+=dot+'<span onclick="clearWeekAdjust()" style="font-size:11px;color:var(--orange);font-weight:700;text-decoration:underline;cursor:pointer">↩ Back to my plan</span>';
@@ -4148,6 +4492,32 @@ function rWorkout(){
       });
       h+=`</div></div>`;
     }
+  }
+  // ── Timed circuit (built by the user) ───────────────────────────────────
+  if(wo.type==='circuit'&&wo.moves&&wo.moves.length){
+    h+=`<div class="phase-session-meta">
+      <span class="phase-type-badge" style="background:rgba(196,133,95,.16);color:var(--orange)">Circuit</span>
+      <span style="font-size:12px;color:var(--sub)">${wo.moves.length} move${wo.moves.length!==1?'s':''} · ${wo.work} sec on${wo.rest?' / '+wo.rest+' sec off':''} · ${wo.rounds} round${wo.rounds!==1?'s':''}</span>
+    </div>`;
+    if(!wdone){
+      h+=`<button class="btn btn-g" style="width:100%;margin-bottom:12px" onclick="circStart()">▶ Start circuit</button>`;
+    }
+    wo.moves.forEach((m,i)=>{
+      h+=`<div class="circ-card">
+        <div class="circ-num">${i+1}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13.5px;font-weight:700;color:var(--text)">${m.n}</div>
+          ${m.i?`<div style="font-size:11px;color:var(--sub);margin-top:2px;line-height:1.4">${m.i}</div>`:''}
+        </div>
+        <div style="font-size:12px;color:var(--sub);flex:none;font-variant-numeric:tabular-nums">${wo.work}s</div>
+      </div>`;
+    });
+    h+=`<button class="btn btn-o" style="width:100%;margin-top:12px" onclick="openWoBuilder()">Build a different one</button>`;
+    if(!wdone){
+      h+=`<button class="btn btn-g" style="width:100%;margin-top:9px" onclick="setWODone(true)">✓ Mark Session Complete</button>`;
+    }
+    document.getElementById('page-workout').innerHTML=h;
+    return;
   }
   // ── Phase-based session (yoga / hiit / cardio / mobility) ────────────────
   if(wo.phases&&wo.phases.length){
@@ -12815,13 +13185,13 @@ function _exReadiness(){
 }
 function _exStreak(){let s=0;for(let i=0;i<90;i++){const d=new Date();d.setDate(d.getDate()-i);const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');if(lsGet('wd_'+k,'0')==='1')s++;else if(i>0)break;}return s;}
 function _exHeroBlock(wo){
-  const cnt=wo.ex?wo.ex.length:(wo.phases?wo.phases.length:0);
+  const cnt=wo.ex?wo.ex.length:(wo.moves?wo.moves.length:(wo.phases?wo.phases.length:0));
   const r=_exReadiness();const streak=_exStreak();
   const dayName=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][vdDate().getDay()];
   return `<div class="fdn-focus" style="margin-bottom:12px">
     <span class="kicker">Today · ${dayName}</span>
     <h3>${wo.name}</h3>
-    <p>${cnt} exercise${cnt===1?'':'s'} · rest-pause sets · ${wo.dur||'~40 min'}</p>
+    <p>${cnt} ${wo.moves?'move':'exercise'}${cnt===1?'':'s'} · ${wo.type==='circuit'?(wo.work+' sec on'+(wo.rest?' / '+wo.rest+' sec off':'')):'rest-pause sets'} · ${wo.dur||'~40 min'}</p>
     <div style="display:flex;align-items:center;gap:8px;margin-top:11px;font-size:11.5px;color:#c8cdd2"><span style="width:8px;height:8px;border-radius:50%;background:${r.c};flex:none"></span>${r.t}</div>
   </div>
   <div class="card" style="display:flex;gap:12px;align-items:flex-start">
@@ -14353,7 +14723,7 @@ window.deleteAccount = deleteAccount;
 var HEALTH_SCOPE_V = '2';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0915-1';
+var WEB_BUILD = '0915-2';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
