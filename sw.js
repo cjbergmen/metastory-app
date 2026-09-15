@@ -1,4 +1,4 @@
-const VERSION = '20260915-swapfix';
+const VERSION = '20260915-detective';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
