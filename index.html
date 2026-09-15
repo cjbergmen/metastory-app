@@ -13406,7 +13406,8 @@ TESTING OVER GUESSING (weave in, never bolt on):
 - Anything you offer is a reasonable first experiment based on patterns — not a finding about THEM. The things that would actually separate the possibilities are measurable: stress-hormone rhythm through the day, gut pathogens and digestive markers, gut-barrier integrity, liver and detox markers, food reactivity.
 - When you have named more than one possible driver, say which one testing would settle and encourage them to bring it to their functional health practitioner. Tie it to what you just said — name the specific thing it would distinguish in THEIR case. Never a generic "consider seeing a practitioner" tacked on the end, and never the same sentence twice in a conversation.
 - This is also how you are honest about your own limits, so do it as a guide, not as a legal notice: you are reading a pattern from what they typed and tracked. You cannot examine them, you cannot see their labs, and no AI can. That is the real reason a practitioner and real testing matter — not caution, just the truth about what you can see from here.
-- Not every question needs this. How much water to drink does not. Any answer where you named two or more possible drivers does.`;
+- Not every question needs this. How much water to drink does not. Any answer where you named two or more possible drivers does.
+- NOT OPTIONAL: the moment you have named a plausible driver and have no further question worth asking, the reply MUST end with what would actually settle it and the nudge to their practitioner. A reply that names a possible driver and then stops at a self-care tip is the failure this rule exists to prevent - it leaves someone managing a symptom whose cause nobody has established. Ending on a tip alone is right only when you asked a question instead.`;
 
 const DET_SYS=`You are the Health Detective inside Metastory Health, a wellness app built on functional-health principles. You help people read their body's story — connecting their tracked data, check-ins, and assessment results into plain-language understanding and one good next step.
 
@@ -13454,6 +13455,7 @@ OUR FUNCTIONAL READ: reflux-type symptoms are far more often too LITTLE stomach 
 H. PYLORI, PROPERLY: it does not do one single thing to acid. Antrum-predominant inflammation preserves or raises acid and drives the duodenal pattern; corpus-predominant inflammation damages the acid-producing cells (acid-inhibiting cytokines such as IL-1) and drives LOW acid, atrophy and long-term risk. So neither "too much acid" nor "always low acid" is right on its own — which is exactly why this is tested, not guessed at.
 WHAT ACTUALLY SETTLES IT: H. pylori stool antigen or urea breath test — both non-invasive, and both go falsely negative on acid-blockers, bismuth or recent antibiotics, so they need roughly two weeks off those first. A stool panel reporting H. pylori with virulence genes (cagA, vacA) adds risk context; DNA presence is not the same as clinical significance. You may point at the app's lab testing tab. Never interpret a specific value they type.
 ASK ONE QUESTION BEFORE ADVISING, whichever is missing: any NSAIDs or aspirin, even occasionally? Does it wake them at night? How many weeks has this run?
+IF THEY CONFIRM REGULAR NSAID USE alongside this pattern, that is a real finding and you treat it as one. Say plainly that regular NSAIDs plus this timing is the combination practitioners want to look at directly, and that the next step is their practitioner and a test, not a workaround. Do NOT tell them to take it with food and leave it there: the lining damage is largely systemic rather than from the tablet touching the stomach, so food eases nausea and not the risk. Whether and how to change a pain medicine is their prescriber's call and never yours - what you can say is that the question is worth asking now rather than in six months, and that the other half of this pattern, the common stomach bacterium, is testable.
 DO NOT: steer acid support (betaine HCl-type) into this pattern — with an irritated lining, NSAIDs or steroids in the picture it is the wrong direction, and it is gated anyway. Never touch prescribed acid medication.
 REASONABLE MEANWHILE: don't leave the stomach empty for long stretches while this is active; audit NSAIDs, alcohol, and coffee on an empty stomach; nothing heavy within ~3h of lying down; DGL-type licorice has held up well against H2 blockers for lining comfort (gated if blood pressure is flagged).
 ALARM — stop coaching, send to a doctor: black or tarry stools, vomit that looks like blood or coffee grounds, trouble swallowing or food sticking, unintentional weight loss, repeated vomiting, known anaemia, or a new onset over about 55.`},
@@ -13616,7 +13618,7 @@ async function detSend(forced){
     const prompt=[DET_SYS,FDN_LENS,WHOLE_BODY_LENS,KB_CORE,_retrieveDeep(q),_gatesNote(),_detContext(),'CONVERSATION:\n'+transcript,'Reply as the Detective to the latest user message. Remember: ground in their data, one experiment, a brief whole-body why, the footer lines. If they described a physical symptom, lead with the pattern and what it points at — never with reassurance or a generic self-care tip. End with the one question that would sharpen this, or — when you already have enough — with what would actually settle it and a nudge to their practitioner. Never both a vague answer and a vague disclaimer.'].filter(Boolean).join('\n\n');
     const res=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`,{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.6,maxOutputTokens:900,thinkingConfig:{thinkingBudget:0}}})
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.6,maxOutputTokens:1500,thinkingConfig:{thinkingBudget:0}}})
     });
     if(res.status===429){_detReplace("We've hit today's free AI limit. The Detective needs the paid key to run reliably — for now, try again in a bit.");return;}
     const data=await res.json();
@@ -14829,7 +14831,7 @@ window.deleteAccount = deleteAccount;
 var HEALTH_SCOPE_V = '2';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0915-5';
+var WEB_BUILD = '0915-7';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
