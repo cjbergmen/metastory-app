@@ -13498,6 +13498,11 @@ HOW TO TALK ABOUT IT: results are a picture of how hard each system is working, 
    is better tailored; this only fires when it didn't. */
 const SYMPTOM_RX=/\b(burn(s|ing|t)?|pain(ful)?|aches?|aching|hurts?|sore(ness)?|bloat\w*|gas(sy)?|reflux|heartburn|nause\w*|cramp\w*|diarrh\w*|constipat\w*|rash(es)?|itch\w*|dizz\w*|headaches?|migraines?|fatigue\w*|exhaust\w*|insomnia|can'?t sleep|wake|wakes|waking|woke|brain fog|foggy|anxious|anxiety|depress\w*|low mood|palpitat\w*|numb\w*|tingl\w*|swell\w*|swollen|flare[- ]?ups?|flares?|symptoms?|feels? off|feeling off|crash(es|ing)?|craving\w*|tired(ness)?|wired|restless\w*|stomach|hormon\w*|libido|acne|eczema|hives|congest\w*|sinus(es)?|gut)\b/i;
 const GIMAP_RX=/GI[‑\-– ]?MAP/i;
+const BODY_RX=/\bmy (skin|stomach|gut|belly|tummy|head|scalp|back|neck|shoulders?|joints?|knees?|hips?|energy|sleep|mood|bowels?|digestion|periods?|cycle|hair|nails|breath|chest|throat|eyes|ears|hands|feet|legs|body|face|jaw|sinuses|appetite|weight|labs?|bloodwork|results?|cortisol|thyroid|iron|ferritin|b12|vitamin d)\b/i;
+const EXPERIENCE_RX=/\b(breaking out|break(s)? out|broke out|go(es|ing)? to the (bathroom|toilet)|every (\\d+|a few|two|three|four|five|several)( or (\\d+|two|three|four|five))? days?|bowel movements?|poop|stool|can'?t focus|cannot focus|can'?t concentrate|no energy|zero energy|knots? up|flares? up|acting up|been (feeling|having|getting|dealing with|struggling)|keeps? happening|every (single )?(night|morning|day|week)|since (january|february|march|april|may|june|july|august|september|october|november|december|last|my))\b/i;
+const LABQ_RX=/\b(came back|my (result|results|panel|number|level|levels)|test (came|showed|says)|what does (this|that|it) mean)\b/i;
+/* Plainly a how-to, a target, or a definition — a handoff here is noise. */
+const KNOWLEDGE_RX=/\b(how (much|many|often|long)|what('s| is) (a |the )?(good|ideal|right|recommended|best|target)|target|how do i (log|track|use|set|add|change|find|order)|what does .{0,30}(measure|track)\b|explain|tell me about|how does .{0,30}work|what is (the|a|an) |can i (log|track|add|change)|recipe|which tab|where (is|do i find))\b/i;
 const HANDOFF_RX=/\b(practitioner|your doctor|your clinician|prescriber|testing|get tested|tested for|test for|lab work|labs)\b/i;
 /* We never recommend a drug. The prompt forbids it; this catches the days it slips,
    and a false positive costs nothing but one honest extra sentence. */
@@ -13519,7 +13524,8 @@ function _detHandoff(text,q){
   // and the gut test is the one we actually want in front of people. So: if it named
   // the panel, leave it alone; if it handed off without naming it, add the pointer
   // only; if it did neither, add the full line, which carries the honest limit too.
-  if(SYMPTOM_RX.test(q)&&!GIMAP_RX.test(text)){
+  const _aboutThem=(SYMPTOM_RX.test(q)||BODY_RX.test(q)||EXPERIENCE_RX.test(q)||LABQ_RX.test(q))&&!KNOWLEDGE_RX.test(q);
+  if(_aboutThem&&!GIMAP_RX.test(text)){
     if(HANDOFF_RX.test(text)){
       out+='\n\nWhen you are ready to stop guessing, the GI-MAP gut panel is where we start — you can order it right here in the app.';
     } else {
@@ -13532,7 +13538,7 @@ function _detHandoff(text,q){
 }
 
 const CRISIS_RX=/\b(suicid|kill myself|killing myself|end my life|don'?t want to (be alive|live|wake up)|want to die|hurt myself|harm myself|self[\s-]?harm|hopeless|no reason to (live|go on)|better off dead|can'?t go on)\b/i;
-const REDFLAG_RX=/\b(blood in (my |the )?stool|black,? tarry|tarry stool|vomit(ing|ed)? blood|coughing up blood|chest pain|chest pressure|can'?t breathe|trouble breathing|short(ness)? of breath|one[\s-]?sided weakness|face droop|slurred speech|worst headache|sudden severe|severe abdominal|passed out|fainted|unexplained weight loss|losing weight without|coffee[\s-]?ground|trouble swallowing|difficulty swallowing|food (gets |getting )?stuck|throwing up blood)\b/i;
+const REDFLAG_RX=/\b(blood in (my |the )?stool|black,? tarry|tarry stool|vomit(ing|ed)? blood|coughing up blood|chest pain|chest pressure|can'?t breathe|trouble breathing|short(ness)? of breath|one[\s-]?sided weakness|face droop|slurred speech|worst headache|sudden severe|severe abdominal|passed out|fainted|unexplained weight loss|losing weight without|coffee[\s-]?ground|(trouble|difficulty|hard|painful|pain) swallowing|swallowing (is )?(hard|painful|difficult)|(food|it) (keeps? |is )?(get(s|ting)? )?stuck when i swallow|food (gets|getting|keeps getting) stuck|can'?t swallow|dysphagia|throwing up blood)\b/i;
 const OUT_MED_RX=/\b(stop|start|increase|raise|decrease|lower|change|adjust|come off|wean off|double)\s+((taking|your|the|off|on)\s+)*(dose|medication|meds|prescription|antidepressant|ssri|ppi|insulin|metformin|levothyroxine|blood ?pressure)/i;
 const OUT_DX_RX=/\byou (likely |probably |may |might )?have (a |an )?(thyroid (problem|condition|disorder)|hypothyroid|hyperthyroid|diabet|cancer|depression|anxiety disorder|ibs|sibo|adrenal fatigue|autoimmune)/i;
 
@@ -14890,7 +14896,7 @@ window.deleteAccount = deleteAccount;
 var HEALTH_SCOPE_V = '2';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0915-13';
+var WEB_BUILD = '0915-15';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
