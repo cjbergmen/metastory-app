@@ -29,7 +29,7 @@
 <div class="wrap">
 <header>
   <h1>Metastory Health — Privacy Policy</h1>
-  <p class="updated">Last updated: September 13, 2026</p>
+  <p class="updated">Last updated: September 16, 2026</p>
 </header>
 
 <p>Metastory Health (&ldquo;Metastory&rdquo;, &ldquo;we&rdquo;) is operated by Megaphone Functional Health, LLC. This policy covers the Metastory web app at app.metastoryhealth.com and the Metastory app for iPhone.</p>
@@ -46,12 +46,24 @@
 
 <h2>Apple Health (HealthKit)</h2>
 <p>Connecting Apple Health is optional, and off until you turn it on in Settings.</p>
-<p>When it is on, Metastory <strong>writes</strong> the workouts you finish to Apple Health, and <strong>reads</strong> back the signals your own devices record there: sleep (including stages), resting heart rate, heart rate variability, respiratory rate, blood oxygen, wrist temperature, steps, active energy, exercise minutes, mindful minutes, VO&#8322; max, body weight and body composition. Metastory does not connect to your ring, watch or strap directly — it reads whatever they have written into Apple Health, and it can show you which apps and devices those are.</p>
-<p>Before you connect it, Metastory tells you — and you have to agree — that the weight it reads becomes part of the profile used to generate your personalized guidance, which is produced by Google Gemini (see <em>Who else sees your data</em>). Health data is never used for advertising, never sold, and never used to train models. You can disconnect at any time in Settings, and you can revoke Metastory&rsquo;s access entirely in the Health app under Sharing &rsaquo; Apps &rsaquo; Metastory.</p>
+<p>When it is on, Metastory <strong>writes</strong> the workouts you finish to Apple Health, and <strong>reads</strong> back the signals your own devices and apps have recorded there. Specifically:</p>
+<ul>
+<li><strong>Sleep</strong> — time asleep and in bed, sleep stages, and when each night started and ended.</li>
+<li><strong>Heart and breathing</strong> — resting heart rate, heart rate, walking heart rate, one-minute heart-rate recovery, heart rate variability, respiratory rate and blood oxygen.</li>
+<li><strong>Activity</strong> — steps, distance walked or run, flights climbed, exercise, stand and move minutes, active and resting energy, walking steadiness, VO&#8322; max and workouts.</li>
+<li><strong>Body</strong> — weight, body fat, lean mass, height, BMI, waist circumference, body temperature, basal body temperature and wrist temperature.</li>
+<li><strong>Blood pressure and blood glucose</strong>, if a cuff or a glucose monitor writes them.</li>
+<li><strong>Food and drink</strong> — calories, protein, carbohydrate, fat, fibre, sugar, sodium, caffeine and water, from whatever nutrition app you use.</li>
+<li><strong>Time in daylight</strong> and <strong>mindful minutes</strong>.</li>
+<li><strong>Symptoms you have recorded yourself</strong> in the Health app or on your watch — bloating, constipation, diarrhoea, heartburn, abdominal cramps, nausea, headache, fatigue, and changes in mood, appetite or sleep.</li>
+<li><strong>Cycle tracking</strong> — menstrual flow only.</li>
+</ul>
+<p>Metastory does not connect to your ring, watch, strap, cuff or monitor directly &mdash; it reads whatever they have written into Apple Health, and it can show you which apps and devices those are. Anything you have not granted, or that nothing on your devices records, simply never arrives.</p>
+<p>Before you connect it, Metastory tells you &mdash; and you have to agree &mdash; that what it reads becomes part of the profile used to generate your personalized guidance, which is produced by Google Gemini (see <em>Who else sees your data</em>). Health data is never used for advertising, never sold, and never used to train models. You can disconnect at any time in Settings, and you can revoke Metastory&rsquo;s access entirely in the Health app under Sharing &rsaquo; Apps &rsaquo; Metastory.</p>
 
 <h2>Who else sees your data</h2>
 <p><strong>Google Firebase</strong> (Authentication, Cloud Firestore) — stores your account and your logged data so it syncs across your devices.</p>
-<p><strong>Google Gemini, through our own Cloudflare Worker</strong> — when Metastory generates personalized guidance, the relevant parts of your profile and recent logs are sent to Google&rsquo;s Gemini model to produce it. If you have connected Apple Health, the weight read from Health forms part of that profile. This is used only to generate your recommendations: not for advertising, and not to train models on your data.</p>
+<p><strong>Google Gemini, through our own Cloudflare Worker</strong> — when Metastory generates personalized guidance, the relevant parts of your profile and recent logs are sent to Google&rsquo;s Gemini model to produce it. If you have connected Apple Health, what Metastory has read from Health &mdash; summarised as daily figures and averages, not raw sample streams &mdash; forms part of that profile. This is used only to generate your recommendations: not for advertising, and not to train models on your data.</p>
 <p><strong>Cloudflare</strong> — serves the app and runs the workers described here.</p>
 <p><strong>If you order a lab test through the app</strong> — the order details you enter are sent to Metastory so we can place the order, emailed to us through Resend, and the test itself is ordered and run through Evexia Diagnostics. If you book a results review or follow-up, that appointment is scheduled through Practice Better. Each of these receives only what it needs to provide that service.</p>
 <p>We do not share your information with anyone else unless you ask us to, or unless we are legally required to.</p>
