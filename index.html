@@ -1041,7 +1041,7 @@ function lsSet(k,v){
   return _r;
 }
 var _daySyncOff=false;
-const SYNC_DAY_PREFIXES=['supptk_','pvlog_','stress_','wd_','rest_','restdone_','wind_','pcdone_','bs_','bshk_','routedone_','bm_','listen_'];
+const SYNC_DAY_PREFIXES=['supptk_','pvlog_','stress_','wd_','rest_','restdone_','wind_','pcdone_','bs_','bshk_','hkx_','routedone_','bm_','listen_'];
 function fbSyncDayMisc(k,v){
   if(_daySyncOff||!fbUser||!fbDb)return;
   var pref=null;for(var i=0;i<SYNC_DAY_PREFIXES.length;i++){if(k.indexOf(SYNC_DAY_PREFIXES[i])===0){pref=SYNC_DAY_PREFIXES[i];break;}}
@@ -13623,6 +13623,9 @@ function _detScan(days){
     pairs:0, improved:0, protHit:0, lateMeals:0,
     waterDays:0, waterOz:0, waterMet:0,
     bs:[], bgDays:0, bgAvgSum:0, bgMin:null, bgMax:null, bmDays:0, bmCount:0, bristol:{}, bmGapMax:0,
+    hkSym:{}, hkDaylight:0, hkDaylightDays:0, hkCaf:0, hkCafDays:0, hkBpDays:0, hkBpSys:0, hkBpDia:0,
+    hkRecDays:0, hkRec:0, hkStepDist:0, hkBasal:0, hkBasalDays:0, hkWaterOz:0, hkWaterDays:0,
+    hkDietDays:0, hkDietKcal:0, hkDietProt:0, hkFlowDays:0,
     sleepNights:0, sleepH:0, sleepUnder7:0, bedMins:[], windDays:0, windItems:0,
     restDays:0, listenSec:0, listenDays:0,
     pv:{}, pvCount:0, pvDays:0, pvFirstHalf:{}, pvSecondHalf:{}, pvLatest:null, pvLatestKey:null,
@@ -13665,6 +13668,22 @@ function _detScan(days){
 
     var bsArr = _jget('bs_'+key, '[]');
     if(Array.isArray(bsArr) && bsArr.length){ any = true; bsArr.forEach(function(r){ if(+r.v) A.bs.push(+r.v); }); }
+    var hx = _jget('hkx_'+key, 'null');
+    if(hx && typeof hx === 'object'){
+      any = true;
+      if(hx.symptoms) Object.keys(hx.symptoms).forEach(function(sk){
+        var e = hx.symptoms[sk]; A.hkSym[sk] = (A.hkSym[sk]||0) + ((e && e.n) || 1);
+      });
+      if(hx.daylightMin != null){ A.hkDaylight += +hx.daylightMin; A.hkDaylightDays++; }
+      if(hx.caffeineMg != null){ A.hkCaf += +hx.caffeineMg; A.hkCafDays++; }
+      if(hx.bpSys != null && hx.bpDia != null){ A.hkBpDays++; A.hkBpSys += +hx.bpSys; A.hkBpDia += +hx.bpDia; }
+      if(hx.hrRecovery != null){ A.hkRecDays++; A.hkRec += +hx.hrRecovery; }
+      if(hx.distanceMi != null) A.hkStepDist += +hx.distanceMi;
+      if(hx.basalKcal != null){ A.hkBasal += +hx.basalKcal; A.hkBasalDays++; }
+      if(hx.waterOz != null){ A.hkWaterOz += +hx.waterOz; A.hkWaterDays++; }
+      if(hx.dietKcal != null){ A.hkDietDays++; A.hkDietKcal += +hx.dietKcal; A.hkDietProt += (+hx.dietProtein||0); }
+      if(hx.menstrualFlow) A.hkFlowDays++;
+    }
     var bgh = _jget('bshk_'+key, 'null');
     if(bgh && bgh.avg != null){
       any = true; A.bgDays++; A.bgAvgSum += +bgh.avg;
@@ -13755,7 +13774,11 @@ function _detScan(days){
 }
 
 function _detDietLine(A, w){
-  if(!A.foodDays) return '· Diet — nothing logged in ' + w + '.';
+  if(!A.foodDays){
+    return A.hkDietDays
+      ? '· Diet — nothing logged in this app, but another app (MyFitnessPal, Cronometer or similar) recorded food on ' + _plural(A.hkDietDays,'day') + ', averaging ' + Math.round(A.hkDietKcal/A.hkDietDays) + ' cal and ' + Math.round(A.hkDietProt/A.hkDietDays) + 'g protein a day. Work from that; do not tell them they are not tracking food.'
+      : '· Diet — nothing logged in ' + w + '.';
+  }
   var s = '· Diet — logged on ' + A.foodDays + ' of ' + A.days + ' days (' + A.meals + ' entries). '
     + 'Average on a logged day: ' + _avg(A.kcal, A.foodDays) + ' cal, ' + _avg(A.prot, A.foodDays) + 'g protein, '
     + _avg(A.carb, A.foodDays) + 'g carb, ' + _avg(A.fat, A.foodDays) + 'g fat. '
@@ -13772,9 +13795,14 @@ function _detDietLine(A, w){
 }
 function _detBodyLines(A, w){
   var L = [];
-  L.push(A.waterDays
-    ? '· Hydration — tracked on ' + A.waterDays + ' days, averaging ' + _avg(A.waterOz, A.waterDays) + ' oz; hit roughly 72 oz+ on ' + A.waterMet + ' of them.'
-    : '· Hydration — not tracked in ' + w + '.');
+  if(A.waterDays){
+    L.push('· Hydration — tracked on ' + _plural(A.waterDays,'day') + ' in the app, averaging ' + _avg(A.waterOz, A.waterDays) + ' oz; hit roughly 72 oz+ on ' + A.waterMet + ' of them.'
+      + (A.hkWaterDays ? ' Another app also logged water on ' + _plural(A.hkWaterDays,'day') + ' (avg ' + Math.round(A.hkWaterOz/A.hkWaterDays) + ' oz) \u2014 the two may double-count the same drink.' : ''));
+  } else if(A.hkWaterDays){
+    L.push('· Hydration — not logged in this app, but a connected app recorded water on ' + _plural(A.hkWaterDays,'day') + ', averaging ' + Math.round(A.hkWaterOz/A.hkWaterDays) + ' oz a day. Use that rather than telling them hydration is untracked.');
+  } else {
+    L.push('· Hydration — not tracked in ' + w + '.');
+  }
   var bgParts = [];
   if(A.bgDays){
     bgParts.push('a connected monitor wrote data on ' + _plural(A.bgDays, 'day')
@@ -13786,6 +13814,24 @@ function _detBodyLines(A, w){
     var sum = A.bs.reduce(function(a,b){return a+b;}, 0);
     bgParts.push(_plural(A.bs.length, 'reading') + ' entered by hand, average ' + Math.round(sum/A.bs.length) + ' mg/dL, range ' + mn + '–' + mx);
   }
+  var SYM_LABEL = {bloating:'bloating', constipation:'constipation', diarrhea:'diarrhoea', heartburn:'heartburn',
+    abdominalCramps:'abdominal cramps', nausea:'nausea', headache:'headache', fatigue:'fatigue',
+    moodChanges:'mood changes', appetiteChanges:'appetite changes', sleepChanges:'sleep changes'};
+  if(Object.keys(A.hkSym).length){
+    L.push('· Symptoms they logged in Apple Health — ' + _top(A.hkSym, 8, function(k){
+      return (SYM_LABEL[k]||k) + ' on ' + _plural(A.hkSym[k], 'day'); }) + '. These are their own records, not a device inference.');
+  }
+  var dev = [];
+  if(A.hkDaylightDays) dev.push('time outdoors in daylight averaged ' + Math.round(A.hkDaylight/A.hkDaylightDays) + ' min/day over ' + _plural(A.hkDaylightDays,'day'));
+  if(A.hkCafDays) dev.push('caffeine averaged ' + Math.round(A.hkCaf/A.hkCafDays) + ' mg/day');
+  if(A.hkBpDays) dev.push('blood pressure averaged ' + Math.round(A.hkBpSys/A.hkBpDays) + '/' + Math.round(A.hkBpDia/A.hkBpDays) + ' across ' + _plural(A.hkBpDays,'day'));
+  if(A.hkRecDays) dev.push('one-minute heart-rate recovery averaged ' + Math.round(A.hkRec/A.hkRecDays) + ' bpm');
+  if(A.hkBasalDays) dev.push('resting burn averaged ' + Math.round(A.hkBasal/A.hkBasalDays) + ' cal/day');
+  if(A.hkStepDist) dev.push(Math.round(A.hkStepDist) + ' miles walked or run');
+  if(A.hkWaterDays) dev.push('another app logged ' + Math.round(A.hkWaterOz/A.hkWaterDays) + ' oz of water a day');
+  if(A.hkDietDays) dev.push('food logged elsewhere on ' + _plural(A.hkDietDays,'day') + ' (avg ' + Math.round(A.hkDietKcal/A.hkDietDays) + ' cal, ' + Math.round(A.hkDietProt/A.hkDietDays) + 'g protein)');
+  if(A.hkFlowDays) dev.push('cycle tracked on ' + _plural(A.hkFlowDays,'day'));
+  if(dev.length) L.push('· From their devices and other apps — ' + dev.join('; ') + '.');
   L.push(bgParts.length
     ? '· Blood sugar — ' + bgParts.join('; ') + '.'
     : '· Blood sugar — not monitored: no monitor is connected and nothing has been entered by hand. Do not assume anything about it, and if the question turns on blood sugar, name that gap.');
@@ -15357,10 +15403,10 @@ window.deleteAccount = deleteAccount;
    appended after it renders rather than threaded through it. */
 /* Bumped whenever the set of Health types the app reads grows, so existing
    users get asked about the new ones exactly once. */
-var HEALTH_SCOPE_V = '3';
+var HEALTH_SCOPE_V = '4';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0916-3';
+var WEB_BUILD = '0916-5';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
@@ -15376,8 +15422,11 @@ async function connectHealth(){
     'Metastory will save the workouts you finish to Apple Health, and read ' +
     'back what your devices already record: sleep, resting heart rate, heart ' +
     'rate variability, breathing rate, blood oxygen, wrist temperature, ' +
-    'steps, active energy, exercise minutes, mindful minutes, weight, body ' +
-    'composition, and blood glucose if a monitor writes it there.\n\n' +
+    'heart-rate recovery, blood pressure from a cuff, body temperature, steps, ' +
+    'distance, stand and move minutes, resting energy, time in daylight, ' +
+    'mindful minutes, weight and body composition, blood glucose from a ' +
+    'monitor, food and drink you log in other apps, and any digestive or mood ' +
+    'symptoms you record in Health.\n\n' +
     'You choose which of those to share on the next screen, and nothing you ' +
     'withhold is read. Your weight and recovery markers become part of the ' +
     'profile used to generate your personalized guidance, which is produced ' +
@@ -16187,6 +16236,21 @@ function healthSyncSignals(){
       if(d.bgMin != null) rec.min = d.bgMin;
       if(d.bgMax != null) rec.max = d.bgMax;
       lsSet('bshk_' + d.date, JSON.stringify(rec));
+    });
+
+    // Everything else a device wrote that the app reasons about but does not
+    // have its own log for. One key per day so the Detective can read it the
+    // same way it reads anything else, and so it syncs like anything else.
+    (res.days || []).forEach(function(d){
+      var x = {};
+      ['basalKcal','distanceMi','flights','standMin','moveMin','walkingHR','hrRecovery',
+       'steadinessPct','bpSys','bpDia','bodyTempF','basalTempF','waterOz','caffeineMg',
+       'dietKcal','dietProtein','dietCarb','dietFat','dietFiber','dietSugar','dietSodiumMg',
+       'daylightMin','mindfulMin','menstrualFlow'].forEach(function(k){
+        if(d[k] != null) x[k] = d[k];
+      });
+      if(d.symptoms && Object.keys(d.symptoms).length) x.symptoms = d.symptoms;
+      if(Object.keys(x).length) lsSet('hkx_' + d.date, JSON.stringify(x));
     });
 
     // Weight, body fat and lean mass, if a scale is writing them.
