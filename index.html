@@ -13680,8 +13680,8 @@ function _detScan(days){
       if(hx.hrRecovery != null){ A.hkRecDays++; A.hkRec += +hx.hrRecovery; }
       if(hx.distanceMi != null) A.hkStepDist += +hx.distanceMi;
       if(hx.basalKcal != null){ A.hkBasal += +hx.basalKcal; A.hkBasalDays++; }
-      if(hx.waterOz != null){ A.hkWaterOz += +hx.waterOz; A.hkWaterDays++; }
-      if(hx.dietKcal != null){ A.hkDietDays++; A.hkDietKcal += +hx.dietKcal; A.hkDietProt += (+hx.dietProtein||0); }
+      if(+hx.waterOz > 0){ A.hkWaterOz += +hx.waterOz; A.hkWaterDays++; }
+      if(+hx.dietKcal > 0){ A.hkDietDays++; A.hkDietKcal += +hx.dietKcal; A.hkDietProt += (+hx.dietProtein||0); }
       if(hx.menstrualFlow) A.hkFlowDays++;
     }
     var bgh = _jget('bshk_'+key, 'null');
@@ -13704,7 +13704,16 @@ function _detScan(days){
       any = true; A.sleepNights++; A.sleepH += (+rest.h||0);
       if(+rest.h < 7) A.sleepUnder7++;
       if(rest.bed){ var m = String(rest.bed).match(/(\d{1,2}):(\d{2})\s*(a|p)?/i);
-        if(m){ var hh = +m[1]%12 + (/p/i.test(m[3]||'') ? 12 : 0); A.bedMins.push(hh*60 + (+m[2])); } }
+        // Bedtimes arrive in two shapes: "10:40pm" from anywhere a person typed
+        // one, and "22:40" from the <input type="time"> and from Apple Health.
+        // Treating the 24-hour form as 12-hour turned every evening bedtime into
+        // a morning one, which then dragged the circular mean to the wrong half
+        // of the clock. Only fold by 12 when an am/pm marker is actually there.
+        if(m){ var raw = +m[1], ap = (m[3]||'').toLowerCase(), hh;
+          if(ap === 'p') hh = (raw % 12) + 12;
+          else if(ap === 'a') hh = raw % 12;
+          else hh = raw % 24;
+          A.bedMins.push(hh*60 + (+m[2])); } }
     }
     var wind = _jget('wind_'+key, '{}');
     if(wind && typeof wind === 'object'){
@@ -15406,7 +15415,7 @@ window.deleteAccount = deleteAccount;
 var HEALTH_SCOPE_V = '4';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0916-6';
+var WEB_BUILD = '0916-7';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
@@ -16231,10 +16240,10 @@ function healthSyncSignals(){
     // overwrite a fingerstick someone typed by hand — a continuous stream and a
     // deliberate reading are different evidence and both are worth keeping.
     (res.days || []).forEach(function(d){
-      if(d.bgAvg == null) return;
+      if(d.bgAvg == null || +d.bgAvg <= 0) return;
       var rec = { avg: d.bgAvg, src: 'health' };
-      if(d.bgMin != null) rec.min = d.bgMin;
-      if(d.bgMax != null) rec.max = d.bgMax;
+      if(+d.bgMin > 0) rec.min = d.bgMin;
+      if(+d.bgMax > 0) rec.max = d.bgMax;
       lsSet('bshk_' + d.date, JSON.stringify(rec));
     });
 
