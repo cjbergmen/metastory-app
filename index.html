@@ -14348,6 +14348,7 @@ var SUPPORT_EMAIL = 'support@metastoryhealth.com';
 var _fbKind = 'bug';
 
 function openFeedback(){
+  _fbShots = [];
   var ov = document.getElementById('fb-ov');
   if(!ov){
     ov = document.createElement('div');
@@ -14417,19 +14418,126 @@ function fbRender(){
 
   body.innerHTML =
     '<div style="font-size:12.5px;color:var(--sub);line-height:1.55;margin-bottom:12px">' +
-      'Goes straight to our team. Screenshots help — if you have one, mention it and we\u2019ll follow up for it.' +
+      'Goes straight to our team. A screenshot helps more than anything you can describe — add one below.' +
     '</div>' +
     '<div style="display:flex;gap:8px;margin-bottom:12px">' + chip('bug','Something is broken') + chip('idea','I have an idea') + '</div>' +
     '<textarea id="fb-text" rows="6" placeholder="' +
-      (isBug ? 'What happened, and what were you doing just before? Screenshots help — you can attach them in Mail.'
+      (isBug ? 'What happened, and what were you doing just before?'
              : 'What would you like Metastory to do?') +
       '" style="width:100%;box-sizing:border-box;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:12px;font-size:16px;color:var(--text);font-family:var(--font-sans);line-height:1.5;outline:none;resize:vertical"></textarea>' +
+    _fbShotPickerHTML() +
     _fbReplyRowHTML() +
     '<button class="btn btn-g btn-f btn-sm" id="fb-send" style="margin-top:12px" onclick="fbSend()">Send to our team</button>' +
     '<div style="font-size:11px;color:var(--sub);line-height:1.5;margin-top:10px">' +
-      'We attach your app version so we can reproduce it — ' + _fbVersionLine() + '. None of your logs, plan or assessment results are included.' +
+      'We attach your app version so we can reproduce it — ' + _fbVersionLine() + '. Nothing else goes with it: not your logs, your plan, or your assessment results — only what you typed and any screenshot you add.' +
+    '</div>';
+  _fbRenderShots();
+}
+
+/* Screenshots. Phone screenshots run 2–4 MB each and three of them would be a
+   slow, failure-prone POST on cell data, so every image is drawn down to a
+   1600px long edge and re-encoded as JPEG before it ever leaves the device.
+   That lands a typical screenshot around 150–300 KB with the text still
+   readable, which is the only thing we need from it. */
+var _fbShots = [];
+var FB_MAX_SHOTS = 3;
+var FB_MAX_EDGE = 1600;
+var FB_MAX_TOTAL = 4 * 1024 * 1024;   // of base64, comfortably inside Resend's cap
+
+function _fbShotPickerHTML(){
+  return '<div style="margin-top:12px">' +
+      '<input id="fb-shot-input" type="file" accept="image/*" multiple ' +
+        'style="display:none" onchange="fbPickShots(this)">' +
+      '<button type="button" id="fb-shot-btn" onclick="document.getElementById(\'fb-shot-input\').click()" ' +
+        'style="width:100%;box-sizing:border-box;background:var(--surface);border:1.5px dashed var(--border);' +
+        'border-radius:12px;padding:12px;font-size:13px;font-weight:700;color:var(--sub);cursor:pointer;' +
+        'font-family:var(--font-sans);display:flex;align-items:center;justify-content:center;gap:8px">' +
+        '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+        'stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/>' +
+        '<circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>' +
+        'Add a screenshot</button>' +
+      '<div id="fb-shots" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>' +
     '</div>';
 }
+
+function _fbRenderShots(){
+  var wrap = document.getElementById('fb-shots');
+  if(!wrap) return;
+  wrap.innerHTML = _fbShots.map(function(sh, i){
+    return '<div style="position:relative;width:64px;height:64px;border-radius:10px;overflow:hidden;' +
+      'border:1.5px solid var(--border);background:var(--surface2)">' +
+      '<img src="' + sh.dataUrl + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block">' +
+      '<button type="button" onclick="fbRemoveShot(' + i + ')" aria-label="Remove screenshot" ' +
+      'style="position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;border:none;' +
+      'background:rgba(0,0,0,.62);color:#fff;font-size:12px;line-height:1;cursor:pointer;padding:0">\u2715</button>' +
+    '</div>';
+  }).join('');
+  var btn = document.getElementById('fb-shot-btn');
+  if(btn){
+    var left = FB_MAX_SHOTS - _fbShots.length;
+    btn.style.display = left > 0 ? 'flex' : 'none';
+  }
+}
+
+function fbRemoveShot(i){ _fbShots.splice(i, 1); _fbRenderShots(); }
+
+function _fbShrink(file){
+  return new Promise(function(resolve){
+    var url;
+    try{ url = URL.createObjectURL(file); }catch(e){ resolve(null); return; }
+    var img = new Image();
+    img.onload = function(){
+      try{
+        var w = img.naturalWidth, h = img.naturalHeight;
+        if(!w || !h){ resolve(null); return; }
+        var scale = Math.min(1, FB_MAX_EDGE / Math.max(w, h));
+        var cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+        var c = document.createElement('canvas');
+        c.width = cw; c.height = ch;
+        var ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cw, ch);   // flatten any transparency
+        ctx.drawImage(img, 0, 0, cw, ch);
+        var out = c.toDataURL('image/jpeg', 0.72);
+        resolve(out && out.indexOf('data:image/jpeg') === 0 ? out : null);
+      }catch(e){ resolve(null); }
+      finally{ try{ URL.revokeObjectURL(url); }catch(e){} }
+    };
+    img.onerror = function(){ try{ URL.revokeObjectURL(url); }catch(e){} resolve(null); };
+    img.src = url;
+  });
+}
+
+async function fbPickShots(input){
+  var files = Array.prototype.slice.call((input && input.files) || []);
+  if(input) input.value = '';           // so picking the same file twice still fires
+  if(!files.length) return;
+  var room = FB_MAX_SHOTS - _fbShots.length;
+  if(room <= 0){ toast('Three screenshots is the limit.', 2500); return; }
+  if(files.length > room){
+    files = files.slice(0, room);
+    toast('Adding the first ' + room + ' — three is the limit.', 2500);
+  }
+  var btn = document.getElementById('fb-shot-btn');
+  if(btn) btn.textContent = 'Adding\u2026';
+  var skipped = 0;
+  for(var i = 0; i < files.length; i++){
+    var dataUrl = await _fbShrink(files[i]);
+    if(!dataUrl){ skipped++; continue; }
+    var b64 = dataUrl.split(',')[1] || '';
+    if(_fbShotBytes() + b64.length > FB_MAX_TOTAL){ skipped++; continue; }
+    _fbShots.push({ name: 'screenshot-' + (_fbShots.length + 1) + '.jpg', dataUrl: dataUrl, b64: b64 });
+  }
+  if(btn) btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> Add a screenshot';
+  if(skipped) toast(skipped + ' image' + (skipped > 1 ? 's' : '') + " couldn't be added \u2014 try a screenshot instead of a photo.", 3500);
+  _fbRenderShots();
+}
+
+function _fbShotBytes(){
+  return _fbShots.reduce(function(n, sh){ return n + sh.b64.length; }, 0);
+}
+
+window.fbPickShots = fbPickShots;
+window.fbRemoveShot = fbRemoveShot;
 
 /* The Worker that turns this into mail in the support inbox. Until it is
    deployed — and any time it is unreachable — we fall back to composing the
@@ -14474,7 +14582,8 @@ function fbSend(){
     message: note,
     replyTo: reply,
     version: _fbVersionLine(),
-    sentAt: new Date().toISOString()
+    sentAt: new Date().toISOString(),
+    attachments: _fbShots.map(function(sh){ return { filename: sh.name, content: sh.b64 }; })
   };
 
   var done = false;
@@ -14488,12 +14597,15 @@ function fbSend(){
     } else {
       closeFeedback();
       _fbOpenMail(note);
-      toast('Couldn\u2019t send directly — opening your email app instead.', 4000);
+      toast(_fbShots.length
+        ? 'Couldn\u2019t send directly — opening your email app. Your screenshot needs attaching there.'
+        : 'Couldn\u2019t send directly — opening your email app instead.', 4500);
     }
   };
 
-  // Never leave the button spinning on a hung request.
-  var bail = setTimeout(function(){ finish(false); }, 8000);
+  // Never leave the button spinning on a hung request. Images make the POST
+  // bigger, so the budget scales with what is actually being uploaded.
+  var bail = setTimeout(function(){ finish(false); }, _fbShots.length ? 30000 : 8000);
 
   try{
     fetch(FEEDBACK_ENDPOINT, {
@@ -14896,7 +15008,7 @@ window.deleteAccount = deleteAccount;
 var HEALTH_SCOPE_V = '2';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0915-17';
+var WEB_BUILD = '0916-1';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
