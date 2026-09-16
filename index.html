@@ -13425,7 +13425,7 @@ const DET_SYS=`You are the Health Detective inside Metastory Health, a wellness 
 WHO YOU ARE: a patient, warm, evidence-first guide. You think like a detective — clues, threads, patterns, never verdicts. You educate and equip; you NEVER diagnose, treat, prescribe, or interpret anything as a disease. You identify "healing opportunities" and "systems working hard." You are an automated companion; if asked, say so plainly and note a human coach is available in the app.
 
 HOW YOU REASON:
-1. Start from THEIR story — ground every answer in the data in CONTEXT. Reference it specifically ("your check-ins this week"). Never invent data; if it can't support an answer, say so and say what a week of tracking would reveal.
+1. Start from THEIR story. The CONTEXT block carries their actual logs in three windows: TODAY, the LAST 30 DAYS, and ALL TIME. The 30-day window is the working picture and carries the most weight; all-time is baseline and tells you how long something has been true; today is what is happening right now. Quote real figures back with the window attached — "22 of the last 30 days", "averaging 6.8h since June" — rather than a vague "your recent data". When the 30-day picture differs from all time, that gap is often the most interesting thing you can tell them, so say it: something got better, something slipped, something started. Never invent a figure that is not in CONTEXT. If the data cannot support an answer, say so plainly and name the ONE thing worth tracking for the question they asked.
 2. Look upstream — symptoms are results, not causes. Connect to the daily foundations (diet, rest, exercise, stress, supplements). Name two or three threads simply.
 2a. ASK BEFORE YOU ADVISE. Unless they asked a pure knowledge question, your reply normally ends with ONE specific follow-up question — the single question whose answer would most change what you'd say next. Good questions narrow: when it happens, what makes it better or worse, how many weeks it has run, what else changed around then, what they have already tried and what happened. Bad questions are open-ended ("tell me more about that"). Never more than one. Skip it only when you already have enough to be specific, or when you're asking them to see someone.
 2b. PATTERN BEFORE PLAN — when they describe a physical symptom, work out the pattern before you suggest anything: when it happens, what makes it better, what makes it worse, how long it has run. If a recognised pattern fits, name the threads practitioners actually investigate for it and what would tell those threads apart. Saying "this is the pattern practitioners look into X for" is not diagnosing — it is the job. Vagueness here is not safety; it is a worse answer, and the person is left with nothing.
@@ -13568,38 +13568,373 @@ function _gatesNote(){
   return 'GATES (enforced — do NOT cross): user flags = '+f.map(x=>DET_FLAG_LABELS[x]||x).join('; ')+'. '+f.map(x=>map[x]||'').filter(Boolean).join(' ');
 }
 
-function _detContext(){
-  let c=[];
-  try{let p={};try{p=JSON.parse(lsGet('_userProfile','{}'))||{};}catch(e){}if(p.goal||p.stress||p.sleep)c.push('Goal: '+(p.goal||'general wellness')+(p.stress?'; self-reported stress: '+p.stress:'')+(p.sleep?'; sleep: '+p.sleep:'')+'.');}catch(e){}
-  // assessments
-  try{
-    const ns=JSON.parse(lsGet('_assess_ns_result','null'));
-    if(ns&&ns.pattern)c.push('Assessment — primary nervous-system pattern: '+ns.pattern+(ns.sympathetic!=null?` (sympathetic ${ns.sympathetic}/20, dorsal ${ns.dorsal}/20, ventral access ${ns.ventral}/20, biological load ${ns.biological}/20)`:'')+'.');
-  }catch(e){}
-  // today macros
-  try{
-    if(typeof getMacros==='function'&&typeof getTgt==='function'){
-      const m=getMacros(),t=getTgt();
-      c.push(`Today so far: ${Math.round(m.k)} cal, ${Math.round(m.p)}g protein${t&&t.p?'/'+t.p+'g target':''}, ${Math.round(m.c)}g carb, ${Math.round(m.f)}g fat.`);
-    }
-  }catch(e){}
-  // meal mood pattern (last 7 days)
-  try{
-    let after={};let n=0;
-    for(let i=0;i<7;i++){const d=new Date();d.setDate(d.getDate()-i);const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-      let log=[];try{log=JSON.parse(lsGet('fl_'+key,'[]'))||[];}catch(e){}
-      log.forEach(e=>{const ma=e.moodAfter;(Array.isArray(ma)?ma:ma?[ma]:[]).forEach(m=>{after[m]=(after[m]||0)+1;n++;});});
-    }
-    if(n)c.push('Recent post-meal feelings (7d): '+Object.entries(after).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([k,v])=>k+'×'+v).join(', ')+'.');
-  }catch(e){}
-  // water
-  try{if(typeof getWater==='function')c.push('Water today: '+getWater()+' oz.');}catch(e){}
-  // sleep last night
-  try{const r=JSON.parse(lsGet('rest_'+dk(),'null'))||JSON.parse(lsGet('rest_'+_yday(),'null'));if(r&&r.h)c.push('Recent sleep: '+r.h+'h'+(r.bed?' (in bed '+r.bed+')':'')+'.');}catch(e){}
-  // supps titration
-  try{const t=JSON.parse(lsGet('_supp_titr','null'));if(t&&t.name)c.push('Mid-titration: '+t.name+' day '+(t.day||1)+(t.status==='hold'?' (holding)':'')+' — protect this before adding anything.');}catch(e){}
-  return c.length?('CONTEXT (this user\'s data):\n'+c.join('\n')):'CONTEXT: little tracked data yet — be honest about that and say what a week of tracking would reveal.';
+/* ── THE USER'S OWN DATA ───────────────────────────────────────────────────────
+   The Detective was reading a thin slice — today's macros, a week of meal moods,
+   last night's sleep — which is why its answers kept sounding like they were
+   about people in general. This walks every day the app has ever stored and
+   builds two windows: the last 30 days, which is what the body is doing NOW, and
+   everything since their first entry, which is what "has always been true" looks
+   like. Both are labelled so the model can say which one it is quoting, and
+   every figure is specific enough to repeat back. One pass over localStorage,
+   summarised on the way through — never raw entries, which would swamp the
+   prompt and tell the model less. */
+var DET_SCAN_DAYS = 400;
+
+function _dkBack(n){
+  var d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
+function _jget(k, dflt){
+  try{ var v = JSON.parse(lsGet(k, dflt)); return v == null ? JSON.parse(dflt) : v; }
+  catch(e){ try{ return JSON.parse(dflt); }catch(_){ return null; } }
+}
+function _top(map, n, fmt){
+  return Object.keys(map)
+    .sort(function(a,b){ return map[b] - map[a]; })
+    .slice(0, n)
+    .map(fmt || function(k){ return k + ' ×' + map[k]; })
+    .join(', ');
+}
+function _avg(sum, n, dp){ return n ? (Math.round(sum / n * Math.pow(10, dp||0)) / Math.pow(10, dp||0)) : 0; }
+/* Clock times wrap, so the mean of 10:40pm, 11:20pm and 12:05am is not
+   (1360+1400+5)/3 — that lands at 3:25pm. Average on the circle instead. */
+function _clockMean(mins){
+  if(!mins.length) return null;
+  var sx = 0, sy = 0;
+  mins.forEach(function(m){ var a = m / 1440 * 2 * Math.PI; sx += Math.cos(a); sy += Math.sin(a); });
+  if(Math.abs(sx) < 1e-9 && Math.abs(sy) < 1e-9) return null;
+  var ang = Math.atan2(sy / mins.length, sx / mins.length);
+  if(ang < 0) ang += 2 * Math.PI;
+  return Math.round(ang / (2 * Math.PI) * 1440) % 1440;
+}
+function _clockStr(m){
+  var h = Math.floor(m / 60) % 24, mm = m % 60;
+  return (((h + 11) % 12) + 1) + ':' + String(mm).padStart(2,'0') + (h >= 12 ? 'pm' : 'am');
+}
+function _plural(n, one, many){ return n + ' ' + (n === 1 ? one : (many || one + 's')); }
+
+function _detScan(days){
+  var A = {
+    days: days, firstKey: null, lastKey: null,
+    foodDays:0, meals:0, kcal:0, prot:0, carb:0, fat:0, foods:{}, after:{}, before:{}, ctx:{},
+    pairs:0, improved:0, protHit:0, lateMeals:0,
+    waterDays:0, waterOz:0, waterMet:0,
+    bs:[], bmDays:0, bmCount:0, bristol:{}, bmGapMax:0,
+    sleepNights:0, sleepH:0, sleepUnder7:0, bedMins:[], windDays:0, windItems:0,
+    restDays:0, listenSec:0, listenDays:0,
+    pv:{}, pvCount:0, pvDays:0, pvFirstHalf:{}, pvSecondHalf:{}, pvLatest:null, pvLatestKey:null,
+    woDays:0, woNames:{}, exSets:{}, exBest:{}, exVol:{}, sets:0, volume:0, circuits:{},
+    suppDays:0, suppTaken:0, suppSched:0
+  };
+  var supps = [];
+  try{ supps = getSupps() || []; }catch(e){}
+  var schedPerDay = 0;
+  supps.forEach(function(s){ (s.timing||[]).forEach(function(){ schedPerDay++; }); });
+
+  var lastBM = null, half = Math.floor(days/2);
+  for(var i = days - 1; i >= 0; i--){
+    var key = _dkBack(i), any = false;
+
+    var log = _jget('fl_'+key, '[]');
+    if(Array.isArray(log) && log.length){
+      any = true; A.foodDays++; A.meals += log.length;
+      log.forEach(function(e){
+        A.kcal += (+e.k||0); A.prot += (+e.p||0); A.carb += (+e.c||0); A.fat += (+e.f||0);
+        var nm = (e.name||'').trim(); if(nm) A.foods[nm] = (A.foods[nm]||0) + 1;
+        var ma = Array.isArray(e.moodAfter) ? e.moodAfter : (e.moodAfter ? [e.moodAfter] : []);
+        var mb = Array.isArray(e.moodBefore) ? e.moodBefore : (e.moodBefore ? [e.moodBefore] : []);
+        ma.forEach(function(m){ A.after[m] = (A.after[m]||0) + 1; });
+        mb.forEach(function(m){ A.before[m] = (A.before[m]||0) + 1; });
+        (e.eatCtx||[]).forEach(function(c){ A.ctx[c] = (A.ctx[c]||0) + 1; });
+        if(ma.length && mb.length){
+          A.pairs++;
+          try{ if(!mb.some(function(w){return CK_POS_MOODS.indexOf(w)>=0;}) && ma.some(function(w){return CK_POS_MOODS.indexOf(w)>=0;})) A.improved++; }catch(_){}
+        }
+        if(e.ts){ var hr = new Date(e.ts).getHours(); if(hr >= 21 || hr < 4) A.lateMeals++; }
+      });
+      var pSum = log.reduce(function(a,e){ return a + (+e.p||0); }, 0);
+      try{ var tg = _tgtFor(_trainDaySet(key).indexOf(new Date(key+'T12:00:00').getDay())>=0);
+           if(tg && tg.p && pSum >= tg.p*0.9) A.protHit++; }catch(_){}
+    }
+
+    var oz = parseFloat(lsGet('wa_'+key,'0')) || 0;
+    if(oz > 0){ any = true; A.waterDays++; A.waterOz += oz; if(oz >= 72) A.waterMet++; }
+
+    var bsArr = _jget('bs_'+key, '[]');
+    if(Array.isArray(bsArr) && bsArr.length){ any = true; bsArr.forEach(function(r){ if(+r.v) A.bs.push(+r.v); }); }
+
+    var bm = _jget('bm_'+key, '[]');
+    if(Array.isArray(bm) && bm.length){
+      any = true; A.bmDays++; A.bmCount += bm.length;
+      bm.forEach(function(e){ var t = e.type||4; A.bristol['Type '+t] = (A.bristol['Type '+t]||0) + 1; });
+      if(lastBM !== null){ var gap = lastBM - i; if(gap > A.bmGapMax) A.bmGapMax = gap; }
+      lastBM = i;
+    }
+
+    var rest = _jget('rest_'+key, 'null');
+    if(rest && rest.h){
+      any = true; A.sleepNights++; A.sleepH += (+rest.h||0);
+      if(+rest.h < 7) A.sleepUnder7++;
+      if(rest.bed){ var m = String(rest.bed).match(/(\d{1,2}):(\d{2})\s*(a|p)?/i);
+        if(m){ var hh = +m[1]%12 + (/p/i.test(m[3]||'') ? 12 : 0); A.bedMins.push(hh*60 + (+m[2])); } }
+    }
+    var wind = _jget('wind_'+key, '{}');
+    if(wind && typeof wind === 'object'){
+      var done = Object.keys(wind).filter(function(k){ return wind[k]; }).length;
+      if(done){ any = true; A.windDays++; A.windItems += done; }
+    }
+    var rd = _jget('restdone_'+key, '[]');
+    if(Array.isArray(rd) && rd.length){ any = true; A.restDays++; }
+    var ls = parseInt(lsGet('listen_'+key,'0'), 10) || 0;
+    if(ls >= 60){ any = true; A.listenDays++; A.listenSec += ls; }
+
+    var pv = _jget('pvlog_'+key, '[]');
+    if(!Array.isArray(pv) || !pv.length){
+      var legacy = lsGet('stress_'+key, '');
+      if(legacy) pv = [{ s: legacy, t: 0 }];
+    }
+    if(Array.isArray(pv) && pv.length){
+      any = true; A.pvDays++; A.pvCount += pv.length;
+      pv.forEach(function(e){
+        var lbl = (typeof PV_STATES !== 'undefined' && PV_STATES[e.s]) ? PV_STATES[e.s].label : e.s;
+        A.pv[lbl] = (A.pv[lbl]||0) + 1;
+        if(i >= half) A.pvFirstHalf[lbl] = (A.pvFirstHalf[lbl]||0) + 1;
+        else A.pvSecondHalf[lbl] = (A.pvSecondHalf[lbl]||0) + 1;
+        A.pvLatest = lbl; A.pvLatestKey = key;
+      });
+    }
+
+    var wl = _jget('wl_'+key, '[]');
+    var woDone = lsGet('wd_'+key,'0') === '1';
+    if((Array.isArray(wl) && wl.length) || woDone){
+      any = true; A.woDays++;
+      try{ var plan = _effectivePlan(key); var d0 = new Date(key+'T12:00:00').getDay();
+           var w = plan && plan[d0];
+           if(w && w.name){
+             if(w.type === 'circuit') A.circuits[w.name] = (A.circuits[w.name]||0) + 1;
+             else A.woNames[w.name] = (A.woNames[w.name]||0) + 1;
+           } }catch(_){}
+      if(Array.isArray(wl)) wl.forEach(function(e){
+        var nm = e.ex || ''; if(!nm) return;
+        var st = e.sets || [];
+        A.exSets[nm] = (A.exSets[nm]||0) + st.length;
+        A.sets += st.length;
+        st.forEach(function(s){
+          var v = (+s.w||0) * (+s.r||0);
+          A.volume += v; A.exVol[nm] = (A.exVol[nm]||0) + v;
+          if(!A.exBest[nm] || (+s.w||0) > A.exBest[nm].w) A.exBest[nm] = { w:+s.w||0, r:+s.r||0 };
+        });
+      });
+    }
+
+    var sl = _jget('_supplog_'+key, '[]');
+    if(schedPerDay && Array.isArray(sl) && sl.length){
+      any = true; A.suppDays++; A.suppTaken += Math.min(sl.length, schedPerDay);
+    }
+
+    if(any){ if(!A.firstKey) A.firstKey = key; A.lastKey = key; }
+  }
+  // Adherence is measured against the days they have actually been using the app,
+  // not every day the scan happened to walk back through — otherwise all-time
+  // adherence is buried under hundreds of days before they ever signed up.
+  if(A.firstKey){
+    var sp = Math.round((new Date(_dkBack(0)+'T12:00:00') - new Date(A.firstKey+'T12:00:00')) / 86400000) + 1;
+    A.span = Math.max(1, Math.min(sp, days));
+    A.suppSched = schedPerDay * A.span;
+  } else { A.span = 0; A.suppSched = 0; }
+  return A;
+}
+
+function _detDietLine(A, w){
+  if(!A.foodDays) return '· Diet — nothing logged in ' + w + '.';
+  var s = '· Diet — logged on ' + A.foodDays + ' of ' + A.days + ' days (' + A.meals + ' entries). '
+    + 'Average on a logged day: ' + _avg(A.kcal, A.foodDays) + ' cal, ' + _avg(A.prot, A.foodDays) + 'g protein, '
+    + _avg(A.carb, A.foodDays) + 'g carb, ' + _avg(A.fat, A.foodDays) + 'g fat. '
+    + 'Hit the protein target on ' + _plural(A.protHit, 'day') + '.';
+  var f = _top(A.foods, 8);
+  if(f) s += ' Eats most often: ' + f + '.';
+  var af = _top(A.after, 5);
+  if(af) s += ' How they feel after eating: ' + af + '.';
+  var cx = _top(A.ctx, 4);
+  if(cx) s += ' Eating context: ' + cx + '.';
+  if(A.pairs) s += ' Mood improved after ' + A.improved + ' of ' + A.pairs + ' meals where they logged both before and after.';
+  if(A.lateMeals) s += ' ' + A.lateMeals + ' entries logged after 9pm.';
+  return s;
+}
+function _detBodyLines(A, w){
+  var L = [];
+  L.push(A.waterDays
+    ? '· Hydration — tracked on ' + A.waterDays + ' days, averaging ' + _avg(A.waterOz, A.waterDays) + ' oz; hit roughly 72 oz+ on ' + A.waterMet + ' of them.'
+    : '· Hydration — not tracked in ' + w + '.');
+  if(A.bs.length){
+    var mn = Math.min.apply(null, A.bs), mx = Math.max.apply(null, A.bs);
+    var sum = A.bs.reduce(function(a,b){return a+b;}, 0);
+    L.push('· Blood sugar — ' + A.bs.length + ' readings, average ' + Math.round(sum/A.bs.length) + ' mg/dL, range ' + mn + '–' + mx + '.');
+  } else {
+    L.push('· Blood sugar — not monitored (no readings logged). Do not assume anything about it.');
+  }
+  L.push(A.bmCount
+    ? '· Bowel movements — ' + A.bmCount + ' logged across ' + _plural(A.bmDays, 'day') + ' (' + _avg(A.bmCount, A.days, 1) + '/day). '
+      + 'Bristol spread: ' + _top(A.bristol, 7) + '.' + (A.bmGapMax > 1 ? ' Longest gap between logged movements: ' + A.bmGapMax + ' days.' : '')
+    : '· Bowel movements — none logged in ' + w + '.');
+  return L;
+}
+function _detRestLine(A, w){
+  if(!A.sleepNights && !A.pvCount && !A.restDays && !A.listenDays) return '· Rest — nothing logged in ' + w + '.';
+  var s = '· Rest — ';
+  if(A.sleepNights){
+    s += A.sleepNights + ' nights logged, averaging ' + _avg(A.sleepH, A.sleepNights, 1) + 'h; '
+       + A.sleepUnder7 + ' nights under 7h.';
+    var bmean = _clockMean(A.bedMins);
+    if(bmean !== null) s += ' Usual bedtime around ' + _clockStr(bmean) + '.';
+  } else s += 'no sleep logged.';
+  if(A.windDays) s += ' Wind-down steps completed on ' + A.windDays + ' days (' + A.windItems + ' steps total).';
+  if(A.restDays) s += ' Rest/prayer sessions on ' + A.restDays + ' days.';
+  if(A.listenDays) s += ' Listening: ' + Math.round(A.listenSec/60) + ' min across ' + A.listenDays + ' days.';
+  return s;
+}
+function _detNervLine(A, w){
+  if(!A.pvCount) return '· Nervous system — no check-ins in ' + w + '.';
+  var s = '· Nervous system — ' + A.pvCount + ' check-ins across ' + A.pvDays + ' days. '
+        + 'States: ' + _top(A.pv, 6) + '.';
+  var f = _top(A.pvFirstHalf, 2), sec = _top(A.pvSecondHalf, 2);
+  if(f && sec) s += ' Earlier half ran ' + f + '; more recent half ' + sec + '.';
+  if(A.pvLatest) s += ' Most recent: ' + A.pvLatest + ' (' + A.pvLatestKey + ').';
+  return s;
+}
+function _detExLine(A, w){
+  if(!A.woDays) return '· Exercise — no sessions in ' + w + '.';
+  var s = '· Exercise — ' + A.woDays + ' sessions.';
+  var wn = _top(A.woNames, 5);
+  if(wn) s += ' Days trained: ' + wn + '.';
+  var ci = _top(A.circuits, 3);
+  if(ci) s += ' Circuits: ' + ci + '.';
+  if(A.sets){
+    s += ' ' + A.sets + ' sets logged';
+    if(A.volume) s += ', ' + Math.round(A.volume).toLocaleString() + ' lb of total volume';
+    s += '. Most-trained lifts: ' + _top(A.exSets, 6, function(k){
+      var b = A.exBest[k];
+      return k + ' (' + A.exSets[k] + ' sets' + (b && b.w ? ', best ' + b.w + ' lb × ' + b.r : '') + ')';
+    }) + '.';
+  } else s += ' No sets logged — sessions were marked complete without recording weights.';
+  return s;
+}
+function _detSuppLine(A, w){
+  var plan = [];
+  try{ plan = getSupps() || []; }catch(e){}
+  if(!plan.length) return '· Supplements — none on their plan.';
+  var names = plan.slice(0, 8).map(function(s){
+    return (s.name||'?') + (s.dose ? ' ' + s.dose : '') + ((s.timing && s.timing.length) ? ' (' + s.timing.join('/') + ')' : '');
+  }).join('; ');
+  var s = '· Supplements — on the plan: ' + names + '.';
+  if(A.suppSched) s += ' Took ' + Math.round(A.suppTaken / A.suppSched * 100) + '% of scheduled doses in ' + w + ', on ' + A.suppDays + ' days.';
+  try{
+    var t = JSON.parse(lsGet('_supp_titr','null'));
+    if(t && t.name) s += ' MID-TITRATION: ' + t.name + ', day ' + (t.day||1) + (t.status==='hold' ? ' (holding)' : '') + ' — protect this before adding anything.';
+  }catch(e){}
+  return s;
+}
+
+function _detToday(){
+  var L = [], k = viewDate;
+  var log = _jget('fl_'+k, '[]');
+  if(Array.isArray(log) && log.length){
+    var names = log.map(function(e){ return e.name; }).filter(Boolean).slice(0, 10).join(', ');
+    var kc = log.reduce(function(a,e){return a+(+e.k||0);},0), p = log.reduce(function(a,e){return a+(+e.p||0);},0),
+        c = log.reduce(function(a,e){return a+(+e.c||0);},0), f = log.reduce(function(a,e){return a+(+e.f||0);},0);
+    var t = null; try{ t = getTgt(); }catch(e){}
+    L.push('Eaten today: ' + names + ' — ' + Math.round(kc) + ' cal, ' + Math.round(p) + 'g protein'
+      + (t && t.p ? ' of a ' + t.p + 'g target' : '') + ', ' + Math.round(c) + 'g carb, ' + Math.round(f) + 'g fat.');
+  } else L.push('Nothing logged to eat yet today.');
+  var oz = parseFloat(lsGet('wa_'+k,'0'))||0;
+  L.push('Water today: ' + oz + ' oz.');
+  var r = _jget('rest_'+k, 'null') || _jget('rest_'+_dkBack(1), 'null');
+  if(r && r.h) L.push('Most recent sleep: ' + r.h + 'h' + (r.bed ? ' (in bed ' + r.bed + ')' : '') + '.');
+  var pv = _jget('pvlog_'+k, '[]');
+  if(Array.isArray(pv) && pv.length){
+    L.push('Nervous-system check-ins today: ' + pv.map(function(e){
+      return (typeof PV_STATES !== 'undefined' && PV_STATES[e.s] ? PV_STATES[e.s].label : e.s);
+    }).join(' → ') + '.');
+  }
+  var bm = _jget('bm_'+k, '[]');
+  if(Array.isArray(bm) && bm.length) L.push('Bowel movements today: ' + bm.map(function(e){ return 'Type ' + (e.type||4); }).join(', ') + '.');
+  var bs = _jget('bs_'+k, '[]');
+  if(Array.isArray(bs) && bs.length) L.push('Blood sugar today: ' + bs.map(function(e){ return e.v + ' mg/dL'; }).join(', ') + '.');
+  var wl = _jget('wl_'+k, '[]');
+  if(Array.isArray(wl) && wl.length){
+    L.push('Trained today: ' + wl.map(function(e){
+      var st = e.sets||[];
+      return e.ex + (st.length ? ' (' + st.map(function(s){ return s.w + '×' + s.r; }).join(', ') + ')' : '');
+    }).slice(0,8).join('; ') + '.');
+  } else if(lsGet('wd_'+k,'0')==='1') L.push('Marked today’s session complete.');
+  return L;
+}
+
+function _detContext(){
+  var out = [];
+  // who they are
+  try{
+    var p = {}; try{ p = JSON.parse(lsGet('_userProfile','{}'))||{}; }catch(e){}
+    var who = [];
+    if(p.goal) who.push('Goal: ' + p.goal);
+    if(p.level) who.push('Training level: ' + p.level);
+    if(p.diet) who.push('Diet approach: ' + p.diet);
+    if(p.stress) who.push('Self-reported stress: ' + p.stress);
+    if(who.length) out.push('WHO THEY ARE: ' + who.join(' · ') + '.');
+  }catch(e){}
+  try{
+    var asr = [];
+    var ns = JSON.parse(lsGet('_assess_ns_result','null'));
+    if(ns && ns.pattern) asr.push('Nervous system: ' + ns.pattern + (ns.sympathetic!=null ? ' (sympathetic ' + ns.sympathetic + '/20, dorsal ' + ns.dorsal + '/20, ventral ' + ns.ventral + '/20, biological ' + ns.biological + '/20)' : ''));
+    var gut = JSON.parse(lsGet('_assess_gut_result','null'));
+    if(gut && (gut.pattern||gut.primary)) asr.push('Gut: ' + (gut.pattern||gut.primary));
+    var aa = JSON.parse(lsGet('_assess_aa_result','null'));
+    if(aa && aa.primaryType) asr.push('Amino acid: ' + aa.primaryType + (aa.typesOverThreshold ? ' (' + aa.typesOverThreshold + ' types over threshold)' : ''));
+    if(asr.length) out.push('ASSESSMENTS THEY HAVE TAKEN: ' + asr.join(' · ') + '.');
+  }catch(e){}
+
+  out.push('TODAY (' + viewDate + '): ' + _detToday().join(' '));
+
+  var R = _detScan(30);
+  out.push('');
+  out.push('LAST 30 DAYS — this is the working picture. Weight it heaviest and quote it by name.');
+  out.push(_detDietLine(R, 'the last 30 days'));
+  _detBodyLines(R, 'the last 30 days').forEach(function(l){ out.push(l); });
+  out.push(_detRestLine(R, 'the last 30 days'));
+  out.push(_detNervLine(R, 'the last 30 days'));
+  out.push(_detExLine(R, 'the last 30 days'));
+  out.push(_detSuppLine(R, 'the last 30 days'));
+
+  // Below about a month there is no "all time" worth the name — it would repeat
+  // the 30-day block line for line and pad the prompt with rows of zeros.
+  var A = _detScan(DET_SCAN_DAYS);
+  if(A.firstKey && A.span > 34){
+    out.push('');
+    out.push('ALL TIME — since their first entry on ' + A.firstKey + ' (' + A.span + ' days). Use this for baseline and for how long something has been true, not as the current picture.');
+    if(A.foodDays) out.push('· Diet on ' + _plural(A.foodDays,'day') + ', ' + A.meals + ' entries, averaging ' + _avg(A.kcal, A.foodDays) + ' cal / ' + _avg(A.prot, A.foodDays) + 'g protein. All-time staples: ' + (_top(A.foods, 6) || 'none') + '.');
+    var bits = [];
+    if(A.waterDays) bits.push('water tracked ' + _plural(A.waterDays,'day') + ' (avg ' + _avg(A.waterOz, A.waterDays) + ' oz)');
+    if(A.bs.length) bits.push(_plural(A.bs.length,'blood-sugar reading'));
+    if(A.bmCount) bits.push(A.bmCount + ' bowel movements logged');
+    if(bits.length) out.push('· ' + bits.join(' · ') + '.');
+    bits = [];
+    if(A.sleepNights) bits.push('sleep ' + _plural(A.sleepNights,'night') + ' (avg ' + _avg(A.sleepH, A.sleepNights, 1) + 'h)');
+    if(A.pvCount) bits.push(A.pvCount + ' nervous-system check-ins');
+    if(A.windDays) bits.push('wind-down on ' + _plural(A.windDays,'day'));
+    if(A.listenSec) bits.push('listening ' + Math.round(A.listenSec/60) + ' min');
+    if(bits.length) out.push('· ' + bits.join(' · ') + '.');
+    if(A.woDays) out.push('· ' + _plural(A.woDays,'training session') + ', ' + _plural(A.sets,'set') + ', ' + Math.round(A.volume).toLocaleString() + ' lb lifted. Lifts they keep coming back to: ' + (_top(A.exSets, 5, function(k){ return k + ' (' + _plural(A.exSets[k], 'set') + ')'; }) || 'none logged') + '.');
+    if(A.suppSched) out.push('· Supplement adherence all time: ' + Math.round(A.suppTaken / A.suppSched * 100) + '%.');
+  }
+
+  if(!R.foodDays && !R.sleepNights && !R.pvCount && !R.woDays){
+    out.push('');
+    out.push('NOTE: almost nothing is tracked yet. Say so honestly and name the one thing worth tracking first for the question they asked — do not invent a pattern.');
+  }
+  return 'CONTEXT — THIS USER’S OWN DATA (never invent a figure that is not here; when you use one, say which window it came from):\n' + out.join('\n');
+}
+
 function _yday(){const d=new Date();d.setDate(d.getDate()-1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 
 // Only two modules fit the prompt budget, so the most specific one has to win.
@@ -15008,7 +15343,7 @@ window.deleteAccount = deleteAccount;
 var HEALTH_SCOPE_V = '2';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0916-1';
+var WEB_BUILD = '0916-2';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
