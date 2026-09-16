@@ -84,7 +84,7 @@
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Metastory saves the workouts you complete to Apple Health, so your training shows up alongside the rest of your activity and counts toward your rings.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Metastory reads your weight and step count from Apple Health so you don't have to enter numbers you have already recorded elsewhere.</string>
+	<string>Metastory reads the health data your devices and apps already record, so you are not retyping numbers you have logged elsewhere. That includes sleep, resting heart rate, HRV, respiratory rate, blood oxygen, heart rate and heart-rate recovery, steps, distance, flights, stand, move and exercise minutes, active and resting energy, workouts, walking steadiness, weight, body fat, lean mass, height, BMI, waist, VO2 max, body and wrist temperature, blood pressure, blood glucose, time in daylight, mindful minutes, water, caffeine and the nutrition you log, cycle tracking, and the symptoms you record yourself. It is used to show you your own patterns inside Metastory and to inform the guidance you ask for.</string>
 
 	<!-- No encryption beyond standard HTTPS, so the app is exempt. Set here to
 	     skip the export-compliance question on every single upload. -->
