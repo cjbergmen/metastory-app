@@ -1041,7 +1041,7 @@ function lsSet(k,v){
   return _r;
 }
 var _daySyncOff=false;
-const SYNC_DAY_PREFIXES=['supptk_','pvlog_','stress_','wd_','rest_','restdone_','wind_','pcdone_','bs_','routedone_','bm_','listen_'];
+const SYNC_DAY_PREFIXES=['supptk_','pvlog_','stress_','wd_','rest_','restdone_','wind_','pcdone_','bs_','bshk_','routedone_','bm_','listen_'];
 function fbSyncDayMisc(k,v){
   if(_daySyncOff||!fbUser||!fbDb)return;
   var pref=null;for(var i=0;i<SYNC_DAY_PREFIXES.length;i++){if(k.indexOf(SYNC_DAY_PREFIXES[i])===0){pref=SYNC_DAY_PREFIXES[i];break;}}
@@ -13142,7 +13142,7 @@ function rDiet(){
   h+=`</div>`;
   // hydration + blood sugar
   const oz=(typeof getWater==='function')?getWater():0;
-  const bs=_bsGet();const last=bs.length?bs[bs.length-1]:null;
+  const bs=_bsGet();const last=bs.length?bs[bs.length-1]:null;const hk=_bsHealth();
   h+=`<div class="card">
       <div style="display:flex;align-items:center;gap:12px">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/></svg>
@@ -13154,7 +13154,7 @@ function rDiet(){
       </div></div>`;
   h+=`<div class="card mk-row" onclick="addBS()">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M12 9v6"/></svg>
-      <div style="flex:1"><h4>Blood sugar <span style="font-weight:500;color:var(--sub)">(optional)</span></h4><small>${last?'Last: '+last.v+' mg/dL':'Target 80–90 before meals'}</small></div>
+      <div style="flex:1"><h4>Blood sugar <span style="font-weight:500;color:var(--sub)">(optional)</span></h4><small>${last?'Last: '+last.v+' mg/dL'+(hk?' · monitor avg '+hk.avg:''):(hk?'From your monitor: avg '+hk.avg+' mg/dL'+(hk.min!=null&&hk.max!=null?' ('+hk.min+'–'+hk.max+')':''):'Target 80–90 before meals')}</small></div>
       <span class="mk-link">Add</span></div>`;
   h+=_bmCard();document.getElementById('page-food').innerHTML=h;
 }
@@ -13359,6 +13359,8 @@ function pvCounts(days){
 }
 /* ════════════ DIET EXTRAS (hydration + blood sugar) ════════════ */
 function _bsGet(){try{return JSON.parse(lsGet('bs_'+viewDate,'[]'))||[];}catch(e){return [];}}
+/* What a connected monitor wrote into Apple Health for this day, if anything. */
+function _bsHealth(date){try{var r=JSON.parse(lsGet('bshk_'+(date||viewDate),'null'));return (r&&r.avg!=null)?r:null;}catch(e){return null;}}
 function addBS(){
   const v=prompt('Blood sugar reading (mg/dL) — target ~80–90 before meals');
   if(!v)return;const n=parseInt(v,10);if(isNaN(n))return;
@@ -13368,7 +13370,7 @@ function addBS(){
 function appendDietExtras(){
   const pg=document.getElementById('page-food');if(!pg)return;
   const oz=(typeof getWater==='function')?getWater():0;
-  const bs=_bsGet();const last=bs.length?bs[bs.length-1]:null;
+  const bs=_bsGet();const last=bs.length?bs[bs.length-1]:null;const hk=_bsHealth();
   const html=`<div id="diet-extras">
     <div class="card" style="display:flex;align-items:center;gap:12px;margin-top:4px" onclick="goPage('water')">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="1.9" style="flex:none"><path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/></svg>
@@ -13377,7 +13379,7 @@ function appendDietExtras(){
     </div>
     <div class="card" style="display:flex;align-items:center;gap:12px" onclick="addBS()">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.9" style="flex:none"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M12 9v6" stroke-linecap="round"/></svg>
-      <div style="flex:1"><div style="font-size:13.5px;font-weight:700">Blood sugar <span style="font-weight:500;color:var(--sub)">(optional)</span></div><small style="font-size:11px;color:var(--sub)">${last?'Last: '+last.v+' mg/dL':'Target 80–90 before meals'}</small></div>
+      <div style="flex:1"><div style="font-size:13.5px;font-weight:700">Blood sugar <span style="font-weight:500;color:var(--sub)">(optional)</span></div><small style="font-size:11px;color:var(--sub)">${last?'Last: '+last.v+' mg/dL'+(hk?' · monitor avg '+hk.avg:''):(hk?'From your monitor: avg '+hk.avg+' mg/dL'+(hk.min!=null&&hk.max!=null?' ('+hk.min+'–'+hk.max+')':''):'Target 80–90 before meals')}</small></div>
       <span style="font-size:12px;font-weight:700;color:var(--green)">Add</span>
     </div></div>`;
   const old=document.getElementById('diet-extras');if(old)old.remove();
@@ -13620,7 +13622,7 @@ function _detScan(days){
     foodDays:0, meals:0, kcal:0, prot:0, carb:0, fat:0, foods:{}, after:{}, before:{}, ctx:{},
     pairs:0, improved:0, protHit:0, lateMeals:0,
     waterDays:0, waterOz:0, waterMet:0,
-    bs:[], bmDays:0, bmCount:0, bristol:{}, bmGapMax:0,
+    bs:[], bgDays:0, bgAvgSum:0, bgMin:null, bgMax:null, bmDays:0, bmCount:0, bristol:{}, bmGapMax:0,
     sleepNights:0, sleepH:0, sleepUnder7:0, bedMins:[], windDays:0, windItems:0,
     restDays:0, listenSec:0, listenDays:0,
     pv:{}, pvCount:0, pvDays:0, pvFirstHalf:{}, pvSecondHalf:{}, pvLatest:null, pvLatestKey:null,
@@ -13663,6 +13665,12 @@ function _detScan(days){
 
     var bsArr = _jget('bs_'+key, '[]');
     if(Array.isArray(bsArr) && bsArr.length){ any = true; bsArr.forEach(function(r){ if(+r.v) A.bs.push(+r.v); }); }
+    var bgh = _jget('bshk_'+key, 'null');
+    if(bgh && bgh.avg != null){
+      any = true; A.bgDays++; A.bgAvgSum += +bgh.avg;
+      if(bgh.min != null && (A.bgMin === null || bgh.min < A.bgMin)) A.bgMin = bgh.min;
+      if(bgh.max != null && (A.bgMax === null || bgh.max > A.bgMax)) A.bgMax = bgh.max;
+    }
 
     var bm = _jget('bm_'+key, '[]');
     if(Array.isArray(bm) && bm.length){
@@ -13767,13 +13775,20 @@ function _detBodyLines(A, w){
   L.push(A.waterDays
     ? '· Hydration — tracked on ' + A.waterDays + ' days, averaging ' + _avg(A.waterOz, A.waterDays) + ' oz; hit roughly 72 oz+ on ' + A.waterMet + ' of them.'
     : '· Hydration — not tracked in ' + w + '.');
+  var bgParts = [];
+  if(A.bgDays){
+    bgParts.push('a connected monitor wrote data on ' + _plural(A.bgDays, 'day')
+      + ', averaging ' + Math.round(A.bgAvgSum / A.bgDays) + ' mg/dL'
+      + ((A.bgMin !== null && A.bgMax !== null) ? ' and ranging ' + A.bgMin + '–' + A.bgMax : ''));
+  }
   if(A.bs.length){
     var mn = Math.min.apply(null, A.bs), mx = Math.max.apply(null, A.bs);
     var sum = A.bs.reduce(function(a,b){return a+b;}, 0);
-    L.push('· Blood sugar — ' + A.bs.length + ' readings, average ' + Math.round(sum/A.bs.length) + ' mg/dL, range ' + mn + '–' + mx + '.');
-  } else {
-    L.push('· Blood sugar — not monitored (no readings logged). Do not assume anything about it.');
+    bgParts.push(_plural(A.bs.length, 'reading') + ' entered by hand, average ' + Math.round(sum/A.bs.length) + ' mg/dL, range ' + mn + '–' + mx);
   }
+  L.push(bgParts.length
+    ? '· Blood sugar — ' + bgParts.join('; ') + '.'
+    : '· Blood sugar — not monitored: no monitor is connected and nothing has been entered by hand. Do not assume anything about it, and if the question turns on blood sugar, name that gap.');
   L.push(A.bmCount
     ? '· Bowel movements — ' + A.bmCount + ' logged across ' + _plural(A.bmDays, 'day') + ' (' + _avg(A.bmCount, A.days, 1) + '/day). '
       + 'Bristol spread: ' + _top(A.bristol, 7) + '.' + (A.bmGapMax > 1 ? ' Longest gap between logged movements: ' + A.bmGapMax + ' days.' : '')
@@ -13861,6 +13876,8 @@ function _detToday(){
   if(Array.isArray(bm) && bm.length) L.push('Bowel movements today: ' + bm.map(function(e){ return 'Type ' + (e.type||4); }).join(', ') + '.');
   var bs = _jget('bs_'+k, '[]');
   if(Array.isArray(bs) && bs.length) L.push('Blood sugar today: ' + bs.map(function(e){ return e.v + ' mg/dL'; }).join(', ') + '.');
+  var bgt = _jget('bshk_'+k, 'null');
+  if(bgt && bgt.avg != null) L.push('Monitor today: average ' + bgt.avg + ' mg/dL' + ((bgt.min!=null&&bgt.max!=null) ? ', ranging ' + bgt.min + '–' + bgt.max : '') + '.');
   var wl = _jget('wl_'+k, '[]');
   if(Array.isArray(wl) && wl.length){
     L.push('Trained today: ' + wl.map(function(e){
@@ -15340,10 +15357,10 @@ window.deleteAccount = deleteAccount;
    appended after it renders rather than threaded through it. */
 /* Bumped whenever the set of Health types the app reads grows, so existing
    users get asked about the new ones exactly once. */
-var HEALTH_SCOPE_V = '2';
+var HEALTH_SCOPE_V = '3';
 
 /* Shown in Settings so a stale cached page is obvious at a glance. */
-var WEB_BUILD = '0916-2';
+var WEB_BUILD = '0916-3';
 
 async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
@@ -15359,8 +15376,8 @@ async function connectHealth(){
     'Metastory will save the workouts you finish to Apple Health, and read ' +
     'back what your devices already record: sleep, resting heart rate, heart ' +
     'rate variability, breathing rate, blood oxygen, wrist temperature, ' +
-    'steps, active energy, exercise minutes, mindful minutes, weight and body ' +
-    'composition.\n\n' +
+    'steps, active energy, exercise minutes, mindful minutes, weight, body ' +
+    'composition, and blood glucose if a monitor writes it there.\n\n' +
     'You choose which of those to share on the next screen, and nothing you ' +
     'withhold is read. Your weight and recovery markers become part of the ' +
     'profile used to generate your personalized guidance, which is produced ' +
@@ -16159,6 +16176,17 @@ function healthSyncSignals(){
       if(d.sleep.end) rec.wake = _hhmm(d.sleep.end);
       lsSet(key, JSON.stringify(rec));
       try{ fbSyncSleep(d.date, rec); }catch(e){}
+    });
+
+    // Blood glucose from a monitor. Kept in its own day key so it can never
+    // overwrite a fingerstick someone typed by hand — a continuous stream and a
+    // deliberate reading are different evidence and both are worth keeping.
+    (res.days || []).forEach(function(d){
+      if(d.bgAvg == null) return;
+      var rec = { avg: d.bgAvg, src: 'health' };
+      if(d.bgMin != null) rec.min = d.bgMin;
+      if(d.bgMax != null) rec.max = d.bgMax;
+      lsSet('bshk_' + d.date, JSON.stringify(rec));
     });
 
     // Weight, body fat and lean mass, if a scale is writing them.
