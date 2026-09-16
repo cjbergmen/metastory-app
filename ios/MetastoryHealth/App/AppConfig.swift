@@ -34,7 +34,7 @@ enum AppConfig {
     // See ios/SHIPPING.md, step 4.
 
     /// e.g. "980408905992-abc123def456.apps.googleusercontent.com"
-    static let googleClientID = "REPLACE_WITH_GOOGLE_IOS_CLIENT_ID"
+    static let googleClientID = "980408905992-s40qrmfr0veiekj9osjl20d4qv9tlna8.apps.googleusercontent.com"
 
     /// Google's redirect scheme is the client ID with its dot-separated parts
     /// reversed. Derived rather than hand-copied so the two can't drift apart.
@@ -58,7 +58,9 @@ enum AppConfig {
     // MARK: - Support
 
     static let supportEmail = "support@metastoryhealth.com"
-    static let privacyPolicyURL = URL(string: "https://metastoryhealth.com/privacy")!
+    /// Lives with the app, not the marketing site — metastoryhealth.com/privacy
+    /// is a 404, and a dead privacy link is something App Review taps.
+    static let privacyPolicyURL = URL(string: "https://app.metastoryhealth.com/privacy")!
 
     // MARK: - Appearance
 
