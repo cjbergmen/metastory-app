@@ -16671,6 +16671,357 @@ if(healthOn() && lsGet('_healthScopeV','') !== HEALTH_SCOPE_V && N.health && N.h
   }, 2500);
 }
 
+
+/* ── Metastory Membership ─────────────────────────────────────────────────
+   One auto-renewable subscription, sold through the App Store: the first
+   month free, then monthly. Everything past sign-in sits behind it.
+
+   The order is deliberate. Sign in first, so a membership bought on this
+   phone and progress made in the app belong to someone; then the paywall;
+   then onboarding, which is already queued underneath and simply appears
+   once the paywall lifts.
+
+   Membership belongs to the Apple Account, not the Metastory sign-in — which
+   is how every App Store subscription works, and why Restore is here.
+   Builds of the app from before this existed have no N.store, and for them
+   nothing below runs at all. */
+if(N.store){
+
+var MS_PRODUCT   = 'com.metastoryhealth.app.membership.monthly';
+var MS_TERMS     = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
+var MS_PRIVACY   = 'https://app.metastoryhealth.com/privacy';
+var MS_CACHE_KEY = '_msActiveUntil';
+
+var _ms = { product: null, loading: false, busy: false, shown: false };
+
+(function injectPaywallStyles(){
+  var css =
+    '#ms-paywall{position:fixed;inset:0;z-index:100001;background:var(--bg);display:none;overflow-y:auto;-webkit-overflow-scrolling:touch}' +
+    '#ms-paywall.open{display:block}' +
+    '#ms-paywall .pw-in{min-height:100%;max-width:440px;margin:0 auto;box-sizing:border-box;display:flex;flex-direction:column;' +
+      'padding:calc(var(--st) + 36px) 26px calc(var(--sb) + 22px)}' +
+    '#ms-paywall .pw-mark{display:flex;justify-content:center;margin-bottom:22px}' +
+    '#ms-paywall .pw-plate{width:84px;height:84px;box-sizing:border-box;padding:18px;border-radius:22px;background:#fff;border:1.5px solid var(--border);box-shadow:0 1px 3px rgba(66,76,87,.06);display:flex;align-items:center;justify-content:center}' +
+    '#ms-paywall .pw-plate img{width:100%;height:100%;object-fit:contain;display:block}' +
+    '#ms-paywall h1{font-family:var(--font-serif);font-weight:500;font-size:32px;line-height:1.12;letter-spacing:-.3px;color:var(--text);text-align:center;margin:0 0 10px;text-wrap:balance}' +
+    '#ms-paywall .pw-sub{font-size:15px;line-height:1.55;color:var(--sub);text-align:center;margin:0 auto 26px;max-width:320px;text-wrap:balance}' +
+    '#ms-paywall .pw-list{list-style:none;margin:0 0 26px;padding:0;display:flex;flex-direction:column;gap:14px}' +
+    '#ms-paywall .pw-list li{display:flex;gap:14px;align-items:flex-start;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}' +
+    '#ms-paywall .pw-dot{flex:0 0 10px;height:10px;border-radius:50%;margin-top:6px;background:var(--green)}' +
+    '#ms-paywall .pw-list li:nth-child(2) .pw-dot{background:var(--purple)}' +
+    '#ms-paywall .pw-list li:nth-child(3) .pw-dot{background:var(--blue)}' +
+    '#ms-paywall .pw-t{font-size:15px;font-weight:700;color:var(--text);margin-bottom:2px}' +
+    '#ms-paywall .pw-d{font-size:13.5px;line-height:1.45;color:var(--sub)}' +
+    '#ms-paywall .pw-spacer{flex:1}' +
+    '#ms-paywall .pw-price{font-size:14px;color:var(--text);text-align:center;margin-bottom:12px;font-weight:600;min-height:20px}' +
+    '#ms-paywall .pw-buy{width:100%;height:54px;border:0;border-radius:14px;background:var(--green);color:#fff;font-family:var(--font-sans);font-size:17px;font-weight:700;cursor:pointer}' +
+    '#ms-paywall .pw-buy:disabled{opacity:.55}' +
+    '#ms-paywall .pw-buy:focus-visible,#ms-paywall .pw-links button:focus-visible{outline:2px solid var(--text);outline-offset:3px}' +
+    '#ms-paywall .pw-fine{font-size:11.5px;line-height:1.5;color:var(--sub);text-align:center;margin:12px 0 14px}' +
+    '#ms-paywall .pw-msg{font-size:13px;line-height:1.45;color:var(--red);text-align:center;margin:0 0 10px;min-height:0}' +
+    '#ms-paywall .pw-links{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 16px;margin-bottom:12px}' +
+    '#ms-paywall .pw-links button{background:none;border:0;padding:6px 2px;font-family:var(--font-sans);font-size:13px;font-weight:600;color:var(--green);cursor:pointer}' +
+    '#ms-paywall .pw-acct{font-size:12px;color:var(--sub);text-align:center;line-height:1.6}' +
+    '#ms-paywall .pw-acct button{background:none;border:0;padding:0 2px;font-family:var(--font-sans);font-size:12px;color:var(--sub);text-decoration:underline;cursor:pointer}';
+  var el = document.createElement('style');
+  el.textContent = css;
+  document.head.appendChild(el);
+})();
+
+function _msEsc(s){
+  return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+  });
+}
+
+function _msPeriodWord(period){
+  if(!period) return 'month';
+  var unit = period.unit || 'month', n = period.value || 1;
+  if(n === 1) return unit;
+  return n + ' ' + unit + 's';
+}
+
+function _msLogo(){
+  var src = '';
+  try{ var img = document.querySelector('.signin-plate img'); if(img) src = img.getAttribute('src'); }catch(e){}
+  return src ? '<div class="pw-mark"><div class="pw-plate"><img alt="" src="' + src + '"></div></div>' : '';
+}
+
+function _msEl(){
+  var el = document.getElementById('ms-paywall');
+  if(el) return el;
+  el = document.createElement('div');
+  el.id = 'ms-paywall';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-modal', 'true');
+  el.setAttribute('aria-labelledby', 'ms-pw-title');
+  el.innerHTML =
+    '<div class="pw-in">' +
+      _msLogo() +
+      '<h1 id="ms-pw-title">Your body’s whole story, in one place.</h1>' +
+      '<p class="pw-sub" id="ms-pw-sub">Everything in Metastory, free for your first month.</p>' +
+      '<ul class="pw-list">' +
+        '<li><span class="pw-dot"></span><div><div class="pw-t">The five daily pillars</div>' +
+          '<div class="pw-d">Diet, Rest, Exercise, Stress and Supplements, tracked together so you can see how they move.</div></div></li>' +
+        '<li><span class="pw-dot"></span><div><div class="pw-t">The Health Detective</div>' +
+          '<div class="pw-d">Ask what your logs and your devices have been telling you, and get one clear next step.</div></div></li>' +
+        '<li><span class="pw-dot"></span><div><div class="pw-t">Safe Inside</div>' +
+          '<div class="pw-d">Guided listening for a nervous system that has been running hot.</div></div></li>' +
+      '</ul>' +
+      '<div class="pw-spacer"></div>' +
+      '<div class="pw-price" id="ms-pw-price" aria-live="polite">Checking the App Store…</div>' +
+      '<p class="pw-msg" id="ms-pw-msg" aria-live="assertive"></p>' +
+      '<button class="pw-buy" id="ms-pw-buy" disabled onclick="_msBuy()">Start my free month</button>' +
+      '<p class="pw-fine" id="ms-pw-fine"></p>' +
+      '<div class="pw-links">' +
+        '<button onclick="_msRestore()">Restore purchases</button>' +
+        '<button onclick="_msRedeem()">Redeem a code</button>' +
+        '<button onclick="_msOpen(\'' + MS_TERMS + '\')">Terms of Use</button>' +
+        '<button onclick="_msOpen(\'' + MS_PRIVACY + '\')">Privacy Policy</button>' +
+      '</div>' +
+      '<div class="pw-acct" id="ms-pw-acct"></div>' +
+    '</div>';
+  document.body.appendChild(el);
+  return el;
+}
+
+function _msMessage(text){
+  var m = document.getElementById('ms-pw-msg');
+  if(m) m.textContent = text || '';
+}
+
+function _msRenderOffer(){
+  var p = _ms.product;
+  var price = document.getElementById('ms-pw-price');
+  var buy   = document.getElementById('ms-pw-buy');
+  var fine  = document.getElementById('ms-pw-fine');
+  var sub   = document.getElementById('ms-pw-sub');
+  var acct  = document.getElementById('ms-pw-acct');
+  if(!price) return;
+
+  if(acct){
+    var who = (fbUser && (fbUser.email || fbUser.displayName)) || 'your account';
+    acct.innerHTML = 'Signed in as ' + _msEsc(who) + ' · ' +
+      '<button onclick="_msSignOut()">Sign out</button> · ' +
+      '<button onclick="deleteAccount()">Delete account</button>';
+  }
+
+  if(!p){
+    price.textContent = _ms.loading ? 'Checking the App Store…' : 'The App Store isn’t answering right now.';
+    buy.disabled = _ms.loading;
+    buy.textContent = _ms.loading ? 'Start my free month' : 'Try again';
+    buy.onclick = _ms.loading ? null : function(){ _msLoadProduct(true); };
+    fine.textContent = '';
+    return;
+  }
+
+  var per = _msPeriodWord(p.period);
+  var trial = p.introEligible && p.intro && p.intro.paymentMode === 'freeTrial';
+  var trialWords = trial ? (p.intro.period && p.intro.period.value === 1 ? 'first ' + p.intro.period.unit : 'first ' + _msPeriodWord(p.intro.period)) : '';
+
+  buy.onclick = _msBuy;
+  buy.disabled = _ms.busy;
+  if(trial){
+    sub.textContent = 'Everything in Metastory, free for your ' + trialWords + '.';
+    price.textContent = 'Free for your ' + trialWords + ', then ' + p.displayPrice + ' per ' + per;
+    buy.textContent = _ms.busy ? 'One moment…' : 'Start my free ' + p.intro.period.unit;
+    fine.textContent =
+      'Metastory Membership is free for your ' + trialWords + ', then ' + p.displayPrice + ' per ' + per +
+      ', charged to your Apple Account. It renews automatically until you cancel. ' +
+      'Cancel anytime in your Apple Account settings at least 24 hours before the trial ends and you won’t be charged.';
+  } else {
+    sub.textContent = 'Everything in Metastory, for ' + p.displayPrice + ' a ' + per + '.';
+    price.textContent = p.displayPrice + ' per ' + per;
+    buy.textContent = _ms.busy ? 'One moment…' : 'Become a member';
+    fine.textContent =
+      'Metastory Membership is ' + p.displayPrice + ' per ' + per + ', charged to your Apple Account. ' +
+      'It renews automatically until you cancel. Cancel anytime in your Apple Account settings at least 24 hours before it renews.';
+  }
+}
+
+function _msLoadProduct(force){
+  if(_ms.loading || (_ms.product && !force)) { _msRenderOffer(); return; }
+  _ms.loading = true;
+  _msMessage('');
+  _msRenderOffer();
+  N.store.products().then(function(list){
+    _ms.product = (list || []).filter(function(p){ return p.id === MS_PRODUCT; })[0] || null;
+  }).catch(function(){
+    _ms.product = null;
+  }).then(function(){
+    _ms.loading = false;
+    _msRenderOffer();
+  });
+}
+
+function _msShow(){
+  var el = _msEl();
+  if(!_ms.shown){
+    _ms.shown = true;
+    el.classList.add('open');
+    try{ document.documentElement.style.overflow = 'hidden'; }catch(e){}
+  }
+  _msLoadProduct(false);
+}
+
+function _msHide(){
+  var el = document.getElementById('ms-paywall');
+  if(el) el.classList.remove('open');
+  _ms.shown = false;
+  try{ document.documentElement.style.overflow = ''; }catch(e){}
+}
+
+function _msApply(status){
+  if(status && status.active){
+    lsSet(MS_CACHE_KEY, String(status.expiresAt || (Date.now() + 36e5)));
+    _msHide();
+    return true;
+  }
+  lsSet(MS_CACHE_KEY, '0');
+  if(fbUser) _msShow();
+  return false;
+}
+
+/* Ask StoreKit, and fall back to the last answer only when StoreKit can't be
+   reached — a member on a plane keeps using the app; nobody else gets in. */
+function checkMembership(){
+  if(!fbUser){ _msHide(); return Promise.resolve(false); }
+  return N.store.status().then(_msApply).catch(function(){
+    var until = parseFloat(lsGet(MS_CACHE_KEY, '0')) || 0;
+    if(until > Date.now()){ _msHide(); return true; }
+    _msShow();
+    return false;
+  });
+}
+window.checkMembership = checkMembership;
+
+function _msBuy(){
+  if(_ms.busy || !_ms.product) return;
+  _ms.busy = true;
+  _msMessage('');
+  _msRenderOffer();
+  N.store.purchase(MS_PRODUCT).then(function(res){
+    if(res && res.active){
+      N.haptics.notify('success');
+      _msApply(res);
+      toast(res.inTrial ? 'Welcome to Metastory. Your free month has started.' : 'Welcome to Metastory.', 3500);
+    } else if(res && res.pending){
+      _msMessage('Your purchase is waiting for approval. The app will open as soon as it’s confirmed.');
+    }
+  }).catch(function(err){
+    N.haptics.notify('error');
+    _msMessage((err && err.message) || 'The purchase didn’t go through. Please try again.');
+  }).then(function(){
+    _ms.busy = false;
+    _msRenderOffer();
+  });
+}
+
+function _msRestore(){
+  if(_ms.busy) return;
+  _ms.busy = true;
+  _msMessage('');
+  _msRenderOffer();
+  N.store.restore().then(function(res){
+    if(res && res.active){
+      N.haptics.notify('success');
+      _msApply(res);
+      toast('Your membership is restored.', 3000);
+    } else {
+      _msMessage('No membership was found for this Apple Account.');
+    }
+  }).catch(function(err){
+    _msMessage((err && err.message) || 'Couldn’t reach the App Store. Please try again.');
+  }).then(function(){
+    _ms.busy = false;
+    _msRenderOffer();
+  });
+}
+
+/* The code sheet belongs to Apple. What it grants comes back through the
+   store-update event below, not through this promise. */
+function _msRedeem(){
+  _msMessage('');
+  N.store.redeemCode().catch(function(err){
+    _msMessage((err && err.message) || 'The code sheet couldn’t open. Please try again.');
+  });
+}
+
+function _msOpen(url){
+  try{ N.app.openExternal(url); }catch(e){ window.open(url, '_blank'); }
+}
+
+function _msSignOut(){
+  if(confirm('Sign out?')){ _msHide(); fbAuth.signOut(); }
+}
+
+window._msBuy = _msBuy;
+window._msRestore = _msRestore;
+window._msRedeem = _msRedeem;
+window._msOpen = _msOpen;
+window._msSignOut = _msSignOut;
+
+/* When to look. */
+if(fbAuth){
+  fbAuth.onAuthStateChanged(function(user){
+    if(user) checkMembership(); else _msHide();
+  });
+}
+window.addEventListener('metastory:resume', function(){ if(fbUser) checkMembership(); });
+window.addEventListener('metastory:store-update', function(){
+  if(fbUser) checkMembership();
+});
+
+/* Membership, in Settings with the rest of the account. */
+function _msDate(ms){
+  try{ return new Date(ms).toLocaleDateString(undefined, { month: 'long', day: 'numeric' }); }catch(e){ return ''; }
+}
+
+after('rSettingsModal', function(){
+  var body = document.getElementById('settings-body');
+  if(!body || !fbUser || document.getElementById('ms-settings-card')) return;
+
+  var card = document.createElement('div');
+  card.className = 'card';
+  card.id = 'ms-settings-card';
+  card.style.marginBottom = '10px';
+  card.innerHTML =
+    '<div class="ct">Membership</div>' +
+    '<div id="ms-settings-line" style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:10px">Checking…</div>' +
+    '<button class="btn btn-s btn-sm btn-f" onclick="N_msManage()">Manage membership</button>' +
+    '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px" onclick="_msRedeem()">Redeem a code</button>';
+  body.insertBefore(card, body.firstChild);
+
+  N.store.status().then(function(st){
+    var line = document.getElementById('ms-settings-line');
+    if(!line) return;
+    if(!st || !st.active){ line.textContent = 'Not active.'; return; }
+    var when = st.expiresAt ? _msDate(st.expiresAt) : '';
+    if(st.inTrial){
+      line.textContent = st.willRenew === false
+        ? 'Free month — ends ' + when + '. It won’t renew.'
+        : 'Free month — membership begins ' + when + '.';
+    } else if(st.viaOfferCode){
+      line.textContent = 'Active through a code' + (when ? ' — until ' + when : '') + '.';
+    } else {
+      line.textContent = st.willRenew === false
+        ? 'Active until ' + when + '. It won’t renew.'
+        : 'Active — renews ' + when + '.';
+    }
+  }).catch(function(){
+    var line = document.getElementById('ms-settings-line');
+    if(line) line.textContent = 'Couldn’t reach the App Store just now.';
+  });
+});
+
+window.N_msManage = function(){
+  N.store.manage().then(function(st){ if(st) _msApply(st); }).catch(function(err){
+    toast((err && err.message) || 'Couldn’t open your subscriptions.', 4000);
+  });
+};
+
+}
+
 })();
 </script>
 </body>
