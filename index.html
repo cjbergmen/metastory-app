@@ -11966,6 +11966,14 @@ function musPlay(i){
     _fltApply();
   }
   a.play().catch(function(){});
+  // Show it as playing straight away (the file can take a few seconds to
+  // arrive), and if iOS drops the start (it can while the audio session is
+  // being activated), try again rather than leaving the person on a silent
+  // player that looks paused.
+  _mus.playing=true; _mus.wantPlay=true; try{_musPaint();}catch(e){}
+  [1500,4000].forEach(function(ms){setTimeout(function(){
+    try{ if(_mus.idx===i && _mus.wantPlay && _musCur().paused){ _musCur().play().catch(function(){}); _mus.playing=true; _musPaint(); } }catch(e){}
+  },ms);});
   // Unlock the plain background element while we still have the user's tap,
   // so the lock-screen hand-off is allowed to start playback later.
   if(!_mus._bUnlocked){
@@ -12002,6 +12010,7 @@ function _musReconcile(){
   else if(bOn&&!_mus.useB){ _mus.useB=true; }
   else if(aOn&&_mus.useB){ _mus.useB=false; }
   const on=aOn||bOn;
+  if(!on&&_mus.wantPlay&&!document.hidden)return;
   if(on!==_mus.playing){ _mus.playing=on; if(on)_mus.lastTick=Date.now(); try{_musPaint();}catch(e){} }
 }
 function musToggle(){
@@ -12013,10 +12022,11 @@ function musToggle(){
     try{if(_mus.a)_mus.a.pause();}catch(e){}
     try{if(_mus.b&&!_mus.b.muted)_mus.b.pause();}catch(e){}
     _mus.playing=false;
+    _mus.wantPlay=false;
   }else{
     if(!document.hidden&&_mus.useB){ try{_musSwap(false);}catch(e){} }
     const c=_musCur();
-    c.play().catch(function(){});_mus.playing=true;
+    c.play().catch(function(){});_mus.playing=true;_mus.wantPlay=true;
   }
   try{_musPaint();}catch(e){}
 }
@@ -12037,7 +12047,7 @@ function musClose(){
   _mus.timerEnd=0;_mus.timerMin=0;_mus.timerEOT=false;
   try{a.volume=1;}catch(e){}
   try{if(_flt.ctx&&_flt.gain){_flt.gain.gain.cancelScheduledValues(_flt.ctx.currentTime);_flt.gain.gain.setValueAtTime(1,_flt.ctx.currentTime);}}catch(e){}
-  _mus.idx=-1;_mus.playing=false;
+  _mus.idx=-1;_mus.playing=false;_mus.wantPlay=false;
   try{playerSheetClose();}catch(e){}
   _musPaint();
   if(typeof curPage!=='undefined'&&curPage==='rest')rRest();
@@ -15323,7 +15333,7 @@ function _msWebSession(tr, playing){
   var _prevSet = window._musMediaSession;
   window._musMediaSession = function(tr){
     _prevSet(tr);
-    _msWebSession(tr, true);
+    if(document.hidden) _msWebSession(tr, true);
   };
 })();
 document.addEventListener('visibilitychange', function(){
