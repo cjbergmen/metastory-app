@@ -1033,7 +1033,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260913-audit1';
+const APP_BUILD='20260921-audio3';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -11885,6 +11885,12 @@ function _musWire(el){
   el.addEventListener('timeupdate',function(){if(el!==_musCur())return;_musTick();_musTimerCheck();_musProg();});
   el.addEventListener('error',function(){if(el===_musCur()&&_mus.idx>=0)showToast('Could not load that track');});
 }
+// Inside the iPhone app, music plays through one plain <audio> element: no
+// Web Audio filter chain and no lock-screen hand-off between two players. iOS
+// cuts Web-Audio-routed sound in the background, and juggling two elements to
+// dodge that is what caused silent starts, a dead lock-screen panel and double
+// playback. The filter stays on the website.
+function _musNative(){try{return !!(window.Metastory&&window.Metastory.isNative);}catch(e){return false;}}
 function _musEl(){
   if(_mus.a)return _mus.a;
   const a=new Audio();
@@ -11911,6 +11917,7 @@ function _musElB(){
 }
 function _musCur(){return (_mus.useB&&_mus.b)?_mus.b:_musEl();}
 function _musSwap(toB){
+  if(_musNative())return;
   if(!!_mus.useB===!!toB)return;
   if(_mus.idx<0)return;
   const from=(_mus.useB&&_mus.b)?_mus.b:_mus.a;
@@ -11976,7 +11983,8 @@ function musPlay(i){
   },ms);});
   // Unlock the plain background element while we still have the user's tap,
   // so the lock-screen hand-off is allowed to start playback later.
-  if(!_mus._bUnlocked){
+  if(_musNative()){}
+  else if(!_mus._bUnlocked){
     try{
       const ub=_musElB();
       ub.muted=true;
@@ -12071,6 +12079,7 @@ let _flt={ctx:null,src:null,ls:null,hs:null,pk:null,mk:null,gain:null,an:null,de
 let _specRaf=0;
 function _fltIsOn(){return lsGet('_fltOn','1')==='1';}
 function _fltEnsure(){
+  if(_musNative()){_flt.dead=true;return;}
   if(_flt.ctx||_flt.dead)return;
   try{
     const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw 0;
@@ -12481,7 +12490,7 @@ function _playerSheetRender(){
     +'<div style="display:flex;gap:8px">'
     +'<button class="ps-ctrl'+(_mus.repeat!=='off'?' act':'')+'" onclick="musRepeatCycle()">'+_PS_ICONS.repeat+'<span>'+repLbl+'</span></button>'
     +'<button class="ps-ctrl'+(_mus.shuffle?' act':'')+'" onclick="musShuffleToggle()">'+_PS_ICONS.shuffle+'<span>Shuffle</span></button>'
-    +'<button class="ps-ctrl'+(_fltIsOn()?' act':'')+'" onclick="fltToggle()">'+_PS_ICONS.filter+'<span>Filter '+(_fltIsOn()?'on':'off')+'</span></button>'
+    +(_musNative()?'':'<button class="ps-ctrl'+(_fltIsOn()?' act':'')+'" onclick="fltToggle()">'+_PS_ICONS.filter+'<span>Filter '+(_fltIsOn()?'on':'off')+'</span></button>')
     +'</div>';
 }
 function playerSheetToggle(){
@@ -12531,13 +12540,13 @@ function _musicCardHTML(){
     +'<button class="btn btn-s btn-sm" style="flex:1" onclick="musRepeatCycle()">'+repLbl+'</button>'
     +'<button class="btn btn-s btn-sm" style="flex:1" onclick="musTimerCycle()">'+timLbl+'</button>'
     +'</div>'
-    +'<div style="margin-top:9px;padding-top:9px;border-top:0.5px solid var(--border)">'
+    +(_musNative()?'':'<div style="margin-top:9px;padding-top:9px;border-top:0.5px solid var(--border)">'
     +'<div style="display:flex;align-items:center;gap:8px">'
     +'<button class="btn btn-s btn-sm" id="mus-flt-btn" style="flex-shrink:0" onclick="fltToggle()">'+(_fltIsOn()?'Filtration: on':'Filtration: off')+'</button>'
     +'<canvas id="mus-spec" width="200" height="34" style="flex:1;min-width:0;height:34px;display:block"></canvas>'
     +'</div>'
     +'<div id="mus-flt-line" style="font-size:10.5px;color:var(--sub);margin-top:5px;line-height:1.4"></div>'
-    +'</div></div>';
+    +'</div>')+'</div>';
   setTimeout(function(){try{_fltApply();}catch(e){}},0);
   }
   return '<div class="card" style="margin-bottom:12px">'
