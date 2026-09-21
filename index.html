@@ -323,6 +323,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 /* Sign-In Screen */
 #signin-screen{display:none;position:fixed;inset:0;background:var(--bg);z-index:300;flex-direction:column;align-items:center;justify-content:center;padding:40px 28px;text-align:center}
 .signin-logo{margin-bottom:20px;line-height:1;display:flex;justify-content:center}
+#sync-veil{display:none;position:fixed;inset:0;z-index:100000;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;padding:40px 32px;text-align:center}
+#sync-veil.open{display:flex}
+#sync-veil .sv-plate{width:84px;height:84px;box-sizing:border-box;padding:11px 9px 7px;border-radius:22px;background:#fff;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;margin-bottom:26px}
+#sync-veil .sv-plate img{width:100%;height:100%;object-fit:contain;display:block}
+#sync-veil .sv-title{font-family:var(--font-serif);font-size:28px;line-height:1.2;color:var(--text);margin-bottom:10px}
+#sync-veil .sv-sub{font-size:14px;line-height:1.6;color:var(--sub);max-width:290px;margin-bottom:28px}
+#sync-veil .sv-bar{width:140px;height:3px;border-radius:3px;background:var(--surface3);overflow:hidden}
+#sync-veil .sv-bar span{display:block;width:40%;height:100%;border-radius:3px;background:var(--green);animation:svSlide 1.3s ease-in-out infinite}
+@keyframes svSlide{0%{transform:translateX(-110%)}100%{transform:translateX(260%)}}
+@media (prefers-reduced-motion: reduce){#sync-veil .sv-bar span{animation:none;width:100%;opacity:.5}}
 .signin-plate{background:#fff;border:1.5px solid var(--border);border-radius:28px;padding:20px;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(66,76,87,.06)}
 .signin-plate img{width:104px;height:104px;object-fit:contain;display:block}
 .signin-title{font-size:30px;font-weight:800;letter-spacing:-.5px;margin-bottom:10px;color:var(--text)}
@@ -1326,8 +1336,21 @@ async function fbPullAll(){
   const uid = fbUser.uid; // snapshot — fbUser can change during async awaits
   _fbSyncing = true;
   try {
+    // Ask for everything at once. These used to be fetched one after another,
+    // so a returning user waited for six round trips in a row while looking at
+    // empty screens. The merge rules below are unchanged; only the waiting is.
+    // The three that were optional before stay optional: a failure there
+    // leaves that section as it was instead of abandoning the whole pull.
+    const _base = fbDb.collection('users').doc(uid);
+    const [foodSnap, _miscSnap, _jSnap, woSnap, _slSnap, userDoc] = await Promise.all([
+      _base.collection('foodLogs').get(),
+      _base.collection('dayMisc').get().catch(() => null),
+      _base.collection('journal').get().catch(() => null),
+      _base.collection('workoutLogs').get(),
+      _base.collection('sleepLogs').get().catch(() => null),
+      _base.get()
+    ]);
     // Pull food logs
-    const foodSnap = await fbDb.collection('users').doc(uid).collection('foodLogs').get();
     foodSnap.forEach(doc => {
       const d = doc.data();
       const date = doc.id;
@@ -1348,8 +1371,8 @@ async function fbPullAll(){
     // Pull misc daily logs (supps taken, stress, rest/prayer, wind-down, blood sugar, routines)
     _daySyncOff=true;
     try{
-      const miscSnap = await fbDb.collection('users').doc(uid).collection('dayMisc').get();
-      miscSnap.forEach(doc => {
+      const miscSnap = _miscSnap;
+      if(miscSnap) miscSnap.forEach(doc => {
         const d = doc.data(); const date = doc.id;
         SYNC_DAY_PREFIXES.forEach(p=>{ const f=p.slice(0,-1); const val=d[f]; if(val!==undefined&&val!==null&&val!==''){ const key=f+'_'+date; if(!lsGet(key,'')) lsSet(key, val); } });
       });
@@ -1357,7 +1380,7 @@ async function fbPullAll(){
     _daySyncOff=false;
     // Pull reflection journal entries (merge by id)
     try{
-      const jSnap = await fbDb.collection('users').doc(uid).collection('journal').get();
+      const jSnap = _jSnap;
       if(jSnap && !jSnap.empty){
         const byId={}; _journalAll().forEach(e=>{ if(e&&e.id) byId[e.id]=e; });
         const gone=_journalTomb();
@@ -1376,7 +1399,6 @@ async function fbPullAll(){
       }
     }catch(e){}
     // Pull workout logs
-    const woSnap = await fbDb.collection('users').doc(uid).collection('workoutLogs').get();
     woSnap.forEach(doc => {
       const d = doc.data();
       const date = doc.id;
@@ -1390,8 +1412,8 @@ async function fbPullAll(){
     });
     // Pull sleep logs (manual entries + anything pushed by the Health Auto Export bridge)
     try {
-      const slSnap = await fbDb.collection('users').doc(uid).collection('sleepLogs').get();
-      slSnap.forEach(doc => {
+      const slSnap = _slSnap;
+      if(slSnap) slSnap.forEach(doc => {
         const d = doc.data(); const date = doc.id;
         if(!(d && d.h > 0)) return;
         let local = null; try { local = JSON.parse(lsGet('rest_'+date,'null')); } catch(e){}
@@ -1402,7 +1424,6 @@ async function fbPullAll(){
       });
     } catch(e){}
     // Pull settings
-    const userDoc = await fbDb.collection('users').doc(uid).get();
     if(userDoc.exists) {
       const s = userDoc.data().settings;
       if(s) {
@@ -1612,6 +1633,39 @@ function clearLocalUserData(){
   Object.keys(MEM).forEach(k=>{if(!keep.includes(k))delete MEM[k];});
 }
 
+/* While a returning account downloads, show that it's downloading. Signing
+   out wipes this phone's copy on purpose, so the next sign-in starts from
+   nothing, and empty screens during that download read as lost data. */
+function showSyncVeil(){
+  let v = document.getElementById('sync-veil');
+  if(!v){
+    v = document.createElement('div');
+    v.id = 'sync-veil';
+    v.setAttribute('role', 'status');
+    v.setAttribute('aria-live', 'polite');
+    let logo = '';
+    try{ const img = document.querySelector('.signin-plate img'); if(img) logo = '<div class="sv-plate"><img alt="" src="' + img.getAttribute('src') + '"></div>'; }catch(e){}
+    v.innerHTML = logo +
+      '<div class="sv-title">Bringing your story back\u2026</div>' +
+      '<div class="sv-sub">Everything you\u2019ve logged is safe in your account. This takes a few seconds.</div>' +
+      '<div class="sv-bar"><span></span></div>';
+    document.body.appendChild(v);
+  }
+  clearTimeout(window._syncVeilTimer);
+  // Never trap anyone here: if the network is very slow, step aside and let
+  // the pull finish in the background.
+  window._syncVeilTimer = setTimeout(() => {
+    hideSyncVeil();
+    try{ showToast('Still bringing your data back \u2014 it will appear as it arrives.', 4000); }catch(e){}
+  }, 25000);
+  v.classList.add('open');
+}
+function hideSyncVeil(){
+  clearTimeout(window._syncVeilTimer);
+  const v = document.getElementById('sync-veil');
+  if(v) v.classList.remove('open');
+}
+
 // Auth state listener
 let _authResolved = false;
 if(fbAuth) {
@@ -1622,10 +1676,11 @@ if(fbAuth) {
     if(user) {
       // Clear if: new sign-in after sign-out (prevUid empty) OR switching accounts
       const freshSignIn = !prevUid || prevUid !== user.uid;
-      if(freshSignIn) clearLocalUserData();
+      if(freshSignIn) { clearLocalUserData(); showSyncVeil(); }
       lsSet('_lastUid', user.uid);
       updateAuthUI();
       fbPullAll().then(pulled => {
+        hideSyncVeil();
         // Bail if auth changed while pull was running — prevents cross-user contamination
         if(!fbUser || fbUser.uid !== user.uid) return;
         // Only push if the pull actually ran (prevents stale-data overwrite on race condition)
@@ -1639,6 +1694,7 @@ if(fbAuth) {
         if(freshSignIn) checkOnboarding();
       });
     } else {
+      hideSyncVeil();
       // Signed out — wipe all user data, zero out lastUid so next sign-in also clears
       clearLocalUserData();
       lsSet('_lastUid', '');
@@ -11417,9 +11473,9 @@ async function forceUpdate(){
       <button class="dr-i" id="dr-summary" onclick="drawerDressSummary()"><span class="ic" style="background:rgba(196,112,112,.16)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M9 13h6M9 17h6M9 9h2"/></svg></span><div>My DRESS Summary<small>Your whole program, one page</small></div></button>
       <button class="dr-i" id="dr-journal" onclick="drawerGo('journal')"><span class="ic" style="background:rgba(120,140,196,.18)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span><div>Reflections<small>Your prayers &amp; insights, summarized over time</small></div></button>
       <button class="dr-i" id="dr-tour" onclick="closeDrawer();setTimeout(function(){startTour();},260)"><span class="ic" style="background:rgba(171,108,82,.14)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 1 1 3.3 2.9c-.6.2-.9.8-.9 1.4v.4"/><path d="M12 17.2v.01"/></svg></span><div>How this works<small>The DRESS model &amp; a tour of the app</small></div></button>
-      <button class="dr-i" id="dr-settings" onclick="closeDrawer();openSettings()"><span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1l-.4-2.6H10l-.4 2.6a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.4 2.6h3.8l.4-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5a7 7 0 0 0 .1-1z"/></svg></span><div>Settings<small>Profile, health flags, sign out</small></div></button>
       <button class="dr-i" id="dr-signout" onclick="drawerSignOut()"><span class="ic" style="background:rgba(196,112,112,.16)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></span><div>Sign out<small>Your logs stay saved to your account</small></div></button>
       <button class="dr-i" id="dr-feedback" onclick="closeDrawer();setTimeout(openFeedback,260)"><span class="ic" style="background:rgba(171,108,82,.14)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.3-.6L3 21l1.8-5a8.3 8.3 0 0 1-.8-3.6 8.4 8.4 0 0 1 8.5-8.4 8.4 8.4 0 0 1 8.5 8.4z"/></svg></span><div>Report a bug or idea<small>Send it straight to our team</small></div></button>
+      <button class="dr-i" id="dr-settings" onclick="closeDrawer();openSettings()"><span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1l-.4-2.6H10l-.4 2.6a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.4 2.6h3.8l.4-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5a7 7 0 0 0 .1-1z"/></svg></span><div>Settings<small>Profile, health flags, membership</small></div></button>
     </div>
     <div class="dr-foot">Education &amp; self-care — not medical diagnosis or treatment.</div>
   </div>
