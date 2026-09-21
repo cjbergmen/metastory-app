@@ -11991,12 +11991,40 @@ function musPlay(i){
   if(typeof curPage!=='undefined'&&curPage==='rest')rRest();
 }
 function musRow(i){if(_mus.idx===i){musToggle();}else{musPlay(i);}}
+// The lock-screen hand-off runs two <audio> elements. If iOS resumes or pauses
+// the "other" one (lock-screen buttons, a phone call, AirPods), the app's idea
+// of which one is playing drifts. This re-reads the truth from the elements.
+function _musReconcile(){
+  if(_mus.idx<0)return;
+  const a=_mus.a,b=_mus.b;
+  const aOn=!!(a&&!a.paused&&!a.ended), bOn=!!(b&&!b.paused&&!b.ended&&!b.muted);
+  if(aOn&&bOn){ try{ if(_mus.useB) a.pause(); else b.pause(); }catch(e){} }
+  else if(bOn&&!_mus.useB){ _mus.useB=true; }
+  else if(aOn&&_mus.useB){ _mus.useB=false; }
+  const on=aOn||bOn;
+  if(on!==_mus.playing){ _mus.playing=on; if(on)_mus.lastTick=Date.now(); try{_musPaint();}catch(e){} }
+}
 function musToggle(){
-  const a=_musCur();
   if(_mus.idx<0){musPlay(0);return;}
-  if(a.paused){a.play().catch(function(){});_mus.playing=true;}else{a.pause();_mus.playing=false;}
+  _musReconcile();
+  const a=_musCur();
+  if(_mus.playing||!a.paused){
+    // Pause everything, whichever element iOS left running.
+    try{if(_mus.a)_mus.a.pause();}catch(e){}
+    try{if(_mus.b&&!_mus.b.muted)_mus.b.pause();}catch(e){}
+    _mus.playing=false;
+  }else{
+    if(!document.hidden&&_mus.useB){ try{_musSwap(false);}catch(e){} }
+    const c=_musCur();
+    c.play().catch(function(){});_mus.playing=true;
+  }
   try{_musPaint();}catch(e){}
 }
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden)return;
+  [300,1200,2500].forEach(function(ms){setTimeout(_musReconcile,ms);});
+});
+setInterval(function(){ if(!document.hidden)_musReconcile(); },2000);
 function musNext(){if(_mus.idx<0){musPlay(0);return;}musPlay(_musPickNext());}
 function musPrev(){if(_mus.idx<0){musPlay(0);return;}musPlay((_mus.idx-1+MUSIC_ALBUM.tracks.length)%MUSIC_ALBUM.tracks.length);}
 function musClose(){
@@ -15265,12 +15293,59 @@ window._musMediaSession = function(tr){
   });
 };
 
+/* When the screen locks, playback moves to a second, unfiltered <audio>
+   element (see _musSwap). iOS can then show WebKit's own Now Playing panel for
+   that element instead of ours, titled with the app name and with buttons that
+   go nowhere. Give WebKit's panel the same title and working buttons, and
+   re-assert ours once the hand-off has settled. */
+function _msWebSession(tr, playing){
+  try{
+    if(!('mediaSession' in navigator) || !tr) return;
+    navigator.mediaSession.metadata = new MediaMetadata({title: tr.t, artist: MUSIC_ALBUM.artist, album: MUSIC_ALBUM.title});
+    var h = {
+      play: function(){ if(!_mus.playing) musToggle(); },
+      pause: function(){ if(_mus.playing) musToggle(); },
+      nexttrack: musNext,
+      previoustrack: musPrev,
+      seekto: function(d){ var el=currentAudioEl(); if(el && d && d.seekTime!=null){ try{ el.currentTime=d.seekTime; }catch(e){} } },
+      seekbackward: function(d){ var el=currentAudioEl(); if(el){ try{ el.currentTime=Math.max(0,(el.currentTime||0)-((d&&d.seekOffset)||10)); }catch(e){} } },
+      seekforward: function(d){ var el=currentAudioEl(); if(el){ try{ el.currentTime=Math.min(trackDuration(el)||1e9,(el.currentTime||0)+((d&&d.seekOffset)||10)); }catch(e){} } }
+    };
+    Object.keys(h).forEach(function(k){ try{ navigator.mediaSession.setActionHandler(k, h[k]); }catch(e){} });
+    navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+    var el = currentAudioEl();
+    if(el && trackDuration(el) && navigator.mediaSession.setPositionState){
+      try{ navigator.mediaSession.setPositionState({duration: trackDuration(el), position: Math.min(el.currentTime||0, trackDuration(el)), playbackRate: 1}); }catch(e){}
+    }
+  }catch(e){}
+}
+(function(){
+  var _prevSet = window._musMediaSession;
+  window._musMediaSession = function(tr){
+    _prevSet(tr);
+    _msWebSession(tr, true);
+  };
+})();
+document.addEventListener('visibilitychange', function(){
+  if(!_mus || _mus.idx < 0) return;
+  [400, 1500].forEach(function(ms){
+    setTimeout(function(){
+      if(!_mus || _mus.idx < 0) return;
+      var tr = MUSIC_ALBUM.tracks[_mus.idx];
+      if(!tr) return;
+      if(_mus.playing){ window._musMediaSession(tr); }
+      else { _msWebSession(tr, false); var el=currentAudioEl(); N.nowPlaying.state(false, el?(el.currentTime||0):0, trackDuration(el)); }
+    }, ms);
+  });
+});
+
 /* _musPaint runs on every play and pause, which is exactly when the lock
    screen needs to know. */
 after('_musPaint', function(){
   if(!_mus || _mus.idx < 0){ N.nowPlaying.clear(); return; }
   var el = currentAudioEl();
   N.nowPlaying.state(_mus.playing, el ? (el.currentTime || 0) : 0, trackDuration(el));
+  try{ if('mediaSession' in navigator) navigator.mediaSession.playbackState = _mus.playing ? 'playing' : 'paused'; }catch(e){}
 });
 
 after('musClose', function(){
