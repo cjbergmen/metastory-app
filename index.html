@@ -9328,6 +9328,17 @@ function exportData(){
   if(!Object.keys(data.entries).length){
     alert('No data to export yet.');return;
   }
+  // Inside the iPhone app a file download would replace the whole app with raw
+  // data and no way back, so hand the backup to the share sheet instead.
+  if(window.Metastory&&window.Metastory.isNative){
+    try{
+      const fname='metastory-health-backup-'+new Date().toISOString().slice(0,10)+'.json';
+      const file=new File([JSON.stringify(data,null,2)],fname,{type:'application/json'});
+      if(navigator.canShare&&navigator.canShare({files:[file]})){ navigator.share({files:[file],title:'Metastory backup'}).catch(()=>{}); return; }
+    }catch(e){}
+    showToast('Your logs are already saved to your account, so there is nothing to export here.',3500);
+    return;
+  }
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
