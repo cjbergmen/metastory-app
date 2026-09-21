@@ -11771,6 +11771,7 @@ function _suggestNowHTML(){
     <span class="kicker">${kick}</span>
     <h3 style="margin:6px 0 4px">${title}</h3>
     <p style="margin:0">${line}</p>
+    <div class="mus-hp-mini" style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-size:11.5px;line-height:1.4;color:rgba(255,255,255,.8)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px" aria-hidden="true"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/><path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg><span>Best with over-ear headphones, EQ set to flat, noise cancelling off.</span></div>
     ${btns}
   </div>`;
 }
@@ -12416,7 +12417,8 @@ function _playerSheetRender(){
   const pos=(a&&a.duration>0)?Math.round(a.currentTime/a.duration*1000):0;
   p.innerHTML=
     '<div style="text-align:center;margin-bottom:2px"><div id="ps-title" style="font-family:var(--font-serif);font-size:21px;font-weight:600;line-height:1.15">'+(tr?tr.t:'Safe Inside')+'</div>'
-    +'<div style="font-size:11.5px;color:var(--sub);margin-top:3px">Ventrality · Safe Inside</div></div>'
+    +'<div style="font-size:11.5px;color:var(--sub);margin-top:3px">Ventrality · Safe Inside</div>'
+    +'<div class="mus-hp-mini" style="display:inline-flex;gap:6px;align-items:center;margin-top:8px;font-size:11px;color:var(--sub)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;" aria-hidden="true"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/><path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg><span>Over-ear headphones · flat EQ · noise cancelling off</span></div></div>'
     +'<div style="display:flex;align-items:center;gap:8px;margin:14px 0 2px">'
     +'<span id="ps-time-el" style="font-size:10.5px;color:var(--sub);min-width:32px">'+_musFmt(a?a.currentTime:0)+'</span>'
     +'<input type="range" id="ps-seek" min="0" max="1000" value="'+pos+'" oninput="musSeek(this.value)" style="flex:1">'
