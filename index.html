@@ -1033,7 +1033,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260922-audio7';
+const APP_BUILD='20260922-swap1';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -2254,13 +2254,21 @@ function saveUsername(){
 }
 
 
+// Two names for the same move ("Bulgarian Split Squats" in a plan, "DB Bulgarian
+// Split Squat" in the swap list) must share one history. Compare on a loose key:
+// case, a leading DB/dumbbell and plurals don't count.
+function _exKey(n){
+  return String(n||'').toLowerCase().replace(/^\s*(db|dumbbell)\s+/,'').replace(/[^a-z0-9().]+/g,' ')
+    .split(' ').filter(Boolean).map(function(w){return (w.length>3&&/[^s]s$/.test(w))?w.slice(0,-1):w;}).join(' ');
+}
 function getLastSession(exName){
+  const _k=_exKey(exName);
   for(let i=1;i<=90;i++){
     const d=new Date(viewDate+'T12:00:00');
     d.setDate(d.getDate()-i);
     const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     const wl=getWL(key);
-    const found=wl.find(e=>e.ex===exName);
+    const found=wl.find(e=>e.ex===exName)||wl.find(e=>e&&_exKey(e.ex)===_k&&e.sets&&e.sets.length);
     if(found&&found.sets&&found.sets.length)return found.sets;
   }
   return null;
@@ -2302,9 +2310,10 @@ function _buildMaxSets(){
         if(w>bw||(w===bw&&r>br)){bw=w;br=r;}
       });
       if(br<0)return; // nothing usable logged that day
-      const cur=map[en.ex];
+      const mk=_exKey(en.ex);
+      const cur=map[mk];
       if(!cur||bw>cur.w||(bw===cur.w&&br>cur.r)||(bw===cur.w&&br===cur.r&&dateKey>cur.date)){
-        map[en.ex]={w:bw,r:br,date:dateKey,sets:en.sets};
+        map[mk]={w:bw,r:br,date:dateKey,sets:en.sets};
       }
     });
   };
@@ -2320,7 +2329,7 @@ function _buildMaxSets(){
 }
 function getMaxSession(exName){
   if(!_maxSetCache)_maxSetCache=_buildMaxSets();
-  return _maxSetCache[exName]||null;
+  return _maxSetCache[_exKey(exName)]||null;
 }
 
 // Called when user changes the weight dropdown
@@ -2718,13 +2727,25 @@ function openSwapModal(idx, e){
   _swapModalIdx=idx;
   const wo=getWO(); if(!wo)return;
   const name=_woExList[idx]||'';
-  const group=EX_MUSCLE_MAP[name]||'chest';
+  const group=EX_MUSCLE_MAP[name]||_guessMuscle(name);
   _swapMuscleFilter=group;
   document.getElementById('swap-title').textContent='Swap: '+name;
   renderSwapTabs();
   renderSwapList();
   document.getElementById('swap-overlay').classList.add('open');
   document.getElementById('swap-sheet').classList.add('open');
+}
+// Moves missing from EX_MUSCLE_MAP used to open the swap sheet on Chest, so a typed
+// replacement for knee raises inherited a chest press's cues. Guess from the name.
+function _guessMuscle(n){
+  n=String(n||'').toLowerCase();
+  if(/knee raise|leg raise|crunch|plank|\bab|core|sit.?up|hollow|dead bug|russian|woodchop|pallof|v.?up|toe.?to/.test(n))return 'core';
+  if(/squat|lunge|deadlift|rdl|step.?up|calf|leg|glute|hip thrust|hamstring|quad/.test(n))return 'legs';
+  if(/row|pull|lat|chin/.test(n))return 'back';
+  if(/curl/.test(n))return 'biceps';
+  if(/tricep|kickback|skull|dip|pushdown|extension/.test(n))return 'triceps';
+  if(/shoulder|lateral|overhead|delt|arnold|raise/.test(n))return 'shoulders';
+  return 'chest';
 }
 function closeSwapModal(){
   const ov=document.getElementById('swap-overlay');
@@ -2782,7 +2803,7 @@ function _renderSwapListOrig(){
   });
   document.getElementById('swap-list').innerHTML=h;
 }
-function applyManualSwap(){var inp=document.getElementById('swap-manual');var name=(inp&&inp.value||'').trim();if(!name){try{showToast('Type an exercise name first');}catch(e){}return;}var base=(_swapCandidates&&_swapCandidates.length)?Object.assign({},_swapCandidates[0]):{};base.n=name;base.manual=true;base.muscle=base.muscle||_swapMuscleFilter;_swapCandidates=_swapCandidates||[];_swapCandidates.push(base);applySwap(_swapModalIdx,_swapCandidates.length-1);}
+function applyManualSwap(){var inp=document.getElementById('swap-manual');var name=(inp&&inp.value||'').trim();if(!name){try{showToast('Type an exercise name first');}catch(e){}return;}var _cur=null;try{var _w=getWO(),_on=_woExList[_swapModalIdx];_cur=[].concat(_w.ex||[],_w.pm||[]).find(function(x){return x.n===_on;})||null;}catch(e){}var base={n:name,manual:true,muscle:_swapMuscleFilter,tag:(_cur&&_cur.tag)||'3 × 10–12',rest:(_cur&&_cur.rest)||'60 sec',i:'',muscles:''};_swapCandidates=_swapCandidates||[];_swapCandidates.push(base);applySwap(_swapModalIdx,_swapCandidates.length-1);}
 function applySwap(idx, ci){_applySwapOrig(idx,ci);try{saveWorkoutToday();}catch(e){}return;}
 function _applySwapOrig(idx, ci){
   const newEx=_swapCandidates[ci]; if(!newEx)return;

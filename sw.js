@@ -1,4 +1,4 @@
-const VERSION = '20260922-audio7';
+const VERSION = '20260922-swap1';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
