@@ -354,7 +354,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .wiz-sec-sub{font-size:12.5px;color:var(--sub);line-height:1.5;margin-bottom:13px}
 .wiz-overlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;overflow-y:auto;opacity:0;transition:opacity .3s;pointer-events:none}
 .wiz-overlay.open{opacity:1;pointer-events:all}
-.wiz-inner{max-width:480px;width:100%;margin:0 auto;padding:24px 18px 40px;display:flex;flex-direction:column;min-height:100vh;box-sizing:border-box}
+.wiz-inner{max-width:480px;width:100%;margin:0 auto;padding:calc(var(--st,0px) + 24px) 18px calc(var(--sb,0px) + 40px);display:flex;flex-direction:column;min-height:100vh;box-sizing:border-box}
 .wiz-progress{height:3px;background:var(--border);border-radius:2px;margin-bottom:28px;flex-shrink:0}
 .wiz-progress-bar{height:100%;background:var(--green);border-radius:2px;transition:width .4s ease}
 .wiz-icon{font-size:48px;text-align:center;margin-bottom:16px}
@@ -1033,7 +1033,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260921-audio3';
+const APP_BUILD='20260922-audio4';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -11972,14 +11972,33 @@ function musPlay(i){
     try{if(_flt.ctx&&_flt.ctx.state!=='running')_flt.ctx.resume();}catch(e){}
     _fltApply();
   }
-  a.play().catch(function(){});
+  // In the iPhone app, switch the phone into music-playback mode *before*
+  // starting the track. Switching while the track is starting knocks the start
+  // offline about half the time.
+  if(_musNative() && !_mus._sessOn){
+    let started=false;
+    const go=function(){ if(started)return; started=true; if(_mus.idx===i && _mus.wantPlay!==false){ a.play().catch(function(){}); } };
+    try{
+      window.Metastory.audio.activate().then(function(){ _mus._sessOn=true; setTimeout(go,150); }).catch(function(){ go(); });
+    }catch(e){ go(); }
+    setTimeout(go,1200);   // never wait on the bridge for longer than this
+  } else {
+    a.play().catch(function(){});
+  }
   // Show it as playing straight away (the file can take a few seconds to
   // arrive), and if iOS drops the start (it can while the audio session is
   // being activated), try again rather than leaving the person on a silent
   // player that looks paused.
   _mus.playing=true; _mus.wantPlay=true; try{_musPaint();}catch(e){}
-  [1500,4000].forEach(function(ms){setTimeout(function(){
-    try{ if(_mus.idx===i && _mus.wantPlay && _musCur().paused){ _musCur().play().catch(function(){}); _mus.playing=true; _musPaint(); } }catch(e){}
+  let _t0=null;
+  [2000,4500,8000].forEach(function(ms){setTimeout(function(){
+    try{
+      if(_mus.idx!==i || !_mus.wantPlay) return;
+      const el=_musCur();
+      const stuck = !el.paused && el.readyState>=3 && _t0!==null && el.currentTime===_t0;
+      if(el.paused || stuck){ try{ if(stuck) el.pause(); }catch(e){} el.play().catch(function(){}); _mus.playing=true; _musPaint(); }
+      _t0=el.currentTime;
+    }catch(e){}
   },ms);});
   // Unlock the plain background element while we still have the user's tap,
   // so the lock-screen hand-off is allowed to start playback later.
@@ -12055,7 +12074,7 @@ function musClose(){
   _mus.timerEnd=0;_mus.timerMin=0;_mus.timerEOT=false;
   try{a.volume=1;}catch(e){}
   try{if(_flt.ctx&&_flt.gain){_flt.gain.gain.cancelScheduledValues(_flt.ctx.currentTime);_flt.gain.gain.setValueAtTime(1,_flt.ctx.currentTime);}}catch(e){}
-  _mus.idx=-1;_mus.playing=false;_mus.wantPlay=false;
+  _mus.idx=-1;_mus.playing=false;_mus.wantPlay=false;_mus._sessOn=false;
   try{playerSheetClose();}catch(e){}
   _musPaint();
   if(typeof curPage!=='undefined'&&curPage==='rest')rRest();
@@ -12725,7 +12744,7 @@ function _prayPage(kind,opts){
   opts=opts||{};
   const SERIF='font-family:var(--font-serif)';
   const attrib=s=>s?`<div style="font-family:var(--font-sans);font-size:13px;letter-spacing:.02em;color:rgba(255,255,255,.72);margin-top:18px">— ${s}</div>`:'';
-  const wrap=inner=>`<div class="pr-page" style="flex:0 0 100%;width:100%;height:100%;overflow-y:auto;scroll-snap-align:start;box-sizing:border-box;padding:182px 28px 96px;color:#fff;font-family:var(--font-sans);-webkit-overflow-scrolling:touch">${inner}</div>`;
+  const wrap=inner=>`<div class="pr-page" style="flex:0 0 100%;width:100%;height:100%;overflow-y:auto;scroll-snap-align:start;box-sizing:border-box;padding:calc(var(--st,0px) + 152px) 28px 96px;color:#fff;font-family:var(--font-sans);-webkit-overflow-scrolling:touch">${inner}</div>`;
   const H=t=>`<div style="${SERIF};font-size:38px;font-weight:500;line-height:1.08;letter-spacing:-.3px;margin-bottom:22px;text-shadow:0 1px 14px rgba(0,0,0,.28)">${t}</div>`;
   const body=t=>`<div style="${SERIF};font-size:22px;font-weight:400;line-height:1.55;white-space:pre-line;text-shadow:0 1px 12px rgba(0,0,0,.3)">${t}</div>`;
   const ghostBtn=(label,onclick)=>`<button onclick="${onclick}" style="width:100%;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.4);color:#fff;font-family:var(--font-sans);font-size:15px;font-weight:600;letter-spacing:.02em;padding:14px;border-radius:12px;cursor:pointer">${label}</button>`;
@@ -12859,7 +12878,7 @@ function openPrayer(slot){
   ov.style.cssText='position:fixed;inset:0;z-index:9999;background:'+_prayerBg(slot);
   ov.innerHTML=`<style>@keyframes prBreathe{0%,100%{transform:scale(.84)}50%{transform:scale(1.12)}}#pr-journal-input::placeholder{color:rgba(255,255,255,.55)}#pr-journal-input:focus{border-color:rgba(255,255,255,.7)}</style>
     <div id="prayer-dark" style="position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .55s"></div>
-    <div id="pr-ring" style="position:absolute;top:44px;left:50%;transform:translateX(-50%);width:116px;height:116px;pointer-events:none;z-index:4;transition:opacity .2s ease"><div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.5);animation:prBreathe 11s ease-in-out infinite"></div><div style="position:absolute;inset:15px;border-radius:50%;border:1px solid rgba(255,255,255,.28);animation:prBreathe 11s ease-in-out infinite"></div></div>
+    <div id="pr-ring" style="position:absolute;top:calc(var(--st,0px) + 14px);left:50%;transform:translateX(-50%);width:116px;height:116px;pointer-events:none;z-index:4;transition:opacity .2s ease"><div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.5);animation:prBreathe 11s ease-in-out infinite"></div><div style="position:absolute;inset:15px;border-radius:50%;border:1px solid rgba(255,255,255,.28);animation:prBreathe 11s ease-in-out infinite"></div></div>
     <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:rgba(255,255,255,.16);z-index:5"><div id="pr-progress" style="position:absolute;left:0;top:0;width:100%;height:0;background:rgba(255,255,255,.85);transition:height .55s ease"></div></div>
     <div id="prayer-stage" style="position:absolute;inset:0">${panels}</div>
     <div style="position:absolute;left:0;right:0;bottom:0;z-index:6">
@@ -12868,7 +12887,7 @@ function openPrayer(slot){
         <span id="ov-mus-title" style="flex:1;min-width:0;font-family:var(--font-sans);font-size:12px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
         <span aria-hidden="true" style="flex:none;color:rgba(255,255,255,.7);display:flex"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg></span>
       </div>
-      <div style="display:flex;align-items:center;gap:14px;padding:0 22px 30px">
+      <div style="display:flex;align-items:center;gap:14px;padding:0 22px max(30px, calc(var(--sb,0px) + 10px))">
         <button onclick="prayerMenu()" aria-label="Prayer times menu" style="background:none;border:none;color:#fff;cursor:pointer;flex:none;display:flex;align-items:center;padding:4px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
         <div id="pr-dots" style="flex:1;display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap"></div>
         <button id="pr-finish" onclick="completePrayer(_prayerSlot)" aria-label="Complete" style="flex:none;width:30px;height:30px;border-radius:50%;border:none;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;cursor:pointer;visibility:hidden"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#222" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
@@ -12959,7 +12978,7 @@ function _practiceMarkDone(id){const d=_practiceDoneToday();if(!d.includes(id)){
 function _practicePage(kind,opts){
   opts=opts||{};
   const SERIF='font-family:var(--font-serif)';
-  const wrap=(inner,pt)=>`<div class="pc-page" style="flex:0 0 100%;width:100%;height:100%;overflow-y:auto;box-sizing:border-box;padding:${pt||182}px 28px 150px;color:#fff;font-family:var(--font-sans);-webkit-overflow-scrolling:touch">${inner}</div>`;
+  const wrap=(inner,pt)=>`<div class="pc-page" style="flex:0 0 100%;width:100%;height:100%;overflow-y:auto;box-sizing:border-box;padding:calc(var(--st,0px) + ${(pt||182)-30}px) 28px 150px;color:#fff;font-family:var(--font-sans);-webkit-overflow-scrolling:touch">${inner}</div>`;
   const H=t=>`<div style="${SERIF};font-size:38px;font-weight:500;line-height:1.08;letter-spacing:-.3px;margin-bottom:20px;text-shadow:0 1px 14px rgba(0,0,0,.22)">${t}</div>`;
   const body=t=>`<div style="${SERIF};font-size:23px;font-weight:400;line-height:1.55;white-space:pre-line;text-shadow:0 1px 12px rgba(0,0,0,.22)">${t}</div>`;
   if(kind==='title'){
@@ -13015,9 +13034,9 @@ function openPractice(id){
   ov.style.cssText='position:fixed;inset:0;z-index:9999;background:'+_PRACTICE_BG;
   ov.innerHTML=`<style>@keyframes pcBreathe{0%,100%{transform:scale(.84)}50%{transform:scale(1.12)}}</style>
     <div id="pc-dark" style="position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .55s"></div>
-    <div id="pc-ring" style="position:absolute;top:44px;left:50%;transform:translateX(-50%);width:116px;height:116px;pointer-events:none;z-index:4;transition:opacity .2s ease"><div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.5);animation:pcBreathe 11s ease-in-out infinite"></div><div style="position:absolute;inset:15px;border-radius:50%;border:1px solid rgba(255,255,255,.28);animation:pcBreathe 11s ease-in-out infinite"></div></div>
+    <div id="pc-ring" style="position:absolute;top:calc(var(--st,0px) + 14px);left:50%;transform:translateX(-50%);width:116px;height:116px;pointer-events:none;z-index:4;transition:opacity .2s ease"><div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.5);animation:pcBreathe 11s ease-in-out infinite"></div><div style="position:absolute;inset:15px;border-radius:50%;border:1px solid rgba(255,255,255,.28);animation:pcBreathe 11s ease-in-out infinite"></div></div>
     <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:rgba(255,255,255,.16);z-index:5"><div id="pc-progress" style="position:absolute;left:0;top:0;width:100%;height:0;background:rgba(255,255,255,.85);transition:height .55s ease"></div></div>
-    <button id="pc-timer" onclick="pcTimerToggle()" aria-label="Practice timer" style="position:absolute;top:14px;right:14px;z-index:7;display:none;align-items:center;gap:9px;background:rgba(0,0,0,.30);border:1px solid rgba(255,255,255,.32);border-radius:22px;padding:7px 15px 7px 12px;color:#fff;font-family:var(--font-sans);cursor:pointer">
+    <button id="pc-timer" onclick="pcTimerToggle()" aria-label="Practice timer" style="position:absolute;top:calc(var(--st,0px) + 14px);right:14px;z-index:7;display:none;align-items:center;gap:9px;background:rgba(0,0,0,.30);border:1px solid rgba(255,255,255,.32);border-radius:22px;padding:7px 15px 7px 12px;color:#fff;font-family:var(--font-sans);cursor:pointer">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>
       <span id="pc-timer-time" style="font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.02em">0:00</span>
       <span id="pc-timer-lbl" style="font-size:11px;font-weight:600;letter-spacing:.03em;opacity:.85">Start</span>
@@ -13033,7 +13052,7 @@ function openPractice(id){
         <button class="mp-b" onclick="musNext()" aria-label="Next track"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 4l10 8-10 8V4zM17 4h2v16h-2z"/></svg></button>
         <button class="mp-b" onclick="musClose()" aria-label="Stop listening" style="color:rgba(255,255,255,.7)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
-      <div style="display:flex;align-items:center;gap:14px;padding:16px 22px 30px">
+      <div style="display:flex;align-items:center;gap:14px;padding:16px 22px max(30px, calc(var(--sb,0px) + 10px))">
         <button onclick="closePractice()" aria-label="Close practice" style="background:none;border:none;color:#fff;cursor:pointer;flex:none;display:flex;align-items:center;padding:4px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
         <div id="pc-dots" style="flex:1;display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap"></div>
         <button id="pc-finish" onclick="completePractice()" aria-label="Complete" style="flex:none;width:30px;height:30px;border-radius:50%;border:none;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;cursor:pointer;visibility:hidden"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#222" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
