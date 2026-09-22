@@ -1033,7 +1033,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260922-audio5';
+const APP_BUILD='20260922-audio6';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -1219,10 +1219,10 @@ function rSettingsModal(){
       <div class="ct"><span class=i-gear></span>App &amp; data</div>
       <div style="font-size:12px;color:var(--sub);margin-bottom:8px;line-height:1.5">Build <b style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">${APP_BUILD}</b></div>
       <button class="btn btn-s btn-sm btn-f" style="color:var(--blue)" onclick="forceUpdate()">⬇️ Force update</button>
-      <details style="margin-top:10px" ontoggle="if(this.open){var l=[];try{l=JSON.parse(lsGet('_audLog','[]'))||[]}catch(e){};document.getElementById('aud-log').textContent=l.length?l.join('\n'):'Nothing recorded yet. Start some music, then come back here.';}">
+      <details style="margin-top:10px" ontoggle="if(this.open)audLogShow()">
         <summary style="font-size:12px;color:var(--sub);cursor:pointer;padding:6px 0;font-weight:600">Audio diagnostics</summary>
-        <pre id="aud-log" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9.5px;line-height:1.35;white-space:pre-wrap;word-break:break-all;background:var(--surface2);border-radius:8px;padding:8px;max-height:260px;overflow:auto;margin:6px 0"></pre>
-        <div style="display:flex;gap:8px"><button class="btn btn-s btn-sm" style="flex:1" onclick="try{navigator.clipboard.writeText(document.getElementById('aud-log').textContent);showToast('Copied');}catch(e){}">Copy</button><button class="btn btn-s btn-sm" style="flex:1" onclick="lsSet('_audLog','[]');document.getElementById('aud-log').textContent='Cleared.';">Clear</button></div>
+        <pre id="aud-log" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9.5px;line-height:1.35;white-space:pre-wrap;word-break:break-all;-webkit-user-select:text;user-select:text;background:var(--surface2);border-radius:8px;padding:8px;max-height:260px;overflow:auto;margin:6px 0"></pre>
+        <div style="display:flex;gap:8px"><button class="btn btn-s btn-sm" style="flex:1" onclick="audLogCopy()">Copy</button><button class="btn btn-s btn-sm" style="flex:1" onclick="audLogClear()">Clear</button></div>
       </details>
       <div style="font-size:11px;color:var(--sub);margin-top:5px;line-height:1.4">Use this if the app seems stuck on an old version — it clears the cache and re-downloads. Your data isn't touched.</div>
       <details style="margin-top:10px">
@@ -11904,6 +11904,22 @@ function _aud(m){
   }catch(e){}
 }
 window._aud=_aud;
+function audLogShow(){
+  var l=[];try{l=JSON.parse(lsGet('_audLog','[]'))||[];}catch(e){}
+  var el=document.getElementById('aud-log'); if(!el)return;
+  el.textContent=l.length?('Build '+APP_BUILD+String.fromCharCode(10)+l.join(String.fromCharCode(10))):'Nothing recorded yet. Start some music, then come back here.';
+}
+function audLogCopy(){
+  var el=document.getElementById('aud-log'); if(!el)return; var t=el.textContent||'';
+  var done=function(){showToast('Copied');};
+  var fallback=function(){
+    try{var ta=document.createElement('textarea');ta.value=t;ta.setAttribute('readonly','');ta.style.cssText='position:fixed;top:0;left:0;opacity:0';document.body.appendChild(ta);ta.select();ta.setSelectionRange(0,t.length);var ok=document.execCommand('copy');ta.remove();if(ok){done();return;}}catch(e){}
+    showToast('Copy is blocked here. Take a screenshot of the log instead.');
+  };
+  try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(done,fallback); return; } }catch(e){}
+  fallback();
+}
+function audLogClear(){ lsSet('_audLog','[]'); var el=document.getElementById('aud-log'); if(el) el.textContent='Cleared. Now go start the music.'; }
 function _audEl(el,tag){
   if(!el||el.__audWired)return; el.__audWired=true;
   ['loadstart','canplay','play','playing','waiting','stalled','pause','ended','abort','emptied','error'].forEach(function(ev){
