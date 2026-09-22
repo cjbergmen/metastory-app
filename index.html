@@ -1033,7 +1033,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260922-audio6';
+const APP_BUILD='20260922-audio7';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -12013,6 +12013,7 @@ function _musSwap(toB){
 }
 function musPlay(i){
   const tr=MUSIC_ALBUM.tracks[i];if(!tr)return;
+  _mus._startAt=Date.now();
   _aud('musPlay '+i+' '+tr.t+' native='+_musNative()+' sessOn='+!!_mus._sessOn+' hidden='+document.hidden);
   if(!document.hidden)_mus.useB=false;
   const a=_musCur();
@@ -12109,6 +12110,7 @@ function musToggle(){
   }else{
     if(!document.hidden&&_mus.useB){ try{_musSwap(false);}catch(e){} }
     const c=_musCur();
+    _mus._startAt=Date.now();
     c.play().catch(function(){});_mus.playing=true;_mus.wantPlay=true;
   }
   try{_musPaint();}catch(e){}
@@ -15478,6 +15480,9 @@ window.addEventListener('metastory:remote-command', function(e){
       if(!playing) musToggle();
       break;
     case 'pause':
+      // iOS fires a stray pause the instant playback starts (session hand-off).
+      // Ignore it for 2s after we start music while the app is on screen.
+      if(!document.hidden && Date.now()-(_mus._startAt||0)<2000){ try{_aud('ignored stray pause');}catch(err){} break; }
       if(playing) musToggle();
       break;
     case 'next':
