@@ -1033,7 +1033,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260922-audio4';
+const APP_BUILD='20260922-audio5';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -1219,6 +1219,11 @@ function rSettingsModal(){
       <div class="ct"><span class=i-gear></span>App &amp; data</div>
       <div style="font-size:12px;color:var(--sub);margin-bottom:8px;line-height:1.5">Build <b style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">${APP_BUILD}</b></div>
       <button class="btn btn-s btn-sm btn-f" style="color:var(--blue)" onclick="forceUpdate()">⬇️ Force update</button>
+      <details style="margin-top:10px" ontoggle="if(this.open){var l=[];try{l=JSON.parse(lsGet('_audLog','[]'))||[]}catch(e){};document.getElementById('aud-log').textContent=l.length?l.join('\n'):'Nothing recorded yet. Start some music, then come back here.';}">
+        <summary style="font-size:12px;color:var(--sub);cursor:pointer;padding:6px 0;font-weight:600">Audio diagnostics</summary>
+        <pre id="aud-log" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9.5px;line-height:1.35;white-space:pre-wrap;word-break:break-all;background:var(--surface2);border-radius:8px;padding:8px;max-height:260px;overflow:auto;margin:6px 0"></pre>
+        <div style="display:flex;gap:8px"><button class="btn btn-s btn-sm" style="flex:1" onclick="try{navigator.clipboard.writeText(document.getElementById('aud-log').textContent);showToast('Copied');}catch(e){}">Copy</button><button class="btn btn-s btn-sm" style="flex:1" onclick="lsSet('_audLog','[]');document.getElementById('aud-log').textContent='Cleared.';">Clear</button></div>
+      </details>
       <div style="font-size:11px;color:var(--sub);margin-top:5px;line-height:1.4">Use this if the app seems stuck on an old version — it clears the cache and re-downloads. Your data isn't touched.</div>
       <details style="margin-top:10px">
         <summary style="font-size:12px;color:var(--sub);cursor:pointer;padding:6px 0;font-weight:600">Advanced</summary>
@@ -11890,10 +11895,41 @@ function _musWire(el){
 // cuts Web-Audio-routed sound in the background, and juggling two elements to
 // dodge that is what caused silent starts, a dead lock-screen panel and double
 // playback. The filter stays on the website.
+function _aud(m){
+  try{
+    const log=JSON.parse(lsGet('_audLog','[]'))||[];
+    const d=new Date(); const ts=d.toTimeString().slice(0,8)+'.'+String(d.getMilliseconds()).padStart(3,'0');
+    log.push(ts+' '+m); while(log.length>60) log.shift();
+    lsSet('_audLog',JSON.stringify(log));
+  }catch(e){}
+}
+window._aud=_aud;
+function _audEl(el,tag){
+  if(!el||el.__audWired)return; el.__audWired=true;
+  ['loadstart','canplay','play','playing','waiting','stalled','pause','ended','abort','emptied','error'].forEach(function(ev){
+    el.addEventListener(ev,function(){
+      let x=''; if(ev==='error'&&el.error) x=' code='+el.error.code+' '+(el.error.message||'');
+      _aud(tag+' '+ev+x+' t='+(el.currentTime||0).toFixed(1)+' rs='+el.readyState+' ns='+el.networkState);
+    });
+  });
+}
+// play() with its result recorded, retried a few times if iOS refuses it.
+function _musTryPlay(el,why,n){
+  n=n||0;
+  try{
+    const p=el.play();
+    _aud('play() '+why+' #'+n);
+    if(p&&p.then) p.then(function(){ _aud('play() ok '+why); }).catch(function(e){
+      _aud('play() FAILED '+why+' '+(e&&e.name)+': '+(e&&e.message||'').slice(0,60));
+      if(n<3 && _mus.wantPlay && _mus.idx>=0) setTimeout(function(){ if(_mus.wantPlay&&el.paused) _musTryPlay(el,why,n+1); },400*(n+1));
+    });
+  }catch(e){ _aud('play() threw '+(e&&e.name)); }
+}
 function _musNative(){try{return !!(window.Metastory&&window.Metastory.isNative);}catch(e){return false;}}
 function _musEl(){
   if(_mus.a)return _mus.a;
   const a=new Audio();
+  _audEl(a,'A');
   _musWire(a);
   // Save partial listening time if the app is backgrounded or closed
   document.addEventListener('visibilitychange',function(){if(document.hidden)_musLogFlush();});
@@ -11961,6 +11997,7 @@ function _musSwap(toB){
 }
 function musPlay(i){
   const tr=MUSIC_ALBUM.tracks[i];if(!tr)return;
+  _aud('musPlay '+i+' '+tr.t+' native='+_musNative()+' sessOn='+!!_mus._sessOn+' hidden='+document.hidden);
   if(!document.hidden)_mus.useB=false;
   const a=_musCur();
   _musLogFlush();
@@ -11977,13 +12014,14 @@ function musPlay(i){
   // offline about half the time.
   if(_musNative() && !_mus._sessOn){
     let started=false;
-    const go=function(){ if(started)return; started=true; if(_mus.idx===i && _mus.wantPlay!==false){ a.play().catch(function(){}); } };
+    const go=function(via){ if(started)return; started=true; _aud('start via '+via); if(_mus.idx===i && _mus.wantPlay!==false){ _musTryPlay(a,'start'); } };
     try{
-      window.Metastory.audio.activate().then(function(){ _mus._sessOn=true; setTimeout(go,150); }).catch(function(){ go(); });
-    }catch(e){ go(); }
-    setTimeout(go,1200);   // never wait on the bridge for longer than this
+      _aud('activate()');
+      window.Metastory.audio.activate().then(function(r){ _aud('activate ok '+JSON.stringify(r)); _mus._sessOn=true; setTimeout(function(){go('session');},150); }).catch(function(e){ _aud('activate FAILED '+(e&&e.message||e)); go('activate-failed'); });
+    }catch(e){ _aud('activate threw'); go('activate-threw'); }
+    setTimeout(function(){go('timeout');},1200);   // never wait on the bridge for longer than this
   } else {
-    a.play().catch(function(){});
+    _musTryPlay(a,'start');
   }
   // Show it as playing straight away (the file can take a few seconds to
   // arrive), and if iOS drops the start (it can while the audio session is
@@ -11996,7 +12034,8 @@ function musPlay(i){
       if(_mus.idx!==i || !_mus.wantPlay) return;
       const el=_musCur();
       const stuck = !el.paused && el.readyState>=3 && _t0!==null && el.currentTime===_t0;
-      if(el.paused || stuck){ try{ if(stuck) el.pause(); }catch(e){} el.play().catch(function(){}); _mus.playing=true; _musPaint(); }
+      _aud('check '+ms+'ms paused='+el.paused+' t='+(el.currentTime||0).toFixed(1)+' rs='+el.readyState+(stuck?' STUCK':''));
+      if(el.paused || stuck){ try{ if(stuck) el.pause(); }catch(e){} _musTryPlay(el,'retry'+ms); _mus.playing=true; _musPaint(); }
       _t0=el.currentTime;
     }catch(e){}
   },ms);});
@@ -12041,6 +12080,7 @@ function _musReconcile(){
   if(on!==_mus.playing){ _mus.playing=on; if(on)_mus.lastTick=Date.now(); try{_musPaint();}catch(e){} }
 }
 function musToggle(){
+  _aud('toggle playing='+_mus.playing);
   if(_mus.idx<0){musPlay(0);return;}
   _musReconcile();
   const a=_musCur();
@@ -12058,6 +12098,7 @@ function musToggle(){
   try{_musPaint();}catch(e){}
 }
 document.addEventListener('visibilitychange',function(){
+  _aud(document.hidden?'app hidden':'app visible');
   if(document.hidden)return;
   [300,1200,2500].forEach(function(ms){setTimeout(_musReconcile,ms);});
 });
@@ -12074,7 +12115,7 @@ function musClose(){
   _mus.timerEnd=0;_mus.timerMin=0;_mus.timerEOT=false;
   try{a.volume=1;}catch(e){}
   try{if(_flt.ctx&&_flt.gain){_flt.gain.gain.cancelScheduledValues(_flt.ctx.currentTime);_flt.gain.gain.setValueAtTime(1,_flt.ctx.currentTime);}}catch(e){}
-  _mus.idx=-1;_mus.playing=false;_mus.wantPlay=false;_mus._sessOn=false;
+  _aud('close');_mus.idx=-1;_mus.playing=false;_mus.wantPlay=false;_mus._sessOn=false;
   try{playerSheetClose();}catch(e){}
   _musPaint();
   if(typeof curPage!=='undefined'&&curPage==='rest')rRest();
@@ -12994,9 +13035,14 @@ function _practicePage(kind,opts){
     return wrap(overline+body(opts.text||''));
   }
   if(kind==='steps'){
-    const list=(opts.steps||[]).map((s,i)=>`<div style="display:flex;gap:14px;margin-bottom:17px">
+    // The practice timer lives beside the step that sets the duration
+    // ("Continue for 5 minutes"), or the last step if none names one.
+    const _st=opts.steps||[];
+    let _slot=-1; _st.forEach((t,i)=>{ if(/\d+\s*(min|minute)/i.test(String(t))) _slot=i; });
+    if(_slot<0) _slot=_st.length-1;
+    const list=_st.map((s,i)=>`<div style="display:flex;gap:14px;margin-bottom:17px">
       <div style="flex:none;width:27px;height:27px;border-radius:50%;border:1.5px solid rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;font-family:var(--font-sans);font-size:13px;font-weight:600;color:#fff;margin-top:3px">${i+1}</div>
-      <div style="${SERIF};font-size:20px;font-weight:400;line-height:1.5;flex:1;text-shadow:0 1px 12px rgba(0,0,0,.22)">${s}</div></div>`).join('');
+      <div style="${SERIF};font-size:20px;font-weight:400;line-height:1.5;flex:1;text-shadow:0 1px 12px rgba(0,0,0,.22)">${s}${i===_slot?'<div class="pc-timer-slot" style="margin-top:12px"></div>':''}</div></div>`).join('');
     const overline=`<div style="font-family:var(--font-sans);font-size:11px;text-transform:uppercase;letter-spacing:.11em;color:rgba(255,255,255,.8);margin-bottom:22px">How to</div>`;
     return wrap(overline+list,150);
   }
@@ -13089,7 +13135,11 @@ function _pcTimerInit(act){
   const secs=_practiceDurSecs(act&&act.dur);
   _pcTimer={secs:secs||0,left:secs||0,running:false,id:null,end:0};
   const el=document.getElementById('pc-timer');
-  if(el) el.style.display=secs?'inline-flex':'none';
+  if(el){
+    const slot=document.querySelector('#practice-overlay .pc-timer-slot');
+    if(slot && secs){ el.style.position='static'; el.style.top='auto'; el.style.right='auto'; slot.appendChild(el); }
+    el.style.display=secs?'inline-flex':'none';
+  }
   _pcTimerPaint();
 }
 function _pcTimerPaint(){
@@ -15401,6 +15451,7 @@ setInterval(function(){
 
 window.addEventListener('metastory:remote-command', function(e){
   var detail = e.detail || {};
+  try{ _aud('native cmd '+detail.command); }catch(err){}
   var playing = !!(_mus && _mus.playing);
 
   switch(detail.command){
