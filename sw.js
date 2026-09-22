@@ -1,4 +1,4 @@
-const VERSION = '20260915-fdnlens';
+const VERSION = '20260922-audio5';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
