@@ -1033,7 +1033,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260923-fit1';
+const APP_BUILD='20260923-fit2';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -4389,14 +4389,14 @@ function _weekSourcePlan(){
 // Shared controls row for the Exercise page (workout and rest-day views).
 // When a one-week adjustment is active, offer an instant "Back to my plan".
 function _planControlsHTML(){
-    const link='font-size:11px;color:var(--sub);text-decoration:underline;cursor:pointer;white-space:nowrap';
-    // No dot separators: the row wraps on a narrow phone, and a dot stranded at the
-    // end of a line looked like a mistake. Spacing comes from the row's gap.
-    let h='<span onclick="openWoBuilder()" style="'+link+'">+ Build</span>'
-         +'<span onclick="openPlanEditor()" style="'+link+'">Edit my week</span>'
-         +'<span onclick="openMoveDay()" style="'+link+'">Move a day</span>'
+    const link='font-size:10.5px;color:var(--sub);text-decoration:underline;cursor:pointer;white-space:nowrap';
+    // One line, one colour, no separators: the row spreads itself across the card
+    // with space-between, and the labels are short enough to fit the narrowest phone.
+    let h='<span onclick="openWoBuilder()" style="'+link+'">Build</span>'
+         +'<span onclick="openPlanEditor()" style="'+link+'">Edit week</span>'
+         +'<span onclick="openMoveDay()" style="'+link+'">Move day</span>'
          +'<span onclick="openShiftWeek()" style="'+link+'">Shift week</span>';
-    if(_hasWeekAdjust()) h+='<span onclick="clearWeekAdjust()" style="font-size:11px;color:var(--orange);font-weight:700;text-decoration:underline;cursor:pointer;white-space:nowrap">↩ Back to my plan</span>';
+    if(_hasWeekAdjust()) h+='<span onclick="clearWeekAdjust()" style="'+link+'">Back to plan</span>';
     return h;
 }
 // ── SAVED-PLAN EDITING (durable) ──────────────────────────────────────────────
@@ -4560,7 +4560,8 @@ function rWorkout(){
       <span class="kicker">Today · Recovery</span>
       <h3>Rest day</h3>
       <p>Movement heals only when the body can afford it. Today is for walking, mobility, and contrast therapy — under-recovery is when progress quietly stalls.</p></div>
-      <div class="card"><div style="display:flex;align-items:center;justify-content:space-between"><div class="ct">${splitTitle}${_hasWeekAdjust()?' <span style="font-size:10px;color:var(--orange);font-weight:700">· adjusted this week</span>':''}</div><span style="margin-left:8px;display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:5px 13px;min-width:0">${_planControlsHTML()}</span></div>`;
+      <div class="card"><div class="ct">${splitTitle}${_hasWeekAdjust()?' <span style="font-size:10px;color:var(--orange);font-weight:700">· adjusted this week</span>':''}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin:8px 0 10px;min-width:0">${_planControlsHTML()}</div>`;
     activeDays.forEach(d=>{
       const w=weekWO[d];
       if(!w)return;
@@ -4600,7 +4601,7 @@ function rWorkout(){
     </div>`;
   }
   h+=_exHeroBlock(wo);
-  h+=`<div style="display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:5px 13px;margin:-4px 3px 8px">${_planControlsHTML()}</div>`;
+  h+=`<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin:-2px 3px 10px;min-width:0">${_planControlsHTML()}</div>`;
   if(wo.info){
     const inf=wo.info;
     h+=`<div class="wo-info-wrap" id="wic-today" onclick="flipWOCard('wic-today',event)">
