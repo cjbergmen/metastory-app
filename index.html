@@ -1033,7 +1033,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260923-fit2';
+const APP_BUILD='20260923-wr1';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -5806,22 +5806,31 @@ async function runWeeklyReview(){
     let profile={};try{profile=JSON.parse(lsGet('_userProfile','{}'))||{};}catch(e){}
     const st=pr.stats;
     const fx=pickWeeklyFocus(pr);
-    const prompt=`You are a trauma-informed functional health coach writing a short weekly note to a client. Warm, specific, encouraging — never shaming. Never mention AI, models, or data systems; write as their coach. Their goal: ${pr.goalLabel}. Stress: ${profile.stress||'unknown'}. Sleep: ${profile.sleep||'unknown'}.
-
-${WHOLE_BODY_LENS}
+    // Two short lists, not a paragraph. Every line has to earn its place: a number
+    // from the week, or the specific thing to change. No pep talk, no assessments.
+    const prompt=`You are this client's functional health coach. Their goal: ${pr.goalLabel}.
 
 THIS WEEK'S FOCUS: ${fx.focus.label} — ${fx.focus.line}
 ${fx.quick?'QUICK WIN: '+fx.quick.label+' — '+fx.quick.line:''}
 
-7-DAY DATA (score 0-100, trend = last half vs prior half of each category's history):
+7-DAY DATA (score 0-100, trend = last half vs prior half):
 - Overall: ${pr.overall}/100 (${pr.label}, ${pr.trendLabel})
 ${pr.cats.map(c=>'- '+c.label+': '+(c.score===null?'no data yet':c.score+'/100, trend '+(c.trend>0?'+':'')+c.trend)+' ('+c.detail+')').join('\n')}
-${st.ns?'- Nervous system assessment: '+JSON.stringify(st.ns)+'\n':''}${st.gut?'- Gut assessment: '+JSON.stringify(st.gut)+'\n':''}${st.aa?'- Amino acid assessment: taken\n':''}(Only reference an assessment if its result is listed above. Never mention or nudge assessments the client hasn't taken.)
 
-Write ONE single paragraph (4-6 sentences) that expands on the focus and quick win above: name a genuine win from the data, then make the focus and quick win feel doable and worth it this week. When you point to the focus habit, include a brief why that connects it to their whole-body/metabolic health (one short clause, e.g. "hydration helps digestion and recovery by…") so they feel how this one piece supports the whole. No lists, no headers.
+Write two short lists from that data.
+STRENGTHS: 2-3 items. What actually went well, each tied to a number or streak from the week.
+OPPORTUNITIES: 2-3 items. The specific change worth making, each naming what to do, not just what is low.
+
+RULES
+- Each item is ONE line, 12 words or fewer. No sentences that just restate the score.
+- Lead with the thing itself ("Hydration 5 of 7 days"), not with "You" or "Your".
+- Be concrete: days, counts, times, amounts. No praise words, no encouragement, no filler.
+- Never repeat the same category in both lists, and never repeat an item.
+- Never mention assessments, quizzes, apps, data, tracking, AI, or this review itself.
+- A category with no data is left out entirely — never mention missing data.
 
 Respond ONLY with valid JSON, no markdown:
-{"paragraph":"the single paragraph","adjustPlan":false,"adjustReason":"only if adjustPlan is true: one sentence on why their plan should be rebuilt"}`;
+{"strengths":["item","item"],"opportunities":["item","item"],"adjustPlan":false,"adjustReason":"only if adjustPlan is true: one sentence on why their plan should be rebuilt"}`;
     const res=await fetch(`${GEMINI_WORKER_URL}/gemini-2.5-flash`,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.4,maxOutputTokens:2000,thinkingConfig:{thinkingBudget:0}}})
@@ -5835,8 +5844,16 @@ Respond ONLY with valid JSON, no markdown:
       const raw=data?.candidates?.[0]?.content?.parts?.map(pt=>pt.text||'').join('')||'';
       const jm=raw.match(/\{[\s\S]*\}/);
       const out=jm?JSON.parse(jm[0]):null;
-      if(out&&(out.paragraph||out.statement)){
-        const rec={ts:Date.now(),paragraph:out.paragraph||out.statement,adjustPlan:!!out.adjustPlan,adjustReason:out.adjustReason||'',overall:pr.overall};
+      const _clean=function(a){
+        if(!Array.isArray(a))return [];
+        const seen={};
+        return a.map(function(x){return String(x||'').replace(/^[-•\s]+/,'').trim();})
+          .filter(function(x){ if(!x||x.length>140)return false; const k=x.toLowerCase(); if(seen[k])return false; seen[k]=1; return true; })
+          .slice(0,3);
+      };
+      if(out&&(_clean(out.strengths).length||_clean(out.opportunities).length||out.paragraph||out.statement)){
+        const rec={ts:Date.now(),strengths:_clean(out.strengths),opportunities:_clean(out.opportunities),paragraph:'',adjustPlan:!!out.adjustPlan,adjustReason:out.adjustReason||'',overall:pr.overall};
+        if(!rec.strengths.length&&!rec.opportunities.length) rec.paragraph=out.paragraph||out.statement||'';
         lsSet('_aiWeekly',JSON.stringify(rec));
         try{fbSyncSettings();}catch(e){}
       }else{
@@ -5850,15 +5867,19 @@ Respond ONLY with valid JSON, no markdown:
 function rAIWeeklyCard(){
   const r=getAIWeekly();
   const para=r?(r.paragraph||r.statement||''):'';
+  const _list=function(title,items){
+    if(!items||!items.length)return '';
+    return '<div style="margin-bottom:13px"><div style="font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--sub);margin-bottom:6px">'+title+'</div>'
+      + items.map(function(x){return '<div style="display:flex;gap:8px;font-size:14px;line-height:1.5;margin-bottom:5px"><span style="color:var(--sub);opacity:.5">·</span><span>'+x+'</span></div>';}).join('')
+      + '</div>';
+  };
+  const lists=r?(_list('Strengths',r.strengths)+_list('Opportunities',r.opportunities)):'';
   return `<div class="card" style="margin-bottom:14px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <div class="ct" style="padding:0;margin:0">Weekly Review</div>
-      ${r?`<div style="font-size:11px;color:var(--sub)">${new Date(r.ts).toLocaleDateString()}</div>`:''}
-    </div>
+    ${r?`<div style="font-size:11px;color:var(--sub);margin-bottom:10px">${new Date(r.ts).toLocaleDateString()}</div>`:''}
     ${_aiWeeklyLoading?`<div style="font-size:15px;color:var(--sub);padding:6px 0">Reviewing your last 7 days…</div>`:
-      r?`<div style="font-size:15px;line-height:1.65;margin-bottom:10px">${para}</div>
+      r?`${lists||`<div style="font-size:15px;line-height:1.65;margin-bottom:10px">${para}</div>`}
       ${r.adjustPlan?`<button class="btn btn-g btn-sm btn-f" style="margin-bottom:6px" onclick="showWizard(true)">Update My Plan</button>`:''}`:
-      `<div style="font-size:15px;color:var(--sub);line-height:1.55;margin-bottom:10px">A short note on your progress, refreshed each week from your last 7 days.</div>`}
+      `<div style="font-size:15px;color:var(--sub);line-height:1.55;margin-bottom:10px">What's working and what to change, from your last 7 days.</div>`}
     ${_aiWeeklyErrMsg?`<div style="font-size:12px;color:var(--red);line-height:1.5;margin-bottom:8px">${_aiWeeklyErrMsg}</div>`:''}
     ${_aiWeeklyLoading?'':`<button onclick="runWeeklyReview()" style="background:none;border:none;color:var(--sub);font-size:12px;cursor:pointer;text-decoration:underline;padding:2px 0">${r?'Refresh review':'Run first review'}</button>`}
   </div>`;
