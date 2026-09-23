@@ -104,6 +104,24 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .btn-o{background:transparent;color:var(--green);border:1.5px solid var(--green)}
 .btn-b{background:var(--blue);color:var(--text)}
 .btn-f{width:100%}
+/* Settings is a stack of collapsed sections: title left, chevron right, one
+   accent colour throughout. Everything opens only if you ask for it. */
+.set-sec{border:1px solid var(--border);border-radius:var(--rs);background:var(--surface);margin-bottom:8px;overflow:hidden}
+.set-sec>summary{list-style:none;cursor:pointer;padding:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14px;font-weight:600;color:var(--text)}
+.set-sec>summary::-webkit-details-marker{display:none}
+.set-sec>summary::marker{content:''}
+.set-sec>summary .set-chev{width:7px;height:7px;border-right:1.6px solid var(--sub);border-bottom:1.6px solid var(--sub);transform:rotate(-45deg);transition:transform .18s;flex:0 0 auto;margin-right:3px}
+.set-sec[open]>summary .set-chev{transform:rotate(45deg)}
+.set-sec>summary .set-note{font-size:11.5px;color:var(--sub);font-weight:500;margin-left:auto;text-align:right}
+.set-body{padding:0 14px 14px}
+.set-body .btn-s{color:var(--blue)}
+.set-body .btn-s.set-danger{color:var(--red)}
+.set-sub{margin-top:10px;border-top:1px solid var(--border);padding-top:4px}
+.set-sub>summary{list-style:none;cursor:pointer;padding:8px 0;font-size:12.5px;font-weight:600;color:var(--blue);display:flex;align-items:center;justify-content:space-between}
+.set-sub>summary::-webkit-details-marker{display:none}
+.set-sub>summary::marker{content:''}
+.set-sub>summary .set-chev{width:6px;height:6px;border-right:1.5px solid var(--blue);border-bottom:1.5px solid var(--blue);transform:rotate(-45deg);transition:transform .18s;flex:0 0 auto;margin-right:3px}
+.set-sub[open]>summary .set-chev{transform:rotate(45deg)}
 .btn-sm{padding:9px 14px;font-size:13px}
 .wg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin:12px 0}
 .wb{padding:13px 8px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--blue);font-size:14px;font-weight:700;cursor:pointer;text-align:center}
@@ -1033,7 +1051,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260923-wr1';
+const APP_BUILD='20260923-set1';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -1137,24 +1155,27 @@ function rSettingsModal(){
   const h = document.getElementById('settings-body');
   if(!h) return;
   const _who = fbUser ? (fbUser.displayName || fbUser.email || 'your account') : '';
+  const sec = (title, note, inner, id) => `<details class="set-sec"${id?' id="'+id+'"':''}>
+      <summary><span>${title}</span>${note?`<span class="set-note">${note}</span>`:''}<span class="set-chev"></span></summary>
+      <div class="set-body">${inner}</div>
+    </details>`;
+  const _supps=(()=>{try{return _suppPlan().length;}catch(e){return 0;}})();
   h.innerHTML = `
-    <div class="card" id="set-account" style="margin-bottom:10px">
-      <div class="ct"><span class=i-user></span>Account</div>
+    ${sec('Account', fbUser?'Signed in':'Signed out', `
       <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Signing in keeps your logs, plan and reflections on every device you use.</div>
-      <div id="settings-sync-status" style="font-size:13px;font-weight:600;margin-bottom:10px;color:${fbUser?'var(--green)':'var(--sub)'}">
-        ${fbUser ? '✅ Signed in as '+_who : '⚪ Not signed in'}
+      <div id="settings-sync-status" style="font-size:13px;font-weight:600;margin-bottom:10px;color:${fbUser?'var(--text)':'var(--sub)'}">
+        ${fbUser ? 'Signed in as '+_who : 'Not signed in'}
       </div>
       <div id="set-account-native"></div>
-      <button id="settings-auth-btn" class="btn ${fbUser?'btn-s':'btn-g'} btn-sm btn-f" onclick="handleUserMenuAuth()">${fbUser?'Sign Out':'<span class=i-key></span> Sign In with Google'}</button>
-    </div>
+      <button id="settings-auth-btn" class="btn ${fbUser?'btn-s':'btn-g'} btn-sm btn-f" onclick="handleUserMenuAuth()">${fbUser?'Sign out':'Sign in with Google'}</button>
+    `, 'set-account')}
 
-    <div class="card" style="margin-bottom:10px">
-      <div class="ct"><span class=i-pencil></span>My plan</div>
+    ${sec('My plan', '', `
       <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Rebuild your workout plan and nutrition targets, or walk through the app again.</div>
-      <button class="btn btn-s btn-sm btn-f" style="color:var(--purple)" onclick="closeSettings();showWizard(true)"><span class=i-pencil></span> Rebuild my plan</button>
-      <button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--green)" onclick="closeSettings();setTimeout(function(){startTour();},260)"><span class=i-compass></span> Replay the walkthrough</button>
-      <details style="margin-top:10px">
-        <summary style="font-size:12px;color:var(--sub);cursor:pointer;padding:6px 0;font-weight:600"><span class=i-target></span> Edit my nutrition targets</summary>
+      <button class="btn btn-s btn-sm btn-f" onclick="closeSettings();showWizard(true)">Rebuild my plan</button>
+      <button class="btn btn-s btn-sm btn-f" style="margin-top:8px" onclick="closeSettings();setTimeout(function(){startTour();},260)">Replay the walkthrough</button>
+      <details class="set-sub">
+        <summary><span>Edit my nutrition targets</span><span class="set-chev"></span></summary>
         ${(()=>{
           let t={train:{p:150,c:200,f:65,k:2100,w:90},rest:{p:125,c:160,f:55,k:1750,w:75}};
           try{const s=lsGet('_userTargets','');if(s){const u=JSON.parse(s);if(u&&u.train&&u.rest)t=u;}}catch(e){}
@@ -1168,7 +1189,7 @@ function rSettingsModal(){
           return `
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0 12px">
             <div>
-              <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px"><span class=i-dumbbell></span> Training day</div>
+              <div style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Training day</div>
               ${row('Protein','nt-tr-p',t.train.p,'g')}
               ${row('Carbs','nt-tr-c',t.train.c,'g')}
               ${row('Fat','nt-tr-f',t.train.f,'g')}
@@ -1176,7 +1197,7 @@ function rSettingsModal(){
               ${row('Water','nt-tr-w',t.train.w,'oz')}
             </div>
             <div>
-              <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">😴 Rest day</div>
+              <div style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Rest day</div>
               ${row('Protein','nt-rs-p',t.rest.p,'g')}
               ${row('Carbs','nt-rs-c',t.rest.c,'g')}
               ${row('Fat','nt-rs-f',t.rest.f,'g')}
@@ -1184,65 +1205,63 @@ function rSettingsModal(){
               ${row('Water','nt-rs-w',t.rest.w,'oz')}
             </div>
           </div>
-          <div id="nt-save-msg" style="font-size:12px;color:var(--green);font-weight:600;min-height:18px;margin-bottom:6px;text-align:center"></div>
-          <button class="btn btn-g btn-sm btn-f" onclick="saveNutritionTargets()"><span class=i-save></span> Save targets</button>
-          <button class="btn btn-s btn-sm btn-f" style="color:var(--sub);margin-top:8px" onclick="recalcTargetsFromProfile()">Recalculate from my profile</button>
+          <div id="nt-save-msg" style="font-size:12px;color:var(--text);font-weight:600;min-height:18px;margin-bottom:6px;text-align:center"></div>
+          <button class="btn btn-g btn-sm btn-f" onclick="saveNutritionTargets()">Save targets</button>
+          <button class="btn btn-s btn-sm btn-f" style="margin-top:8px" onclick="recalcTargetsFromProfile()">Recalculate from my profile</button>
           <div style="font-size:11px;color:var(--sub);line-height:1.5;margin-top:8px">These are a starting point. Let how you feel 90 minutes to 2 hours after eating be the real guide — steady means the ratio fits; foggy or hungry means adjust.</div>`;
         })()}
       </details>
-    </div>
+    `)}
 
-    <div class="card" style="margin-bottom:10px">
-      <div class="ct">Health &amp; safety flags</div>
+    ${(()=>{
+      let f=[];try{f=JSON.parse(lsGet('_detFlags','[]'))||[];}catch(e){}
+      const opts=[['pregnant','Pregnant / nursing'],['cancer','Cancer (current or history)'],['ppi','Reflux meds, ulcer, or regular NSAIDs'],['antidepressant','Antidepressant / mood medication'],['bp','Blood pressure condition'],['virus','Latent virus (EBV, shingles, Lyme)'],['bloodthinner','Blood thinners / upcoming surgery'],['diabetes','Diabetes on medication'],['minor','Under 18']];
+      const chips='<div style="display:flex;flex-wrap:wrap;gap:7px">'+opts.map(([k,l])=>{const on=f.includes(k);return '<button onclick="toggleDetFlag(\''+k+'\')" style="font-size:12px;font-weight:600;padding:8px 12px;border-radius:999px;border:1.5px solid '+(on?'var(--blue)':'var(--border)')+';background:'+(on?'rgba(122,154,171,.14)':'var(--surface2)')+';color:'+(on?'var(--blue)':'var(--sub)')+';cursor:pointer">'+l+'</button>';}).join('')+'</div>';
+      return sec('Health &amp; safety flags', f.length?f.length+' set':'', `
       <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">These let the Health Detective and supplement guidance keep your practitioner in the loop where it matters. Private to your account — tap any that apply to you.</div>
-      ${(()=>{
-        let f=[];try{f=JSON.parse(lsGet('_detFlags','[]'))||[];}catch(e){}
-        const opts=[['pregnant','Pregnant / nursing'],['cancer','Cancer (current or history)'],['ppi','Reflux meds, ulcer, or regular NSAIDs'],['antidepressant','Antidepressant / mood medication'],['bp','Blood pressure condition'],['virus','Latent virus (EBV, shingles, Lyme)'],['bloodthinner','Blood thinners / upcoming surgery'],['diabetes','Diabetes on medication'],['minor','Under 18']];
-        return '<div style="display:flex;flex-wrap:wrap;gap:7px">'+opts.map(([k,l])=>{const on=f.includes(k);return '<button onclick="toggleDetFlag(\''+k+'\')" style="font-size:12px;font-weight:600;padding:8px 12px;border-radius:999px;border:1.5px solid '+(on?'var(--green)':'var(--border)')+';background:'+(on?'rgba(171,108,82,.12)':'var(--surface2)')+';color:'+(on?'var(--green)':'var(--sub)')+';cursor:pointer">'+l+'</button>';}).join('')+'</div>';
-      })()}
-    </div>
+      ${chips}`);
+    })()}
 
-    <div class="card" style="margin-bottom:10px">
-      <div class="ct"><span class=i-pill></span>Supplements</div>
+    ${sec('Supplements', _supps?_supps+' configured':'', `
       <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Add supplements from Fullscript or anywhere else, then track them on the Today tab.</div>
-      ${(()=>{const s=_suppPlan();return s.length?`<div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:8px">${s.length} supplement${s.length===1?'':'s'} configured</div>`:'';})()}
-      <button class="btn btn-s btn-sm btn-f" style="color:var(--blue)" onclick="closeSettings();openSuppModal()"><span class=i-pill></span> Manage supplements</button>
-      <details style="margin-top:10px">
-        <summary style="font-size:12px;color:var(--sub);cursor:pointer;padding:6px 0;font-weight:600">🩺 I have a report code from my practitioner</summary>
-        ${lsGet('_practitionerReport',null) ? `<div style="font-size:12px;font-weight:600;color:var(--green);margin:8px 0">✅ Report imported — ${lsGet('_practitionerReport',{}).sessionDate||'date unknown'}</div>` : ''}
+      <button class="btn btn-s btn-sm btn-f" onclick="closeSettings();openSuppModal()">Manage supplements</button>
+      <details class="set-sub">
+        <summary><span>I have a report code from my practitioner</span><span class="set-chev"></span></summary>
+        ${lsGet('_practitionerReport',null) ? `<div style="font-size:12px;font-weight:600;color:var(--text);margin:8px 0">Report imported — ${lsGet('_practitionerReport',{}).sessionDate||'date unknown'}</div>` : ''}
         <textarea id="pract-code-input" class="fi" rows="2" placeholder="Paste your MSH-RPT-… code here" style="margin:8px 0;font-size:16px;font-family:monospace;resize:none"></textarea>
         <button class="btn btn-g btn-sm btn-f" onclick="importPractitionerReport()">Import report</button>
       </details>
-    </div>
+    `)}
 
-    <div class="card" style="margin-bottom:10px">
-      <div class="ct"><span class=i-gear></span>App &amp; data</div>
-      <div style="font-size:12px;color:var(--sub);margin-bottom:8px;line-height:1.5">Build <b style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">${APP_BUILD}</b></div>
-      <button class="btn btn-s btn-sm btn-f" style="color:var(--blue)" onclick="forceUpdate()">⬇️ Force update</button>
-      <details style="margin-top:10px" ontoggle="if(this.open)audLogShow()">
-        <summary style="font-size:12px;color:var(--sub);cursor:pointer;padding:6px 0;font-weight:600">Audio diagnostics</summary>
+    ${sec('App &amp; data', APP_BUILD, `
+      <button class="btn btn-s btn-sm btn-f" onclick="forceUpdate()">Force update</button>
+      <div style="font-size:11px;color:var(--sub);margin-top:5px;line-height:1.4">Use this if the app seems stuck on an old version — it clears the cache and re-downloads. Your data isn't touched.</div>
+      <details class="set-sub" ontoggle="if(this.open)audLogShow()">
+        <summary><span>Audio diagnostics</span><span class="set-chev"></span></summary>
         <pre id="aud-log" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9.5px;line-height:1.35;white-space:pre-wrap;word-break:break-all;-webkit-user-select:text;user-select:text;background:var(--surface2);border-radius:8px;padding:8px;max-height:260px;overflow:auto;margin:6px 0"></pre>
         <div style="display:flex;gap:8px"><button class="btn btn-s btn-sm" style="flex:1" onclick="audLogCopy()">Copy</button><button class="btn btn-s btn-sm" style="flex:1" onclick="audLogClear()">Clear</button></div>
       </details>
-      <div style="font-size:11px;color:var(--sub);margin-top:5px;line-height:1.4">Use this if the app seems stuck on an old version — it clears the cache and re-downloads. Your data isn't touched.</div>
-      <details style="margin-top:10px">
-        <summary style="font-size:12px;color:var(--sub);cursor:pointer;padding:6px 0;font-weight:600">Advanced</summary>
+      <details class="set-sub">
+        <summary><span>Back up or restore</span><span class="set-chev"></span></summary>
         <div style="display:flex;gap:8px;margin:8px 0">
-          <button class="btn btn-s btn-sm" style="flex:1" onclick="exportData()">⬆️ Export</button>
-          <label class="btn btn-s btn-sm" style="flex:1;cursor:pointer;text-align:center">⬇️ Import<input type="file" accept=".json" style="display:none" onchange="importData(this)"></label>
+          <button class="btn btn-s btn-sm" style="flex:1" onclick="exportData()">Export</button>
+          <label class="btn btn-s btn-sm" style="flex:1;cursor:pointer;text-align:center;color:var(--blue)">Import<input type="file" accept=".json" style="display:none" onchange="importData(this)"></label>
         </div>
         <div style="font-size:11px;color:var(--sub);margin-bottom:10px;line-height:1.4">Save your logs to a file, or restore one.</div>
-        <button class="btn btn-s btn-sm btn-f" style="color:var(--purple)" onclick="const n=importHistoryToLib();alert(n>0?n+' food item'+(n===1?'':'s')+' added to your library!':'All logged foods are already in your library.')"><span class=i-books></span> Import foods from history</button>
-        ${fbUser ? '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--blue)" onclick="manualCloudSync()"><span class=i-refresh></span> Force sync now</button>' : ''}
-        <button class="btn btn-s btn-sm btn-f" style="color:var(--green);margin-top:8px" onclick="runRecovery()"><span class=i-search></span> Recover missing data</button>
-        <div style="font-size:11px;color:var(--sub);margin-top:5px;margin-bottom:10px;line-height:1.4">Scans for entries misplaced by a timezone change.</div>
-        <button class="btn btn-s btn-sm btn-f" style="color:var(--sub)" onclick="resetWorkoutPlan()">↩️ Reset to default plan</button>
-        ${fbUser ? '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--red);opacity:0.8" onclick="clearFoodLibrary()"><span class=i-trash></span> Reset food library</button>' : ''}
-        ${fbUser ? '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--red);opacity:0.8" onclick="resetAccountData()"><span class=i-alert></span> Reset my account data</button><div style="font-size:11px;color:var(--sub);margin-top:4px;line-height:1.4">Clears your profile, plan and targets — locally and in the cloud — and re-runs setup.</div>' : ''}
+        <button class="btn btn-s btn-sm btn-f" onclick="const n=importHistoryToLib();alert(n>0?n+' food item'+(n===1?'':'s')+' added to your library!':'All logged foods are already in your library.')">Import foods from history</button>
+        ${fbUser ? '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px" onclick="manualCloudSync()">Force sync now</button>' : ''}
+        <button class="btn btn-s btn-sm btn-f" style="margin-top:8px" onclick="runRecovery()">Recover missing data</button>
+        <div style="font-size:11px;color:var(--sub);margin-top:5px;line-height:1.4">Scans for entries misplaced by a timezone change.</div>
       </details>
-    </div>
+      <details class="set-sub">
+        <summary><span>Start over</span><span class="set-chev"></span></summary>
+        <button class="btn btn-s btn-sm btn-f set-danger" style="margin-top:8px" onclick="resetWorkoutPlan()">Reset to default plan</button>
+        ${fbUser ? '<button class="btn btn-s btn-sm btn-f set-danger" style="margin-top:8px" onclick="clearFoodLibrary()">Reset food library</button>' : ''}
+        ${fbUser ? '<button class="btn btn-s btn-sm btn-f set-danger" style="margin-top:8px" onclick="resetAccountData()">Reset my account data</button><div style="font-size:11px;color:var(--sub);margin-top:4px;line-height:1.4">Clears your profile, plan and targets — locally and in the cloud — and re-runs setup.</div>' : ''}
+      </details>
+    `)}
 
-    <div style="font-size:11px;color:var(--sub);line-height:1.55;padding:4px 2px 10px">Metastory Health is built on the <b>D.R.E.S.S. for Health Success&reg;</b> framework. <b>D.R.E.S.S. for Health Success&reg;</b> and <b>Metabolic Chaos&reg;</b> are registered trademarks of <b>Functional Diagnostic Nutrition&reg;</b> (FDN), developed by Reed Davis. This app applies these principles for personal education and self-care. It is not affiliated with or endorsed by FDN, and does not diagnose, treat, or replace care from a qualified practitioner.</div>
+    <div id="set-legal" style="font-size:11px;color:var(--sub);line-height:1.55;padding:4px 2px 10px">Metastory Health is built on the <b>D.R.E.S.S. for Health Success&reg;</b> framework. <b>D.R.E.S.S. for Health Success&reg;</b> and <b>Metabolic Chaos&reg;</b> are registered trademarks of <b>Functional Diagnostic Nutrition&reg;</b> (FDN), developed by Reed Davis. This app applies these principles for personal education and self-care. It is not affiliated with or endorsed by FDN, and does not diagnose, treat, or replace care from a qualified practitioner.</div>
   `;
 }
 
@@ -1263,7 +1282,7 @@ function updateAuthUI(){
     if(btn){ btn.style.color = 'var(--green)'; btn.style.borderColor = 'var(--green)'; }
     if(authBtn){ authBtn.textContent = '🚪 Sign Out'; authBtn.style.color = 'var(--red)'; }
     const sp = document.getElementById('settings-sync-status');
-    if(sp) sp.innerHTML = '✅ Signed in as ' + fbUser.displayName;
+    if(sp) sp.innerHTML = 'Signed in as ' + fbUser.displayName;
     const sfb = document.getElementById('settings-auth-btn');
     if(sfb){ sfb.textContent = 'Sign Out'; sfb.className = 'btn btn-s btn-sm btn-f'; }
     render(curPage);
@@ -1274,9 +1293,9 @@ function updateAuthUI(){
     if(btn){ btn.style.color = 'var(--sub)'; btn.style.borderColor = 'var(--border)'; }
     if(authBtn){ authBtn.textContent = 'Sign In with Google'; authBtn.style.color = 'var(--sub)'; }
     const sp = document.getElementById('settings-sync-status');
-    if(sp) sp.innerHTML = '⚪ Not signed in';
+    if(sp) sp.innerHTML = 'Not signed in';
     const sfb = document.getElementById('settings-auth-btn');
-    if(sfb){ sfb.innerHTML = '<span class=i-key></span> Sign In with Google'; sfb.className = 'btn btn-g btn-sm btn-f'; }
+    if(sfb){ sfb.textContent = 'Sign in with Google'; sfb.className = 'btn btn-g btn-sm btn-f'; }
   }
 }
 
@@ -3483,7 +3502,7 @@ function saveNutritionTargets(){
   fbSyncSettings();
   refresh();
   const msg=document.getElementById('nt-save-msg');
-  if(msg){msg.textContent='✅ Saved!';setTimeout(()=>{msg.textContent='';},2500);}
+  if(msg){msg.textContent='Saved';setTimeout(()=>{msg.textContent='';},2500);}
 }
 // Recompute targets from the saved profile and repopulate the editor fields
 // for review. Override-safe: nothing is saved until the user taps Save.
@@ -16807,15 +16826,16 @@ after('rSettingsModal', function(){
     account.innerHTML =
       '<div style="font-size:12px;color:var(--sub);margin-bottom:6px;line-height:1.5">Ways to sign in</div>' +
       _nativeSignInMethodsBody() +
-      '<button class="btn btn-s btn-sm btn-f" style="margin:12px 0 10px;color:var(--red)" onclick="deleteAccount()">Delete my account</button>' +
+      '<button class="btn btn-s btn-sm btn-f set-danger" style="margin:12px 0 10px" onclick="deleteAccount()">Delete my account</button>' +
       '<div style="font-size:11px;color:var(--sub);margin-bottom:12px;line-height:1.4">Permanently erases your account and every log, plan and reflection stored with it. This cannot be undone.</div>';
   }
 
   var html =
-    '<div class="card" style="margin-bottom:10px" id="native-settings-card">' +
-      '<div class="ct"><span class=i-phone></span>On this iPhone</div>' +
+    '<details class="set-sec" id="native-settings-card">' +
+      '<summary><span>On this iPhone</span><span class="set-chev"></span></summary>' +
+      '<div class="set-body">' +
 
-      '<div style="font-size:13px;font-weight:600;margin-bottom:4px"><span class=i-pulse></span> Apple Health</div>' +
+      '<div style="font-size:13px;font-weight:600;margin-bottom:4px">Apple Health</div>' +
       '<div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">' +
         (health
           ? 'Workouts you finish are saved to Apple Health, and your weight is read back from it. That weight is part of the profile your personalized guidance is generated from.'
@@ -16825,12 +16845,12 @@ after('rSettingsModal', function(){
       (health ? _nativeHealthDiagHTML() : '') +
       (health
         ? '<button class="btn btn-s btn-sm btn-f" onclick="_nativeHealthRefresh()">Refresh from Health</button>' +
-          '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--red);opacity:.85" onclick="_nativeDisconnectHealth()">Stop syncing with Health</button>'
+          '<button class="btn btn-s btn-sm btn-f set-danger" style="margin-top:8px" onclick="_nativeDisconnectHealth()">Stop syncing with Health</button>'
         : '<button class="btn btn-g btn-sm btn-f" onclick="_nativeConnectHealth()">Connect Apple Health</button>') +
 
       '<div style="height:1px;background:var(--border);margin:14px 0"></div>' +
 
-      '<div style="font-size:13px;font-weight:600;margin-bottom:4px"><span class=i-bell></span> Notifications</div>' +
+      '<div style="font-size:13px;font-weight:600;margin-bottom:4px">Notifications</div>' +
       '<div style="font-size:12px;color:var(--sub);margin-bottom:8px;line-height:1.5">' +
         'Rest timers ring on the lock screen, even with Metastory closed.' +
       '</div>' +
@@ -16841,24 +16861,27 @@ after('rSettingsModal', function(){
       '</div>' +
       '<button class="btn btn-s btn-sm btn-f" onclick="Metastory.app.openSettings()">Open iPhone Settings</button>' +
       _nativeDbgHTML() +
-    '</div>' +
+      '</div>' +
+    '</details>' +
 
     '<div style="font-size:11px;color:var(--sub);line-height:1.5;text-align:center;padding:0 2px 10px">' +
       'Metastory for iPhone ' + N.version + ' (' + N.build + ') · web ' + WEB_BUILD +
     '</div>';
 
-  body.insertAdjacentHTML('beforeend', html);
+  var legal = document.getElementById('set-legal');
+  if(legal) legal.insertAdjacentHTML('beforebegin', html);
+  else body.insertAdjacentHTML('beforeend', html);
 
   N.timers.permission().then(function(state){
     var el = document.getElementById('native-notif-status');
     if(!el) return;
     if(state === 'granted'){
-      el.textContent = '✅ Notifications are on';
-      el.style.color = 'var(--green)';
+      el.textContent = 'Notifications are on';
+      el.style.color = 'var(--text)';
     } else if(state === 'denied'){
-      el.textContent = '⚪ Turned off — rest bells won\'t ring';
+      el.textContent = 'Turned off — rest bells won\'t ring';
     } else {
-      el.textContent = '⚪ Not asked yet — start a rest timer to enable';
+      el.textContent = 'Not asked yet — start a rest timer to enable';
     }
   }).catch(function(){});
 });
@@ -16884,8 +16907,8 @@ function _nativeSignInMethodsBody(){
   var have = nativeLinkedProviders();
   var row = function(on, label){
     return '<div style="font-size:13px;margin-bottom:6px;color:' +
-      (on ? 'var(--green)' : 'var(--sub)') + '">' +
-      (on ? '✅ ' : '⚪️ ') + label + (on ? '' : ' — not connected') + '</div>';
+      (on ? 'var(--text)' : 'var(--sub)') + '">' +
+      label + (on ? ' — connected' : ' — not connected') + '</div>';
   };
   var html = row(!!have['apple.com'], 'Apple') + row(!!have['google.com'], 'Google');
   if(!have['apple.com']){
@@ -17312,15 +17335,16 @@ after('rSettingsModal', function(){
   var body = document.getElementById('settings-body');
   if(!body || !fbUser || document.getElementById('ms-settings-card')) return;
 
-  var card = document.createElement('div');
-  card.className = 'card';
+  var card = document.createElement('details');
+  card.className = 'set-sec';
   card.id = 'ms-settings-card';
-  card.style.marginBottom = '10px';
   card.innerHTML =
-    '<div class="ct">Membership</div>' +
-    '<div id="ms-settings-line" style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:10px">Checking…</div>' +
-    '<button class="btn btn-s btn-sm btn-f" onclick="N_msManage()">Manage membership</button>' +
-    '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px" onclick="_msRedeem()">Redeem a code</button>';
+    '<summary><span>Membership</span><span class="set-chev"></span></summary>' +
+    '<div class="set-body">' +
+      '<div id="ms-settings-line" style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:10px">Checking…</div>' +
+      '<button class="btn btn-s btn-sm btn-f" onclick="N_msManage()">Manage membership</button>' +
+      '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px" onclick="_msRedeem()">Redeem a code</button>' +
+    '</div>';
   body.insertBefore(card, body.firstChild);
 
   N.store.status().then(function(st){
