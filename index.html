@@ -1033,7 +1033,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260922-swap1';
+const APP_BUILD='20260923-auth1';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -1089,7 +1089,7 @@ if(!PREVIEW_SANDBOX){
 function toggleAuth(){
   if(PREVIEW_SANDBOX){showToast('Preview mode — not connected to your account');return;}
   if(fbUser) {
-    if(confirm('Sign out?')) fbAuth.signOut();
+    if(confirm('Sign out?')){ window._signOutIntent=true; fbAuth.signOut(); }
   } else {
     const provider = new firebase.auth.GoogleAuthProvider();
     fbAuth.signInWithPopup(provider).catch(e => {
@@ -1114,7 +1114,7 @@ function closeUserMenu(){
 function handleUserMenuAuth(){
   if(PREVIEW_SANDBOX){showToast('Preview mode — not connected to your account');return;}
   if(fbUser){
-    if(confirm('Sign out?')) fbAuth.signOut();
+    if(confirm('Sign out?')){ window._signOutIntent=true; fbAuth.signOut(); }
   } else {
     const provider = new firebase.auth.GoogleAuthProvider();
     fbAuth.signInWithPopup(provider).catch(e => {
@@ -1317,6 +1317,7 @@ function fbSyncSettings(){
     try { const mp=lsGet('_macroProfile',''); if(mp) settings.macroProfile=JSON.parse(mp); } catch(e){}
     if(lsGet('_onboardDone','')) settings.onboardDone='1';
     if(lsGet('_tourDone','')) settings.tourDone='1';
+    if(lsGet('_notifOnboarded','')) settings.notifOnboarded='1';
     try { const df=lsGet('_detFlags',''); if(df) settings.detFlags=JSON.parse(df); } catch(e){}
     try { const np=lsGet('_notifPrefs',''); if(np) settings.notifPrefs=JSON.parse(np); } catch(e){}
     try { const cw=lsGet('_customWorkouts',''); if(cw) settings.customWorkouts=JSON.parse(cw); } catch(e){}
@@ -1461,6 +1462,7 @@ async function fbPullAll(){
         if(s.fltOn) lsSet('_fltOn', s.fltOn);
         if(s.onboardDone || s.userProfile || s.userTargets || s.routineTR) lsSet('_onboardDone', '1');
         if(s.tourDone) lsSet('_tourDone', '1');
+        if(s.notifOnboarded) lsSet('_notifOnboarded', '1');
         if(s.detFlags) lsSet('_detFlags', JSON.stringify(s.detFlags));
         if(s.notifPrefs) lsSet('_notifPrefs', JSON.stringify(s.notifPrefs));
         if(s.customWorkouts) lsSet('_customWorkouts', JSON.stringify(s.customWorkouts));
@@ -1679,9 +1681,14 @@ if(fbAuth) {
     fbUser = user;
     _authResolved = true;
     if(user) {
-      // Clear if: new sign-in after sign-out (prevUid empty) OR switching accounts
+      // Clear only when this really is a different account. Firebase can report a
+      // momentary signed-out state on launch before it restores the session; wiping
+      // on the way back through here used to erase every setting that lives only on
+      // the phone — which is why the reminders question kept coming back.
       const freshSignIn = !prevUid || prevUid !== user.uid;
-      if(freshSignIn) { clearLocalUserData(); showSyncVeil(); }
+      if(prevUid && prevUid !== user.uid) clearLocalUserData();
+      if(freshSignIn) showSyncVeil();
+      window._signOutIntent=false;
       lsSet('_lastUid', user.uid);
       updateAuthUI();
       fbPullAll().then(pulled => {
@@ -1700,11 +1707,17 @@ if(fbAuth) {
       });
     } else {
       hideSyncVeil();
-      // Signed out — wipe all user data, zero out lastUid so next sign-in also clears
-      clearLocalUserData();
-      lsSet('_lastUid', '');
-      updateAuthUI();
-      refresh();
+      // Only a sign-out the person asked for wipes this phone's copy. A null from
+      // the SDK on launch is not a sign-out, and must leave their data alone.
+      if(window._signOutIntent){
+        clearLocalUserData();
+        lsSet('_lastUid', '');
+        window._signOutIntent=false;
+        updateAuthUI();
+        refresh();
+      } else {
+        updateAuthUI();
+      }
     }
   });
 }
@@ -11550,7 +11563,7 @@ function drawerSignOut(){
       try{ showToast('Sign-in isn\'t ready yet. Please try again in a moment.', 3000); }catch(e){}
       return;
     }
-    if(confirm('Sign out?')) auth.signOut();
+    if(confirm('Sign out?')){ window._signOutIntent=true; auth.signOut(); }
   }, 260);
 }
 window.drawerSignOut = drawerSignOut;
@@ -15618,7 +15631,7 @@ function nativeAuthAction(){
     return;
   }
   if(fbUser){
-    if(confirm('Sign out?')) fbAuth.signOut();
+    if(confirm('Sign out?')){ window._signOutIntent=true; fbAuth.signOut(); }
     return;
   }
   signInSheet();
@@ -17247,7 +17260,7 @@ function _msOpen(url){
 }
 
 function _msSignOut(){
-  if(confirm('Sign out?')){ _msHide(); fbAuth.signOut(); }
+  if(confirm('Sign out?')){ _msHide(); window._signOutIntent=true; fbAuth.signOut(); }
 }
 
 window._msBuy = _msBuy;
