@@ -1051,7 +1051,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260923-set1';
+const APP_BUILD='20260923-set2';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -11854,8 +11854,9 @@ function _suggestNowHTML(){
   let btns;
   if(pair){
     line='Starting with &ldquo;'+tr.t+'&rdquo;.<br><span style="opacity:.85">While it plays: <b>'+pair.label+'</b>'+(pair.sub?' ('+pair.sub+')':'')+'.</span>';
-    btns=`<button class="btn" style="margin-top:12px;width:100%;background:var(--purple);color:var(--text);border:none;font-weight:700" onclick="musBeginSession();${pair.act}">Begin listening + ${pair.label}</button>
-    <button onclick="musBeginSession()" style="margin-top:8px;width:100%;background:none;border:none;color:rgba(255,255,255,.85);font-size:12px;text-decoration:underline;cursor:pointer;font-family:var(--font-sans)">Just the music</button>`;
+    // Music on its own already has its own home in Listening below; a second
+    // route to it here only made the card busier.
+    btns=`<button class="btn" style="margin-top:12px;width:100%;background:var(--purple);color:var(--text);border:none;font-weight:700" onclick="musBeginSession();${pair.act}">Begin listening + ${pair.label}</button>`;
   }else{
     btns=`<button class="btn" style="margin-top:12px;width:100%;background:var(--purple);color:var(--text);border:none;font-weight:700" onclick="musBeginSession()">Begin listening</button>`;
   }
