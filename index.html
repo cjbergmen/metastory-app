@@ -1064,7 +1064,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260924-boot2';
+const APP_BUILD='20260924-ms1';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -17120,7 +17120,9 @@ var _ms = { product: null, loading: false, busy: false, shown: false };
     '#ms-paywall .pw-links{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 16px;margin-bottom:12px}' +
     '#ms-paywall .pw-links button{background:none;border:0;padding:6px 2px;font-family:var(--font-sans);font-size:13px;font-weight:600;color:var(--green);cursor:pointer}' +
     '#ms-paywall .pw-acct{font-size:12px;color:var(--sub);text-align:center;line-height:1.6}' +
-    '#ms-paywall .pw-acct button{background:none;border:0;padding:0 2px;font-family:var(--font-sans);font-size:12px;color:var(--sub);text-decoration:underline;cursor:pointer}';
+    '#ms-paywall .pw-acct button{background:none;border:0;padding:0 2px;font-family:var(--font-sans);font-size:12px;color:var(--sub);text-decoration:underline;cursor:pointer}' +
+    '#ms-pw-close{display:none;position:absolute;top:calc(var(--st) + 14px);right:16px;width:34px;height:34px;border:0;border-radius:50%;background:var(--surface2);color:var(--text);font-size:17px;line-height:1;cursor:pointer;z-index:2}' +
+    '#ms-paywall.preview #ms-pw-close{display:block}';
   var el = document.createElement('style');
   el.textContent = css;
   document.head.appendChild(el);
@@ -17178,7 +17180,8 @@ function _msEl(){
         '<button onclick="_msOpen(\'' + MS_PRIVACY + '\')">Privacy Policy</button>' +
       '</div>' +
       '<div class="pw-acct" id="ms-pw-acct"></div>' +
-    '</div>';
+    '</div>' +
+    '<button id="ms-pw-close" aria-label="Close" onclick="_msClosePreview()">\u2715</button>';
   document.body.appendChild(el);
   return el;
 }
@@ -17252,6 +17255,21 @@ function _msLoadProduct(force){
   });
 }
 
+/* The same screen, opened on purpose from Settings rather than because access
+   is blocked — so a member can read the plan's terms without cancelling, and so
+   the flow can be demonstrated. Closable; the real gate is not. */
+function _msPreview(){
+  var el = _msEl();
+  el.classList.add('preview');
+  _msShow();
+}
+function _msClosePreview(){
+  var el = document.getElementById('ms-paywall');
+  if(el) el.classList.remove('preview');
+  _msHide();
+}
+window._msPreview = _msPreview;
+window._msClosePreview = _msClosePreview;
 function _msShow(){
   var el = _msEl();
   if(!_ms.shown){
@@ -17271,6 +17289,7 @@ function _msHide(){
 
 function _msApply(status){
   if(status && status.active){
+    try{ var _pw=document.getElementById('ms-paywall'); if(_pw) _pw.classList.remove('preview'); }catch(e){}
     lsSet(MS_CACHE_KEY, String(status.expiresAt || (Date.now() + 36e5)));
     _msHide();
     return true;
@@ -17387,6 +17406,7 @@ after('rSettingsModal', function(){
     '<div class="set-body">' +
       '<div id="ms-settings-line" style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:10px">Checking…</div>' +
       '<button class="btn btn-s btn-sm btn-f" onclick="N_msManage()">Manage membership</button>' +
+      '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px" onclick="closeSettings();setTimeout(_msPreview,260)">Membership options</button>' +
       '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px" onclick="_msRedeem()">Redeem a code</button>' +
     '</div>';
   body.insertBefore(card, body.firstChild);

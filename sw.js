@@ -1,4 +1,4 @@
-const VERSION = '20260924-boot2';
+const VERSION = '20260924-ms1';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
