@@ -1007,6 +1007,21 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   </div>
 </div>
 
+<!-- Workout library: everything you can do today without touching the plan -->
+<div class="swap-overlay" id="wolib-overlay" onclick="closeWoLibrary()"></div>
+<div class="swap-sheet" id="wolib-sheet">
+  <div class="swap-handle"></div>
+  <div class="swap-header">
+    <div class="swap-title">Workout library</div>
+    <button class="swap-close" onclick="closeWoLibrary()">&#10005;</button>
+  </div>
+  <div class="swap-divider"></div>
+  <div class="swap-list" id="wolib-list"></div>
+  <div style="padding:10px 16px 16px;flex:none;border-top:0.5px solid var(--border)">
+    <button class="btn btn-s btn-sm btn-f" style="color:var(--blue)" onclick="closeWoLibrary();openWoBuilder()">Build my own</button>
+  </div>
+</div>
+
 <!-- Circuit Runner -->
 <div class="circ-run" id="circ-run">
   <div class="rd" id="circ-round">Round 1</div>
@@ -1064,7 +1079,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260924-ms1';
+const APP_BUILD='20260925-lib1';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -3108,6 +3123,59 @@ function _wobBuild(){
 }
 // "Just today" writes a one-week adjustment, so the saved plan is untouched and
 // the day reverts on its own next week. "Save to my plan" is the durable write.
+/* Every workout the person can reach: what their own plan holds on any day,
+   plus the built-in splits they may have edited away from. Deduped by name. */
+function _woLibrary(){
+  var out=[], seen={};
+  var add=function(wo,where){
+    if(!wo||!wo.name)return;
+    var k=wo.name.toLowerCase();
+    if(seen[k])return; seen[k]=1;
+    out.push({wo:wo, name:wo.name, where:where});
+  };
+  var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  try{ var base=_basePlan()||{}; for(var i=0;i<7;i++){ if(base[i]) add(base[i], 'Your '+DAYS[i]); } }catch(e){}
+  try{ Object.keys(WORKOUTS).forEach(function(k){ add(WORKOUTS[k], 'Built in'); }); }catch(e){}
+  return out;
+}
+function _woLibCount(wo){
+  if(!wo)return '';
+  if(wo.type==='circuit') return (wo.moves?wo.moves.length:0)+' moves · '+(wo.rounds||1)+' rounds';
+  var n=(wo.ex?wo.ex.length:0), pm=(wo.pm?wo.pm.length:0);
+  return n+' exercise'+(n===1?'':'s')+(pm?' + PM boost':'');
+}
+function openWoLibrary(){
+  var list=_woLibrary();
+  var h='<div style="font-size:12px;color:var(--sub);line-height:1.5;padding:2px 0 12px">Pick any workout to do today. Nothing here changes your plan — tomorrow goes back to normal.</div>';
+  h+=list.map(function(it,i){
+    return '<div class="swap-item" onclick="woLibRun('+i+')">'
+      +'<div class="swap-item-name">'+it.name+'</div>'
+      +'<div style="font-size:11.5px;color:var(--sub);margin-top:2px">'+_woLibCount(it.wo)+' · '+it.where+'</div>'
+      +'</div>';
+  }).join('');
+  if(!list.length) h+='<div style="font-size:13px;color:var(--sub);padding:10px 0">No workouts yet.</div>';
+  var el=document.getElementById('wolib-list'); if(el) el.innerHTML=h;
+  window.__woLib=list;
+  document.getElementById('wolib-overlay').classList.add('open');
+  document.getElementById('wolib-sheet').classList.add('open');
+}
+function closeWoLibrary(){
+  var o=document.getElementById('wolib-overlay');if(o)o.classList.remove('open');
+  var s=document.getElementById('wolib-sheet');if(s)s.classList.remove('open');
+}
+function woLibRun(i){
+  var it=(window.__woLib||[])[i]; if(!it)return;
+  _woOneOff={date:viewDate, wo:JSON.parse(JSON.stringify(it.wo))};
+  _woPendingSwaps={};_woSwapFrom={};
+  try{lsSet('wd_'+viewDate,'0');}catch(e){}
+  closeWoLibrary();
+  try{goPage('workout');}catch(e){}
+  try{rWorkout();}catch(e){}
+  try{showToast('Just for today — your plan is untouched', 3000);}catch(e){}
+}
+window.openWoLibrary=openWoLibrary;
+window.closeWoLibrary=closeWoLibrary;
+window.woLibRun=woLibRun;
 function wobApply(scope){
   var wo=_wobBuild();if(!wo)return;
   var d=vdDate().getDay();
@@ -3491,7 +3559,23 @@ function clearWeekAdjust(){
   try{showToast('Back to your plan ↩');}catch(e){}
   try{if(typeof rWorkout==='function')rWorkout();}catch(e){}
 }
+/* A workout picked from the library runs today and is never written anywhere:
+   no saved plan, no week adjustment. It lives in memory, scoped to the date it
+   was started on, so leaving the app puts the real plan back. */
+var _woOneOff=null;
+function _woOneOffFor(date){
+  return (_woOneOff && _woOneOff.date===date) ? _woOneOff.wo : null;
+}
+function _woClearOneOff(){
+  _woOneOff=null;
+  try{lsSet('wd_'+viewDate,'0');}catch(e){}
+  try{rWorkout();}catch(e){}
+  try{showToast('Back to your plan');}catch(e){}
+}
+window._woClearOneOff=_woClearOneOff;
 function getWO(){
+  const one=_woOneOffFor(viewDate);
+  if(one)return one;
   const d=vdDate().getDay();
   const plan=_effectivePlan(viewDate);
   return (plan&&plan[d])||null;
@@ -4431,11 +4515,12 @@ function _planControlsHTML(){
     const link='font-size:10.5px;color:var(--sub);text-decoration:underline;cursor:pointer;white-space:nowrap';
     // One line, one colour, no separators: the row spreads itself across the card
     // with space-between, and the labels are short enough to fit the narrowest phone.
-    let h='<span onclick="openWoBuilder()" style="'+link+'">Build</span>'
+    let h='<span onclick="openWoLibrary()" style="'+link+'">Library</span>'
          +'<span onclick="openPlanEditor()" style="'+link+'">Edit week</span>'
          +'<span onclick="openMoveDay()" style="'+link+'">Move day</span>'
          +'<span onclick="openShiftWeek()" style="'+link+'">Shift week</span>';
-    if(_hasWeekAdjust()) h+='<span onclick="clearWeekAdjust()" style="'+link+'">Back to plan</span>';
+    if(_woOneOffFor(viewDate)) h+='<span onclick="_woClearOneOff()" style="'+link+'">Back to plan</span>';
+    else if(_hasWeekAdjust()) h+='<span onclick="clearWeekAdjust()" style="'+link+'">Back to plan</span>';
     return h;
 }
 // ── SAVED-PLAN EDITING (durable) ──────────────────────────────────────────────
