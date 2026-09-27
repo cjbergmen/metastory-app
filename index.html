@@ -1016,10 +1016,23 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     <button class="swap-close" onclick="closeWoLibrary()">&#10005;</button>
   </div>
   <div class="swap-divider"></div>
+  <div class="swap-tabs" id="wolib-tabs"></div>
   <div class="swap-list" id="wolib-list"></div>
   <div style="padding:10px 16px 16px;flex:none;border-top:0.5px solid var(--border)">
     <button class="btn btn-s btn-sm btn-f" style="color:var(--blue)" onclick="closeWoLibrary();openWoBuilder()">Build my own</button>
   </div>
+</div>
+
+<!-- Custom rest length -->
+<div class="swap-overlay" id="wocust-overlay" onclick="_woCustomClose()"></div>
+<div class="swap-sheet" id="wocust-sheet" style="max-height:70vh">
+  <div class="swap-handle"></div>
+  <div class="swap-header">
+    <div class="swap-title">Rest timer</div>
+    <button class="swap-close" onclick="_woCustomClose()">&#10005;</button>
+  </div>
+  <div class="swap-divider"></div>
+  <div style="padding:14px 16px 20px" id="wocust-body"></div>
 </div>
 
 <!-- Circuit Runner -->
@@ -1079,7 +1092,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260925-lib1';
+const APP_BUILD='20260925-lib2';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -3123,6 +3136,113 @@ function _wobBuild(){
 }
 // "Just today" writes a one-week adjustment, so the saved plan is untouched and
 // the day reverts on its own next week. "Save to my plan" is the durable write.
+
+/* ── THE WORKOUT MENU ────────────────────────────────────────────────────
+   A browsable database, grouped the way people actually think about a
+   session. Every move is pulled from EX_LIBRARY by name, so the sets, cues
+   and rest match the rest of the app — and a move done here lands on the
+   same history line as the same move done from the plan. */
+var WO_CATS=[['plan','My plan'],['upper','Upper'],['lower','Lower'],['full','Full body'],['core','Core'],['cond','Conditioning'],['quick','Quick'],['bw','Bodyweight']];
+var WO_MENU=[
+ // ── Upper ───────────────────────────────────────────────────────────────
+ {cat:'upper',name:'Push — Chest & Shoulders',why:'Presses first, then the smaller heads. The order that lets you go heaviest where it counts.',
+  names:['Incline DB Press','Flat DB Press','DB Overhead Press','DB Lateral Raise','Overhead DB Tricep Extension']},
+ {cat:'upper',name:'Pull — Back & Biceps',why:'Rows build the mid-back that holds your posture together; curls finish what the rows started.',
+  names:['DB Bent-Over Row','DB Single-Arm Row','DB Rear Delt Fly','DB Bicep Curl','DB Hammer Curl']},
+ {cat:'upper',name:'Chest Focus',why:'Flyes pre-exhaust the pecs so the pressing that follows lands on chest, not triceps.',
+  names:['DB Chest Flyes','Incline DB Press','Flat DB Press','DB Squeeze Press','Push-Ups']},
+ {cat:'upper',name:'Back Focus',why:'Two rows from different angles, a pullover for the lats, and shrugs to finish the upper traps.',
+  names:['DB Deadlift','DB Bent-Over Row','DB Single-Arm Row','DB Pullover','DB Shrugs']},
+ {cat:'upper',name:'Shoulders & Arms',why:'Overhead work while you are fresh, then lateral and arm work at lighter loads.',
+  names:['DB Arnold Press','DB Lateral Raise','DB Front Raise','DB Bicep Curl','DB Skull Crushers']},
+ {cat:'upper',name:'Arms Only',why:'Twenty-five minutes when arms are the only thing you have time for.',
+  names:['DB Bicep Curl','DB Incline Curl','DB Hammer Curl','DB Tricep Kickback','Overhead DB Tricep Extension','Diamond Push-Ups']},
+ {cat:'upper',name:'Barbell Upper',why:'Bench and row as the two anchors, pressing overhead once the horizontal work is done.',
+  names:['Barbell Bench Press','Barbell Bent-Over Row','Barbell Overhead Press','Barbell Curl','Barbell Skull Crusher']},
+ // ── Lower ───────────────────────────────────────────────────────────────
+ {cat:'lower',name:'Quad Focus',why:'Goblet squats set the pattern, split squats expose the side that is behind.',
+  names:['DB Goblet Squat','DB Bulgarian Split Squat','DB Step-Up','DB Lunge','DB Calf Raise']},
+ {cat:'lower',name:'Posterior Chain',why:'Hinges over squats. This is the side of the leg that protects your back.',
+  names:['DB Romanian Deadlift','DB Deadlift','Glute Bridge','Single-Leg Glute Bridge','DB Calf Raise']},
+ {cat:'lower',name:'Glutes & Hamstrings',why:'Thrusts and hinges with the reps kept honest — glutes respond to tension, not weight.',
+  names:['Hip Thrust','DB Romanian Deadlift','DB Sumo Squat','Single-Leg Glute Bridge','Glute Bridge']},
+ {cat:'lower',name:'Legs — No Equipment',why:'Everything here works with a floor. Slow the eccentric and it is plenty hard.',
+  names:['Bodyweight Squat','Bodyweight Lunge','Glute Bridge','Wall Sit','Single-Leg Glute Bridge']},
+ {cat:'lower',name:'Single-Leg Day',why:'One leg at a time finds the imbalance that a barbell hides.',
+  names:['DB Bulgarian Split Squat','DB Reverse Lunge','DB Step-Up','Single-Leg Glute Bridge','DB Calf Raise']},
+ {cat:'lower',name:'Barbell Lower',why:'Squat, hinge, and accessory work in the order that lets the big lifts stay heavy.',
+  names:['Barbell Back Squat','Barbell Romanian Deadlift','Leg Press','Leg Curl','Leg Extension']},
+ // ── Full body ───────────────────────────────────────────────────────────
+ {cat:'full',name:'Full Body A',why:'One squat, one press, one row, one overhead. The whole body in five moves.',
+  names:['DB Goblet Squat','Flat DB Press','DB Bent-Over Row','DB Overhead Press','Plank']},
+ {cat:'full',name:'Full Body B',why:'The mirror of A — hinge instead of squat, incline instead of flat.',
+  names:['DB Romanian Deadlift','Incline DB Press','DB Single-Arm Row','DB Lateral Raise','DB Russian Twist']},
+ {cat:'full',name:'Full Body — Barbell',why:'Four lifts, heavier than usual, longer rests. Use it when you have an hour.',
+  names:['Barbell Back Squat','Barbell Bench Press','Barbell Bent-Over Row','Barbell Overhead Press']},
+ {cat:'full',name:'Hotel Room',why:'No equipment, no space, no excuse. Built for a floor between a bed and a wall.',
+  names:['Push-Ups','Bodyweight Squat','Bodyweight Lunge','Pike Push-Ups','Plank']},
+ {cat:'full',name:'Carry & Crawl',why:'Loaded carries build the grip, core and shoulders that every other lift leans on.',
+  names:['DB Suitcase Carry','DB Overhead Carry','DB Renegade Row','DB Goblet Squat','Mountain Climbers']},
+ // ── Core ────────────────────────────────────────────────────────────────
+ {cat:'core',name:'Core Basics',why:'Brace, rotate, resist. Fifteen minutes that carry into every other session.',
+  names:['Plank','Dead Bug','Bicycle Crunch','DB Russian Twist']},
+ {cat:'core',name:'Obliques & Rotation',why:'The side and rotational work most programs skip entirely.',
+  names:['DB Woodchop','DB Side Bend','DB Russian Twist','DB Suitcase Carry']},
+ {cat:'core',name:'Anti-Rotation Core',why:'Holding still under load is harder, and more useful, than crunching.',
+  names:['Plank','DB Suitcase Carry','DB Overhead Carry','Dead Bug','Superman Hold']},
+ // ── Conditioning ────────────────────────────────────────────────────────
+ {cat:'cond',name:'10-Minute Burner',type:'circuit',work:40,rest:20,rounds:4,why:'Four rounds, no equipment, done before you can talk yourself out of it.',
+  moves:['Bodyweight Squat','Push-Ups','Mountain Climbers','Plank']},
+ {cat:'cond',name:'20-Minute Conditioning',type:'circuit',work:45,rest:15,rounds:5,why:'Five rounds alternating push, pull and legs so nothing fails before the clock does.',
+  moves:['DB Goblet Squat','Push-Ups','DB Bent-Over Row','Mountain Climbers','Bicycle Crunch']},
+ {cat:'cond',name:'Dumbbell Complex',type:'circuit',work:50,rest:10,rounds:4,why:'One pair of dumbbells, never set down. Pick lighter than you think.',
+  moves:['DB Goblet Squat','DB Overhead Press','DB Bent-Over Row','DB Reverse Lunge']},
+ {cat:'cond',name:'Core Finisher',type:'circuit',work:30,rest:15,rounds:3,why:'Three rounds on the floor to close out a lifting day.',
+  moves:['Plank','Bicycle Crunch','Dead Bug','Mountain Climbers']},
+ // ── Quick ───────────────────────────────────────────────────────────────
+ {cat:'quick',name:'15-Minute Upper',why:'Three moves, straight through, when the day got away from you.',
+  names:['Flat DB Press','DB Bent-Over Row','DB Lateral Raise']},
+ {cat:'quick',name:'15-Minute Lower',why:'Squat, hinge, calves. Enough to keep the week honest.',
+  names:['DB Goblet Squat','DB Romanian Deadlift','DB Calf Raise']},
+ {cat:'quick',name:'15-Minute Full Body',why:'One of each pattern. Better than the session you skip.',
+  names:['DB Goblet Squat','Push-Ups','DB Single-Arm Row','Plank']},
+ {cat:'quick',name:'Desk Reset',type:'circuit',work:40,rest:20,rounds:2,why:'Two rounds between meetings to undo an afternoon of sitting.',
+  moves:['Bodyweight Squat','Glute Bridge','Superman Hold','Dead Bug']},
+ // ── Bodyweight ──────────────────────────────────────────────────────────
+ {cat:'bw',name:'Bodyweight Push',why:'Three push-up variations, hardest first, at whatever angle you can own.',
+  names:['Push-Ups','Pike Push-Ups','Diamond Push-Ups','Plank']},
+ {cat:'bw',name:'Bodyweight Pull',why:'Needs a bar or a sturdy table. Pulling is the half of bodyweight training people skip.',
+  names:['Chin-Ups','Inverted Row','Superman Hold','Dead Bug']},
+ {cat:'bw',name:'Bodyweight Legs',why:'Volume and time under tension standing in for load.',
+  names:['Bodyweight Squat','Bodyweight Lunge','Single-Leg Glute Bridge','Wall Sit','Glute Bridge']},
+ {cat:'bw',name:'Bodyweight Full Body',why:'The whole body, floor only, twenty-five minutes.',
+  names:['Push-Ups','Bodyweight Squat','Inverted Row','Bodyweight Lunge','Plank']}
+];
+// Look a move up by name across every muscle group in the library.
+function _exByName(n){
+  try{
+    var keys=Object.keys(EX_LIBRARY);
+    for(var i=0;i<keys.length;i++){
+      var arr=EX_LIBRARY[keys[i]]||[];
+      for(var j=0;j<arr.length;j++) if(arr[j].n===n) return arr[j];
+    }
+  }catch(e){}
+  return null;
+}
+function _woFromMenu(item){
+  if(!item)return null;
+  if(item.type==='circuit'){
+    return {name:item.name,col:'var(--blue)',type:'circuit',work:item.work,rest:item.rest,rounds:item.rounds,
+      info:{role:item.why,goal:'',tip:''},
+      moves:(item.moves||[]).map(function(n){ var e=_exByName(n)||{}; return {n:n,i:e.i||'',muscles:e.muscles||''}; })};
+  }
+  var ex=(item.names||[]).map(function(n){
+    var e=_exByName(n);
+    return e? {n:e.n,tag:e.tag,i:e.i,rest:e.rest} : {n:n,tag:'3 × 10',i:'',rest:'60 sec'};
+  });
+  return {name:item.name,col:'var(--green)',info:{role:item.why,goal:'',tip:''},ex:ex};
+}
+
 /* Every workout the person can reach: what their own plan holds on any day,
    plus the built-in splits they may have edited away from. Deduped by name. */
 function _woLibrary(){
@@ -3144,18 +3264,37 @@ function _woLibCount(wo){
   var n=(wo.ex?wo.ex.length:0), pm=(wo.pm?wo.pm.length:0);
   return n+' exercise'+(n===1?'':'s')+(pm?' + PM boost':'');
 }
-function openWoLibrary(){
-  var list=_woLibrary();
+var _woLibCat='plan';
+function woLibTab(c){ _woLibCat=c; _woLibRender(); }
+window.woLibTab=woLibTab;
+function _woLibRender(){
+  var tabs=WO_CATS.map(function(c){
+    return '<button class="swap-tab'+(_woLibCat===c[0]?' active':'')+'" onclick="woLibTab(\''+c[0]+'\')">'+c[1]+'</button>';
+  }).join('');
+  var tb=document.getElementById('wolib-tabs'); if(tb) tb.innerHTML=tabs;
+
+  var list=[];
+  if(_woLibCat==='plan'){
+    list=_woLibrary();
+  } else {
+    list=WO_MENU.filter(function(m){return m.cat===_woLibCat;}).map(function(m){
+      return {wo:_woFromMenu(m), name:m.name, where:m.why};
+    });
+  }
   var h='<div style="font-size:12px;color:var(--sub);line-height:1.5;padding:2px 0 12px">Pick any workout to do today. Nothing here changes your plan — tomorrow goes back to normal.</div>';
   h+=list.map(function(it,i){
     return '<div class="swap-item" onclick="woLibRun('+i+')">'
       +'<div class="swap-item-name">'+it.name+'</div>'
-      +'<div style="font-size:11.5px;color:var(--sub);margin-top:2px">'+_woLibCount(it.wo)+' · '+it.where+'</div>'
+      +'<div style="font-size:11.5px;color:var(--sub);margin-top:3px;line-height:1.45">'+_woLibCount(it.wo)+'</div>'
+      +'<div style="font-size:11.5px;color:var(--sub);margin-top:3px;line-height:1.45;opacity:.9">'+it.where+'</div>'
       +'</div>';
   }).join('');
-  if(!list.length) h+='<div style="font-size:13px;color:var(--sub);padding:10px 0">No workouts yet.</div>';
+  if(!list.length) h+='<div style="font-size:13px;color:var(--sub);padding:10px 0">Nothing here yet.</div>';
   var el=document.getElementById('wolib-list'); if(el) el.innerHTML=h;
   window.__woLib=list;
+}
+function openWoLibrary(){
+  _woLibRender();
   document.getElementById('wolib-overlay').classList.add('open');
   document.getElementById('wolib-sheet').classList.add('open');
 }
@@ -4852,9 +4991,9 @@ function rWorkout(){
     });
   }
   h+=`<div style="display:flex;gap:9px;margin-top:14px">
-    <button class="btn btn-o" style="flex:1" onclick="openTimer('Rest-Pause',15)">⏱ 15 sec RP</button>
-    <button class="btn btn-o" style="flex:1" onclick="openTimer('Set Rest',90)">⏱ 90 sec</button>
-    <button class="btn btn-o" style="flex:1" onclick="openTimer('Set Rest',120)">⏱ 2 min</button>
+    <button class="btn btn-o" style="flex:1" onclick="openTimer('Set Rest',30)">30 sec</button>
+    <button class="btn btn-o" style="flex:1" onclick="openTimer('Set Rest',60)">60 sec</button>
+    <button class="btn btn-o" style="flex:1" onclick="_woCustomTimer()">${_woCustomLabel()}</button>
   </div>`;
   // ── Pending swap save bar ─────────────────────────────────
   const pendingCount=Object.keys(_woPendingSwaps).length;
@@ -8572,6 +8711,58 @@ function _reqNotifPerm(){
 }
 let _notifToastShown=false;
 
+/* The third rest button is whatever the person sets, and it remembers. */
+function _woCustomSecs(){
+  var v=parseInt(lsGet('_timerCustom','180'),10);
+  return (v>0&&v<=3600)?v:180;
+}
+function _woCustomLabel(){
+  var s=_woCustomSecs();
+  if(s%60===0) return (s/60)+(s===60?' min':' min');
+  return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+}
+function _woCustomTimer(){
+  var cur=_woCustomSecs();
+  var h='<div style="font-size:12.5px;color:var(--sub);line-height:1.5;margin-bottom:12px">Set your own rest. It stays on that button until you change it.</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">'
+    +[45,90,120,150,180,240,300].map(function(s){
+        return '<button class="btn btn-s btn-sm" style="flex:1 0 28%;color:'+(s===cur?'var(--green)':'var(--blue)')+'" onclick="_woCustomSet('+s+')">'+(s%60===0?(s/60)+' min':s+' sec')+'</button>';
+      }).join('')
+    +'</div>'
+    +'<div style="display:flex;gap:8px;align-items:center">'
+    +'<input id="wo-custom-min" class="fi" type="number" inputmode="numeric" min="0" max="59" value="'+Math.floor(cur/60)+'" style="width:72px;text-align:center;font-size:16px">'
+    +'<span style="font-size:13px;color:var(--sub)">min</span>'
+    +'<input id="wo-custom-sec" class="fi" type="number" inputmode="numeric" min="0" max="59" value="'+(cur%60)+'" style="width:72px;text-align:center;font-size:16px">'
+    +'<span style="font-size:13px;color:var(--sub)">sec</span>'
+    +'<button class="btn btn-g btn-sm" style="flex:1" onclick="_woCustomSetTyped()">Start</button>'
+    +'</div>';
+  var el=document.getElementById('wocust-body'); if(el) el.innerHTML=h;
+  document.getElementById('wocust-overlay').classList.add('open');
+  document.getElementById('wocust-sheet').classList.add('open');
+}
+function _woCustomClose(){
+  var o=document.getElementById('wocust-overlay');if(o)o.classList.remove('open');
+  var s=document.getElementById('wocust-sheet');if(s)s.classList.remove('open');
+}
+function _woCustomSet(secs){
+  if(!(secs>0))return;
+  lsSet('_timerCustom',String(secs));
+  _woCustomClose();
+  try{rWorkout();}catch(e){}
+  openTimer('Set Rest',secs);
+}
+function _woCustomSetTyped(){
+  var m=parseInt((document.getElementById('wo-custom-min')||{}).value,10)||0;
+  var s=parseInt((document.getElementById('wo-custom-sec')||{}).value,10)||0;
+  var total=m*60+s;
+  if(total<5){ try{showToast('Pick at least 5 seconds');}catch(e){} return; }
+  if(total>3600) total=3600;
+  _woCustomSet(total);
+}
+window._woCustomTimer=_woCustomTimer;
+window._woCustomSet=_woCustomSet;
+window._woCustomSetTyped=_woCustomSetTyped;
+window._woCustomClose=_woCustomClose;
 function openTimer(title,sec){
   _timerClear();
   document.getElementById('timer-title').textContent=title;
