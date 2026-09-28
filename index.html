@@ -1092,7 +1092,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260925-lib2';
+const APP_BUILD='20260928-ctx1';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -1105,7 +1105,7 @@ function lsGet(k,d){
 }
 function lsSet(k,v){
   let _r;try{localStorage.setItem(k,v);delete MEM[k];_r=true;}catch(e){MEM[k]=v;_r=false;}
-  try{if(k&&k.indexOf('wl_')===0)_maxSetCache=null;}catch(e){}
+  try{if(k&&(k.indexOf('wl_')===0||k.indexOf('wd_')===0))_maxSetCache=null;}catch(e){}
   try{fbSyncDayMisc(k,v);}catch(e){}
   return _r;
 }
@@ -2341,15 +2341,42 @@ function _exKey(n){
   return String(n||'').toLowerCase().replace(/^\s*(db|dumbbell)\s+/,'').replace(/[^a-z0-9().]+/g,' ')
     .split(' ').filter(Boolean).map(function(w){return (w.length>3&&/[^s]s$/.test(w))?w.slice(0,-1):w;}).join(' ');
 }
+/* Which workout was being done on a given date. Sets logged from today on
+   carry it on the entry; older ones are read back off the plan that was in
+   effect for that day. */
+function _woKey(n){ return String(n||'').toLowerCase().replace(/\s+/g,' ').trim(); }
+function _woNameOn(dateKey, entry){
+  if(entry && entry.wo) return _woKey(entry.wo);
+  try{
+    const d=new Date(dateKey+'T12:00:00');
+    const plan=_effectivePlan(dateKey);
+    const wo=plan&&plan[d.getDay()];
+    if(wo&&wo.name) return _woKey(wo.name);
+  }catch(e){}
+  return '';
+}
+function _woKeyToday(){
+  try{ const w=getWO(); return _woKey(w&&w.name); }catch(e){ return ''; }
+}
+/* A day still being worked through doesn't set records. The max only moves
+   once the workout is ticked complete, so beating it on set one can't hide
+   what the later sets are being measured against. */
+function _woCounted(dateKey){
+  try{ return lsGet('wd_'+dateKey,'0')==='1'; }catch(e){ return false; }
+}
 function getLastSession(exName){
   const _k=_exKey(exName);
+  const _ctx=_woKeyToday();
   for(let i=1;i<=90;i++){
     const d=new Date(viewDate+'T12:00:00');
     d.setDate(d.getDate()-i);
     const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     const wl=getWL(key);
-    const found=wl.find(e=>e.ex===exName)||wl.find(e=>e&&_exKey(e.ex)===_k&&e.sets&&e.sets.length);
-    if(found&&found.sets&&found.sets.length)return found.sets;
+    const cand=wl.filter(e=>e&&e.sets&&e.sets.length&&(e.ex===exName||_exKey(e.ex)===_k));
+    // Same lift, same workout. A match from a different session isn't a
+    // comparison — the order and the fatigue around it were different.
+    const found=cand.find(e=>!_ctx||_woNameOn(key,e)===_ctx);
+    if(found)return found.sets;
   }
   return null;
 }
@@ -2379,6 +2406,8 @@ function _buildMaxSets(){
   const scan=function(dateKey,raw){
     let wl;try{wl=JSON.parse(raw||'[]');}catch(e){return;}
     if(!Array.isArray(wl))return;
+    // Today counts only once the workout is marked complete.
+    if(dateKey===dk() && !_woCounted(dateKey))return;
     wl.forEach(function(en){
       if(!en||!en.ex||!Array.isArray(en.sets))return;
       // Best single set within this one session.
@@ -2390,7 +2419,7 @@ function _buildMaxSets(){
         if(w>bw||(w===bw&&r>br)){bw=w;br=r;}
       });
       if(br<0)return; // nothing usable logged that day
-      const mk=_exKey(en.ex);
+      const mk=_woNameOn(dateKey,en)+'||'+_exKey(en.ex);
       const cur=map[mk];
       if(!cur||bw>cur.w||(bw===cur.w&&br>cur.r)||(bw===cur.w&&br===cur.r&&dateKey>cur.date)){
         map[mk]={w:bw,r:br,date:dateKey,sets:en.sets};
@@ -2409,7 +2438,7 @@ function _buildMaxSets(){
 }
 function getMaxSession(exName){
   if(!_maxSetCache)_maxSetCache=_buildMaxSets();
-  return _maxSetCache[_exKey(exName)]||null;
+  return _maxSetCache[_woKeyToday()+'||'+_exKey(exName)]||null;
 }
 
 // Called when user changes the weight dropdown
@@ -2443,6 +2472,10 @@ function addWoSet(idx){
   const wl=getWL();
   let ex=wl.find(e=>e.ex===name);
   if(!ex){ex={ex:name,sets:[]};wl.push(ex);}
+  // Stamp the workout this set belongs to. The same lift inside Upper A and
+  // inside a full-body day are different jobs, and the history line should
+  // only ever compare like with like.
+  try{ const _w=getWO(); if(_w&&_w.name) ex.wo=_w.name; }catch(e){}
   ex.sets.push({w:st.selW,r});
   putWL(wl);
   _woState[name].rep='';
@@ -2477,6 +2510,7 @@ function markExDone(idx){
   let ex=wl.find(e=>e.ex===name);
   if(!ex){ex={ex:name,sets:[],done:true};wl.push(ex);}
   else ex.done=true;
+  try{ const _w=getWO(); if(_w&&_w.name && !ex.wo) ex.wo=_w.name; }catch(e){}
   putWL(wl);
   rWorkout();
   if(carry)_ctCarryTo(idx,carry);
