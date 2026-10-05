@@ -1092,7 +1092,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20260928-ctx1';
+const APP_BUILD='20261005-max1';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -1105,7 +1105,7 @@ function lsGet(k,d){
 }
 function lsSet(k,v){
   let _r;try{localStorage.setItem(k,v);delete MEM[k];_r=true;}catch(e){MEM[k]=v;_r=false;}
-  try{if(k&&(k.indexOf('wl_')===0||k.indexOf('wd_')===0))_maxSetCache=null;}catch(e){}
+  try{if(k&&(k.indexOf('wl_')===0||k.indexOf('wd_')===0||k==='_customWorkouts'||k==='_weekAdjust'))_maxSetCache=null;}catch(e){}
   try{fbSyncDayMisc(k,v);}catch(e){}
   return _r;
 }
@@ -2364,6 +2364,32 @@ function _woKeyToday(){
 function _woCounted(dateKey){
   try{ return lsGet('wd_'+dateKey,'0')==='1'; }catch(e){ return false; }
 }
+/* How many sets the plan asked for. Every workout tag leads with its set
+   count — "3 × 12–15", "3 RP · fail→5→5", "2 DS · 30→25→20" — so the first
+   number is the answer in all three shapes. 0 means we couldn't tell. */
+function _tagSets(tag){
+  const m=/^\s*(\d+)\s*(\u00d7|x|RP|DS)/i.exec(String(tag||''));
+  return m?parseInt(m[1],10):0;
+}
+function _woDefOn(dateKey){
+  try{
+    const one=_woOneOffFor(dateKey);
+    if(one)return one;
+    const d=new Date(dateKey+'T12:00:00');
+    const plan=_effectivePlan(dateKey);
+    return (plan&&plan[d.getDay()])||null;
+  }catch(e){return null;}
+}
+function _prescribedSets(dateKey,exName){
+  try{
+    const wo=_woDefOn(dateKey);
+    if(!wo)return 0;
+    const k=_exKey(exName);
+    const found=[...(wo.ex||[]),...(wo.pm||[])]
+      .find(x=>x&&(x.n===exName||_exKey(x.n)===k));
+    return found?_tagSets(found.tag):0;
+  }catch(e){return 0;}
+}
 function getLastSession(exName){
   const _k=_exKey(exName);
   const _ctx=_woKeyToday();
@@ -2410,19 +2436,29 @@ function _buildMaxSets(){
     if(dateKey===dk() && !_woCounted(dateKey))return;
     wl.forEach(function(en){
       if(!en||!en.ex||!Array.isArray(en.sets))return;
-      // Best single set within this one session.
-      let bw=-1,br=-1;
+      // Best single set within this one session, and how many sets it held.
+      let bw=-1,br=-1,used=0;
       en.sets.forEach(function(st){
         if(!st)return;
         const r=+st.r||0,w=+st.w||0;
         if(r<=0)return;
+        used++;
         if(w>bw||(w===bw&&r>br)){bw=w;br=r;}
       });
       if(br<0)return; // nothing usable logged that day
+      // A day the exercise was cut short isn't a record. One heavy set logged
+      // before the session was abandoned shouldn't outrank three honest ones,
+      // so a session that met its prescribed set count always wins over one
+      // that didn't — and a short day only shows when there's nothing fuller.
+      const need=_prescribedSets(dateKey,en.ex);
+      const full=!need||used>=need;
       const mk=_woNameOn(dateKey,en)+'||'+_exKey(en.ex);
       const cur=map[mk];
-      if(!cur||bw>cur.w||(bw===cur.w&&br>cur.r)||(bw===cur.w&&br===cur.r&&dateKey>cur.date)){
-        map[mk]={w:bw,r:br,date:dateKey,sets:en.sets};
+      const better=!cur ? true
+        : (full!==cur.full) ? full
+        : (bw>cur.w||(bw===cur.w&&br>cur.r)||(bw===cur.w&&br===cur.r&&dateKey>cur.date));
+      if(better){
+        map[mk]={w:bw,r:br,date:dateKey,sets:en.sets,full:full};
       }
     });
   };
