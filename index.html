@@ -1092,7 +1092,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20261005-max1';
+const APP_BUILD='20261006-hk1';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -16161,29 +16161,12 @@ async function connectHealth(){
   var available = await N.health.isAvailable().catch(function(){ return false; });
   if(!available){ toast('Apple Health isn\'t available on this device'); return; }
 
-  // Apple's guideline 5.1.3 allows HealthKit data to be used for health
-  // management but not disclosed to a third party without consent, and the
-  // weight read here becomes part of the profile the AI guidance is built
-  // from. So the consent is asked for here, in plain words, before the
-  // HealthKit prompt rather than buried in the privacy policy.
-  var consent = confirm(
-    'Connect Apple Health?\n\n' +
-    'Metastory will save the workouts you finish to Apple Health, and read ' +
-    'back what your devices already record: sleep, resting heart rate, heart ' +
-    'rate variability, breathing rate, blood oxygen, wrist temperature, ' +
-    'heart-rate recovery, blood pressure from a cuff, body temperature, steps, ' +
-    'distance, stand and move minutes, resting energy, time in daylight, ' +
-    'mindful minutes, weight and body composition, blood glucose from a ' +
-    'monitor, food and drink you log in other apps, and any digestive or mood ' +
-    'symptoms you record in Health.\n\n' +
-    'You choose which of those to share on the next screen, and nothing you ' +
-    'withhold is read. Your weight and recovery markers become part of the ' +
-    'profile used to generate your personalized guidance, which is produced ' +
-    'by Google Gemini. It is never used for advertising, never sold, and ' +
-    'never used to train models.\n\n' +
-    'You can turn this off any time in Settings.'
-  );
-  if(!consent) return;
+  // This used to put a confirm() in front of Apple's sheet, which App Review
+  // rejected under 5.1.1(iv): a custom message before a permission request may
+  // not give the person a way to cancel out of the request itself. Tapping the
+  // button IS the decision, so it goes straight through. What we read and why
+  // — the 5.1.3 disclosure — now sits in full on the Settings card above this
+  // button, where it is readable without committing to anything.
 
   try{
     await N.health.requestAuthorization();
@@ -17229,8 +17212,9 @@ after('rSettingsModal', function(){
       '<div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">' +
         (health
           ? 'Workouts you finish are saved to Apple Health, and your weight is read back from it. That weight is part of the profile your personalized guidance is generated from.'
-          : 'Save the workouts you finish to Apple Health, and let Metastory read your weight instead of asking you to type it.') +
+          : 'Save the workouts you finish to Apple Health, and let Metastory read what your devices already record. Tapping below opens Apple\'s permission screen, where you choose what to share.') +
       '</div>' +
+      (health ? '' : _healthDisclosureHTML()) +
       (health ? _nativeHealthSourcesHTML() : '') +
       (health ? _nativeHealthDiagHTML() : '') +
       (health
@@ -17395,6 +17379,22 @@ function nativeHealthRefresh(){
 window._nativeHealthRefresh = nativeHealthRefresh;
 window._nativeHealthSourcesHTML = _nativeHealthSourcesHTML;
 
+/* Guideline 5.1.3: HealthKit data may be used for health management but not
+   handed to a third party without consent, and the weight and recovery markers
+   read here become part of the profile the AI guidance is built from. So the
+   whole list is stated plainly on the card, ahead of the button — not inside a
+   dialog that stands between someone and Apple's own permission screen. */
+function _healthDisclosureHTML(){
+  return '<details class="set-sub" style="margin-bottom:10px">' +
+    '<summary><span>What Metastory reads, and why</span><span class="set-chev"></span></summary>' +
+    '<div style="font-size:12px;color:var(--sub);line-height:1.55;padding:6px 2px 2px">' +
+      '<p style="margin:0 0 8px">Metastory saves the workouts you finish to Apple Health, and reads back what your devices already record: sleep, resting heart rate, heart rate variability, breathing rate, blood oxygen, wrist temperature, heart-rate recovery, blood pressure from a cuff, body temperature, steps, distance, stand and move minutes, resting energy, time in daylight, mindful minutes, weight and body composition, blood glucose from a monitor, food and drink you log in other apps, and any digestive or mood symptoms you record in Health.</p>' +
+      '<p style="margin:0 0 8px">You choose which of those to share on Apple\'s permission screen, and nothing you withhold is read.</p>' +
+      '<p style="margin:0 0 8px">Your weight and recovery markers become part of the profile used to generate your personalized guidance, which is produced by Google Gemini. It is never used for advertising, never sold, and never used to train models.</p>' +
+      '<p style="margin:0">You can turn this off any time, here in Settings.</p>' +
+    '</div></details>';
+}
+window._healthDisclosureHTML = _healthDisclosureHTML;
 window._nativeConnectHealth = connectHealth;
 window._nativeDisconnectHealth = disconnectHealth;
 
