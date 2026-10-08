@@ -1023,6 +1023,18 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   </div>
 </div>
 
+<!-- Correct a max -->
+<div class="swap-overlay" id="maxed-overlay" onclick="_maxEdClose()"></div>
+<div class="swap-sheet" id="maxed-sheet" style="max-height:80vh">
+  <div class="swap-handle"></div>
+  <div class="swap-header">
+    <div class="swap-title" id="maxed-title">Max</div>
+    <button class="swap-close" onclick="_maxEdClose()">&#10005;</button>
+  </div>
+  <div class="swap-divider"></div>
+  <div style="padding:14px 16px 20px;overflow-y:auto" id="maxed-body"></div>
+</div>
+
 <!-- Custom rest length -->
 <div class="swap-overlay" id="wocust-overlay" onclick="_woCustomClose()"></div>
 <div class="swap-sheet" id="wocust-sheet" style="max-height:70vh">
@@ -1092,7 +1104,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // Which build of index.html is actually running. Shown in Settings → App, so
 // "is my app on the new code?" is a five-second check instead of a guess. Keep
 // this in step with VERSION in sw.js whenever you ship.
-const APP_BUILD='20261006-hk1';
+const APP_BUILD='20261008-maxed1';
 // ── STORAGE (safe for file:// Safari) ────────────────────────────────────────
 const MEM = {};
 // MEM takes precedence over localStorage so a quota-failed write in this
@@ -1381,6 +1393,7 @@ function fbSyncSettings(){
     try { const df=lsGet('_detFlags',''); if(df) settings.detFlags=JSON.parse(df); } catch(e){}
     try { const np=lsGet('_notifPrefs',''); if(np) settings.notifPrefs=JSON.parse(np); } catch(e){}
     try { const cw=lsGet('_customWorkouts',''); if(cw) settings.customWorkouts=JSON.parse(cw); } catch(e){}
+    try { const mo=lsGet('_maxOv',''); if(mo) settings.maxOverrides=JSON.parse(mo); } catch(e){}
     try { const wa=lsGet('_weekAdjust',''); if(wa) settings.weekAdjust=JSON.parse(wa); } catch(e){}
     try { const aw=lsGet('_aiWeekly',''); if(aw) settings.aiWeekly=JSON.parse(aw); } catch(e){}
     try { const ns=lsGet('_assess_ns_result',''); if(ns) settings.assessNs=JSON.parse(ns); } catch(e){}
@@ -1526,6 +1539,7 @@ async function fbPullAll(){
         if(s.detFlags) lsSet('_detFlags', JSON.stringify(s.detFlags));
         if(s.notifPrefs) lsSet('_notifPrefs', JSON.stringify(s.notifPrefs));
         if(s.customWorkouts) lsSet('_customWorkouts', JSON.stringify(s.customWorkouts));
+        if(s.maxOverrides) lsSet('_maxOv', JSON.stringify(s.maxOverrides));
         if(s.weekAdjust) lsSet('_weekAdjust', JSON.stringify(s.weekAdjust));
         if(s.aiWeekly) lsSet('_aiWeekly', JSON.stringify(s.aiWeekly));
         if(s.assessNs) lsSet('_assess_ns_result', JSON.stringify(s.assessNs));
@@ -2472,7 +2486,106 @@ function _buildMaxSets(){
   try{Object.keys(MEM).forEach(function(k){if(k.indexOf('wl_')===0)scan(k.slice(3),MEM[k]);});}catch(e){}
   return map;
 }
+/* ── Correcting a max ─────────────────────────────────────────────────────
+   The calculated max is only as good as what was logged, and a mistyped
+   weight or a set logged against the wrong exercise can leave a number
+   nobody can beat. A correction is stored per exercise per workout, the same
+   scope the calculated max uses, and it simply stands in for it until it is
+   cleared. The underlying logs are never rewritten — they are the record of
+   what happened, and a wrong max is a display problem, not a history one. */
+function _maxOvAll(){ try{ return JSON.parse(lsGet('_maxOv','{}'))||{}; }catch(e){ return {}; } }
+function _maxOvKey(exName){ return _woKeyToday()+'||'+_exKey(exName); }
+function _maxOvGet(exName){
+  const m=_maxOvAll()[_maxOvKey(exName)];
+  return (m && Array.isArray(m.sets) && m.sets.length) ? m : null;
+}
+function _maxOvSave(exName,sets){
+  const all=_maxOvAll();
+  all[_maxOvKey(exName)]={sets:sets,at:Date.now()};
+  lsSet('_maxOv',JSON.stringify(all));
+  try{ fbSyncSettings(); }catch(e){}
+}
+function _maxOvClear(exName){
+  const all=_maxOvAll();
+  delete all[_maxOvKey(exName)];
+  lsSet('_maxOv',JSON.stringify(all));
+  try{ fbSyncSettings(); }catch(e){}
+}
+function _maxFromSets(sets){
+  let bw=-1,br=-1;
+  (sets||[]).forEach(function(st){
+    if(!st)return; const r=+st.r||0,w=+st.w||0; if(r<=0)return;
+    if(w>bw||(w===bw&&r>br)){bw=w;br=r;}
+  });
+  return {w:bw,r:br};
+}
+
+var _maxEdEx='';
+function openMaxEdit(idx){
+  try{ _maxEdEx = _woExList[idx]; }catch(e){ return; }
+  if(!_maxEdEx) return;
+  const ov=_maxOvGet(_maxEdEx);
+  const calc=_maxSetCache ? _maxSetCache[_maxOvKey(_maxEdEx)] : (_buildMaxSets()||{})[_maxOvKey(_maxEdEx)];
+  _maxEdRender((ov?ov.sets:(calc?calc.sets:[{w:0,r:0}])).map(function(x){return {w:+x.w||0,r:+x.r||0};}));
+  const t=document.getElementById('maxed-title'); if(t) t.textContent=_maxEdEx;
+  document.getElementById('maxed-overlay').classList.add('open');
+  document.getElementById('maxed-sheet').classList.add('open');
+}
+function _maxEdCurrent(){
+  const rows=[];
+  document.querySelectorAll('#maxed-body .maxed-row').forEach(function(row){
+    const w=row.querySelector('.maxed-w'), r=row.querySelector('.maxed-r');
+    rows.push({w:parseFloat(w&&w.value)||0, r:parseInt(r&&r.value,10)||0});
+  });
+  return rows;
+}
+function _maxEdRender(sets){
+  if(!sets.length) sets=[{w:0,r:0}];
+  const ov=_maxOvGet(_maxEdEx);
+  let h='<div style="font-size:12.5px;color:var(--sub);line-height:1.5;margin-bottom:12px">'
+    + (ov ? 'This max was set by hand. Clear it to go back to the one calculated from your logs.'
+          : 'Calculated from your logged sets. Change the numbers below if they are wrong — your logs stay as they are.')
+    + '</div>';
+  sets.forEach(function(st,i){
+    h+='<div class="maxed-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">'
+      +'<span style="font-size:12px;color:var(--sub);width:40px;flex:none">Set '+(i+1)+'</span>'
+      +'<input class="fi maxed-w" type="number" inputmode="decimal" min="0" step="0.5" value="'+st.w+'" style="flex:1;min-width:0;text-align:center;font-size:16px">'
+      +'<span style="font-size:12px;color:var(--sub);flex:none">lb</span>'
+      +'<input class="fi maxed-r" type="number" inputmode="numeric" min="0" value="'+st.r+'" style="flex:1;min-width:0;text-align:center;font-size:16px">'
+      +'<span style="font-size:12px;color:var(--sub);flex:none">reps</span>'
+      +'<button class="wo-set-del" style="flex:none" onclick="_maxEdDel('+i+')">&#10005;</button>'
+      +'</div>';
+  });
+  h+='<div style="font-size:11px;color:var(--sub);margin:2px 0 14px;line-height:1.4">Leave the weight at 0 for a bodyweight set.</div>'
+    +'<button class="btn btn-s btn-sm btn-f" style="color:var(--blue);margin-bottom:10px" onclick="_maxEdAdd()">Add a set</button>'
+    +'<button class="btn btn-g btn-sm btn-f" onclick="_maxEdSave()">Save</button>'
+    + (ov ? '<button class="btn btn-s btn-sm btn-f" style="margin-top:8px;color:var(--sub)" onclick="_maxEdReset()">Use the calculated max</button>' : '');
+  const el=document.getElementById('maxed-body'); if(el) el.innerHTML=h;
+}
+function _maxEdAdd(){ const c=_maxEdCurrent(); c.push({w:0,r:0}); _maxEdRender(c); }
+function _maxEdDel(i){ const c=_maxEdCurrent(); c.splice(i,1); _maxEdRender(c); }
+function _maxEdSave(){
+  const sets=_maxEdCurrent().filter(function(st){ return (+st.r||0)>0; });
+  if(!sets.length){ try{toast('Give at least one set some reps.');}catch(e){} return; }
+  _maxOvSave(_maxEdEx,sets);
+  _maxEdClose();
+  try{ rWorkout(); }catch(e){}
+  try{ toast('Max updated'); }catch(e){}
+}
+function _maxEdReset(){
+  _maxOvClear(_maxEdEx);
+  _maxEdClose();
+  try{ rWorkout(); }catch(e){}
+  try{ toast('Back to the calculated max'); }catch(e){}
+}
+function _maxEdClose(){
+  const o=document.getElementById('maxed-overlay'); if(o)o.classList.remove('open');
+  const sh=document.getElementById('maxed-sheet'); if(sh)sh.classList.remove('open');
+}
+
 function getMaxSession(exName){
+  const ov=_maxOvGet(exName);
+  if(ov){ const b=_maxFromSets(ov.sets); return {w:b.w,r:b.r,date:null,sets:ov.sets,full:true,manual:true}; }
   if(!_maxSetCache)_maxSetCache=_buildMaxSets();
   return _maxSetCache[_woKeyToday()+'||'+_exKey(exName)]||null;
 }
@@ -2807,7 +2920,10 @@ function buildExCard(e,idx,num,col,wdone){
   const _maxSess=getMaxSession(name),_maxTxt=_maxSess?fmtLastSets(_maxSess.sets):'';
   const _lastTxt=fmtLastSets(lastSets);
   const _hint=(label,txt)=>`<div class="wo-last-hint" style="display:flex;align-items:flex-start;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:2px"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg><span>${label}: ${txt}</span></div>`;
-  if(_maxTxt)h+=_hint('Max',_maxTxt);
+  // The max is the one number here that can be wrong without the logs being
+  // wrong, so it's the one that opens an editor.
+  const _maxHint=(txt,manual)=>`<div class="wo-last-hint" style="display:flex;align-items:flex-start;gap:5px;cursor:pointer" onclick="openMaxEdit(${idx})"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:2px"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg><span style="flex:1">Max: ${txt}${manual?' <span style="opacity:.7">(set by hand)</span>':''}</span><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:3px;opacity:.65"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></div>`;
+  if(_maxTxt)h+=_maxHint(_maxTxt,!!(_maxSess&&_maxSess.manual));
   if(_lastTxt)h+=_hint('Last',_lastTxt);
   if(todaySets.length){
     h+=`<div class="wo-sets-list">`;
