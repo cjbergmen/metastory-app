@@ -3946,7 +3946,7 @@ function recalcTargetsFromProfile(){
     if(msg){msg.style.color='var(--sub)';msg.textContent='Add your stats in Rebuild My Plan first.';setTimeout(()=>{msg.textContent='';msg.style.color='var(--green)';},3500);}
     return;
   }
-  const t=wizComputeTargets(prof);
+  const t=wizComputeTargets(_profForTargets(prof));
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v;};
   set('nt-tr-p',t.train.p);set('nt-tr-c',t.train.c);set('nt-tr-f',t.train.f);set('nt-tr-k',t.train.k);set('nt-tr-w',t.train.w);
   set('nt-rs-p',t.rest.p);set('nt-rs-c',t.rest.c);set('nt-rs-f',t.rest.f);set('nt-rs-k',t.rest.k);set('nt-rs-w',t.rest.w);
@@ -10103,13 +10103,12 @@ const WIZ_STEPS=[
   ]},
   // 4: Where you are starting from — activity and experience
   {type:'group',parts:[
-    {type:'opts',key:'activity',title:'How active are you day to day?',sub:'This sets your starting calorie needs. If your routine changes, update it in Rebuild My Plan.',
+    {type:'opts',key:'lifestyle',title:'Outside of workouts, how much do you move?',sub:'Just your normal day \u2014 work, errands, getting around. Your workouts are counted separately from the training days you pick.',
      opts:[
-      {val:'sedentary',label:'Mostly sedentary',desc:'Desk job, little planned exercise'},
-      {val:'light',label:'Lightly active',desc:'1\u20133 training sessions a week'},
-      {val:'moderate',label:'Moderately active',desc:'3\u20135 sessions a week'},
-      {val:'active',label:'Very active',desc:'6\u20137 sessions a week'},
-      {val:'very_active',label:'Extremely active',desc:'Hard daily training or a physical job'},
+      {val:'desk',label:'Mostly sitting',desc:'Desk job or mostly seated \u2014 under ~5,000 steps a day'},
+      {val:'mixed',label:'Some walking',desc:'Up and about part of the day \u2014 ~5,000\u20138,000 steps'},
+      {val:'feet',label:'On my feet most of the day',desc:'Retail, teaching, nursing, parenting little ones \u2014 ~8,000\u201312,000 steps'},
+      {val:'labor',label:'Physical work',desc:'Construction, landscaping, warehouse, farm \u2014 heavy lifting or 12,000+ steps'},
     ]},
     {type:'tiles',key:'level',title:'How much training is behind you?',sub:'Be honest \u2014 your plan adapts to where you are now.',
      tiles:[
@@ -10325,9 +10324,20 @@ function renderWizStep(s){
       <div style="font-size:11px;color:var(--sub);text-align:center;margin-top:12px;line-height:1.5">Not sure? Pick the closest — you can update it any time from Rebuild My Plan.</div>`;
   }
   if(s.type==='opts'){
+    let _hkNote='';
+    if(s.key==='lifestyle'){
+      // Prefer what the phone measured over a guess: seed from 14-day step average.
+      try{
+        const st=(typeof healthOn==='function'&&healthOn()&&typeof _healthBaseline==='function')?_healthBaseline('steps',14):null;
+        if(st&&st>0){
+          if(!_wiz.profile.lifestyle){ _wiz.profile.lifestyle=_lifestyleFromSteps(st); _wiz.profile.lifestyleFromHealth=true; }
+          _hkNote=`<div style="font-size:12px;color:var(--green);margin:-6px 0 12px;line-height:1.45">Your phone shows about ${(Math.round(st/100)*100).toLocaleString()} steps a day on average${_wiz.profile.lifestyleFromHealth?', so we picked this for you \u2014 change it if it doesn\u2019t fit':''}.</div>`;
+        }
+      }catch(e){}
+    }
     const sel=_wiz.profile[s.key]||null;
     return `<div class="wiz-title">${s.title}</div>
-      <div class="wiz-sub">${s.sub}</div>
+      <div class="wiz-sub">${s.sub}</div>${_hkNote}
       <div class="wiz-opts">${s.opts.map(o=>`
         <div class="wiz-opt${sel===o.val?' sel':''}" onclick="wizSel('${s.key}','${o.val}')">
           <div class="wiz-opt-info"><div class="wiz-opt-label">${o.label}</div><div class="wiz-opt-desc">${o.desc}</div></div>
@@ -10518,6 +10528,7 @@ function wizUpdateNext(){
 function wizSel(key,val){
   _wizSaveStep(WIZ_STEPS[_wiz.step]);
   _wiz.profile[key]=val;
+  if(key==='lifestyle')_wiz.profile.lifestyleFromHealth=false;
   renderWiz();
 }
 
@@ -11141,15 +11152,30 @@ function wizComputeTargets(p){
   const bmrMifflin=10*kg+6.25*cm-5*age+(sex==='male'?5:-161);
   const bmrKatch=370+21.6*leanKg;
   const bmr=Math.round((bmrMifflin+bmrKatch)/2);
+  // Activity factor = daily-life baseline + planned training. Splitting the
+  // two (non-exercise movement vs. exercise) is how energy-expenditure research
+  // models it, and it stops the activity answer contradicting the days picked.
+  // Each weekly session adds ~0.08 — the step implied by the standard
+  // 1.2 / 1.375 / 1.55 / 1.725 table — so a desk worker training 4 days lands
+  // on the familiar "moderately active" 1.52. Older profiles that only have the
+  // single combined answer keep using it.
   const ACT={sedentary:1.2,light:1.375,moderate:1.55,active:1.725,very_active:1.9};
-  const mult=ACT[p.activity]||1.55;
+  const BASE={desk:1.2,mixed:1.3,feet:1.4,labor:1.55};
+  const trainDays=Math.min(Math.max(parseInt(p.days)||(Array.isArray(p.dayList)?p.dayList.length:0)||0,0),7);
+  let mult;
+  if(p.lifestyle&&BASE[p.lifestyle]){
+    mult=Math.round(Math.min(2.0, BASE[p.lifestyle]+0.08*trainDays)*1000)/1000;
+  }else{
+    mult=ACT[p.activity]||1.55;
+  }
   let tdee;
   if(minor){
     // IOM (2005) Estimated Energy Requirement, ages 9–18, incl. +25 kcal growth.
     const PA=sex==='male'
       ?{sedentary:1.0,light:1.13,moderate:1.26,active:1.42,very_active:1.42}
       :{sedentary:1.0,light:1.16,moderate:1.31,active:1.56,very_active:1.56};
-    const pa=PA[p.activity]||PA.moderate;
+    const paKey=p.lifestyle?(mult<1.4?'sedentary':mult<1.6?'light':mult<1.75?'moderate':'active'):p.activity;
+    const pa=PA[paKey]||PA.moderate;
     tdee=sex==='male'
       ?88.5-61.9*age+pa*(26.7*kg+903*m)+25
       :135.3-30.8*age+pa*(10.0*kg+934*m)+25;
@@ -11226,7 +11252,7 @@ function wizComputeTargets(p){
   const wTrain=wRest+20;
   return{
     _meta:{bf:Math.round(bf),leanLb:Math.round(leanLb),bmr,tdee:Math.round(tdee),
-           activity:p.activity||'moderate',mult,goal,diet,depleted,minor,floored,
+           activity:p.lifestyle||p.activity||'moderate',lifestyle:p.lifestyle||null,trainDays,mult,goal,diet,depleted,minor,floored,
            avgK:k,days,method:minor?'IOM-EER':'Mifflin+Katch',computedAt:Date.now()},
     train:{p:prot,c:carb,f:fat,k:trainK,w:wTrain},
     rest:{p:prot,c:restCarb,f:fat,k:restK,w:wRest}
@@ -11463,7 +11489,7 @@ function targetsRecheck(){
     lsSet('_targetsRecheckAt', String(Date.now()));
 
     // Recompute with what they have lived, not what they typed at setup.
-    var live=Object.assign({},prof);
+    var live=_profForTargets(prof);
     if(read.sleep) live.sleep=read.sleep;
     if(read.stress) live.stress=read.stress;
 
@@ -11507,6 +11533,18 @@ setTimeout(targetsRecheck, 6000);
    of a weight change is lean mass, three quarters fat (Heymsfield 2014) — so
    lean-mass protein moves sensibly instead of being re-guessed. Averaging
    several weigh-ins keeps day-to-day water swings from moving the plan. */
+function _lifestyleFromSteps(st){ return st<5000?'desk':(st<8000?'mixed':(st<12000?'feet':'labor')); }
+// Recalculations outside the wizard count the training days in the plan the
+// person is actually on now (edits via "Edit my week" included).
+function _profForTargets(prof){
+  const p=Object.assign({},prof||{});
+  try{
+    const cw=JSON.parse(lsGet('_customWorkouts','{}')||'{}');
+    const n=Object.keys(cw).filter(k=>/^[0-6]$/.test(k)&&cw[k]).length;
+    if(n>0){ p.days=n; delete p.dayList; }
+  }catch(e){}
+  return p;
+}
 function _wlKey(dt){return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');}
 function _wlGet(){try{const a=JSON.parse(lsGet('_weightLog','[]'));return Array.isArray(a)?a.filter(x=>x&&x.d&&+x.lb>0):[];}catch(e){return[];}}
 function _wlPut(a){a.sort((x,y)=>x.d<y.d?-1:(x.d>y.d?1:0));lsSet('_weightLog',JSON.stringify(a.slice(-400)));}
@@ -11567,7 +11605,7 @@ function weightRecheck(){
   if(cur&&cur.manual){
     try{ toast('Your weight is '+dir+' '+amt+' lb. Your targets are hand-set, so they were not changed — open Settings › Edit my nutrition targets and tap Recalculate to update them.',9000); }catch(e){}
   }else{
-    const live=Object.assign({},next);
+    const live=_profForTargets(next);
     try{ const r=_recoveryRead(); if(r){ if(r.sleep)live.sleep=r.sleep; if(r.stress)live.stress=r.stress; } }catch(e){}
     const t=wizComputeTargets(live); t.manual=false;
     const oldK=cur&&cur.train?cur.train.k:null;
