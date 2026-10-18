@@ -3918,7 +3918,7 @@ function setWODone(v){
 function getTgt(){
   const custom=lsGet('_userTargets','');
   if(custom){try{const t=JSON.parse(custom);if(t&&t.train&&t.rest)return isTrain()?t.train:t.rest;}catch(e){}}
-  return isTrain()?{p:150,c:200,f:65,k:2100,w:90}:{p:125,c:160,f:55,k:1750,w:75};
+  return isTrain()?{p:150,c:225,f:65,k:2085,w:110}:{p:150,c:165,f:65,k:1845,w:90};
 }
 function saveNutritionTargets(){
   const g=(id)=>Math.max(0,+(document.getElementById(id)?.value||0));
@@ -10100,7 +10100,7 @@ const WIZ_STEPS=[
   ]},
   // 4: Where you are starting from — activity and experience
   {type:'group',parts:[
-    {type:'opts',key:'activity',title:'How active are you day to day?',sub:'This sets your starting calorie needs. We fine-tune it from your logged workouts over time.',
+    {type:'opts',key:'activity',title:'How active are you day to day?',sub:'This sets your starting calorie needs. If your routine changes, update it in Rebuild My Plan.',
      opts:[
       {val:'sedentary',label:'Mostly sedentary',desc:'Desk job, little planned exercise'},
       {val:'light',label:'Lightly active',desc:'1\u20133 training sessions a week'},
@@ -10311,7 +10311,7 @@ function renderWizStep(s){
       return `<circle cx="30" cy="20" r="8.5"/><rect x="26" y="27" width="8" height="6" rx="2"/><path d="${d}"/>`;
     };
     return `<div class="wiz-title">What is your current build?</div>
-      <div class="wiz-sub">Tap the figure closest to you today. This sets your protein and calorie targets from your lean body mass — no need to know a number. It sharpens as you track.</div>
+      <div class="wiz-sub">Tap the figure closest to you today. This sets your protein and calorie targets from your lean body mass — no need to know a number.</div>
       <div style="display:flex;justify-content:space-between;gap:3px;margin-top:8px">
         ${scale.map(o=>`
           <div onclick="wizSel('bodyFat',${o.bf})" style="flex:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;padding:9px 2px;border:1.5px solid ${sel===o.bf?'var(--green)':'transparent'};border-radius:12px;color:${sel===o.bf?'var(--green)':'var(--sub)'};${sel===o.bf?'background:rgba(183,186,167,.15)':''}">
@@ -10319,7 +10319,7 @@ function renderWizStep(s){
             <div style="font-size:11px;font-weight:700;color:${sel===o.bf?'var(--green)':'var(--text)'}">${o.l}</div>
           </div>`).join('')}
       </div>
-      <div style="font-size:11px;color:var(--sub);text-align:center;margin-top:12px;line-height:1.5">Not sure? Pick the closest — the way you feel after meals refines it over time.</div>`;
+      <div style="font-size:11px;color:var(--sub);text-align:center;margin-top:12px;line-height:1.5">Not sure? Pick the closest — you can update it any time from Rebuild My Plan.</div>`;
   }
   if(s.type==='opts'){
     const sel=_wiz.profile[s.key]||null;
@@ -10456,7 +10456,7 @@ function renderWizStep(s){
             <span><strong>${t.train.f}g</strong> fat</span>
             <span><strong>${t.train.k}</strong> kcal</span>
           </div>
-          ${t._meta?`<div style="font-size:11px;color:var(--sub);margin-top:6px">Built from ~${t._meta.leanLb} lb of lean mass at ${t._meta.bf}% body fat.${t._meta.depleted?' Deficit paused while your body recovers.':''}</div>`:''}
+          ${t._meta?`<div style="font-size:11px;color:var(--sub);margin-top:6px">Built from ~${t._meta.leanLb} lb of lean mass at ${t._meta.bf}% body fat.${t._meta.minor?' Under 18: set for growth, so there is no calorie deficit or surplus.':(t._meta.depleted?' Deficit paused while your body recovers.':(t._meta.floored?' Held at a safe minimum so your intake never drops too low.':''))} Training days shown; rest days run a little lower.</div>`:''}
           <div style="font-size:11px;color:var(--sub);line-height:1.5;margin-top:6px">This is your starting plate. The real signal is how you feel 90 minutes to 2 hours after eating — steady energy and mood means the ratio is right for you; foggy, sleepy, or hungry means we shift it.</div>
           </div>`:''}
         ${foods?`<div class="wiz-done-card"><div class="wiz-done-card-title">${foods} foods added to your library</div>
@@ -10494,7 +10494,9 @@ function _wizStepOk(s){
     const age=document.getElementById('wi-age')?.value;
     const wt=document.getElementById('wi-weight')?.value;
     const sex=document.getElementById('wi-sex')?.value;
-    return !!(age&&wt&&sex);
+    const ft=+document.getElementById('wi-ht-ft')?.value||0;
+    // Height drives BMR — don't let it silently default.
+    return !!(age&&wt&&sex&&ft>=4&&ft<=7);
   }
   if(s.type==='bodyfat')return _wiz.profile.bodyFat!=null;
   if(s.type==='opts')return !!_wiz.profile[s.key];
@@ -11098,40 +11100,70 @@ function buildWorkoutFromLibrary(p){
 }
 
 function wizComputeTargets(p){
-  // Personalized engine: lean-mass protein (FDN), BMR->TDEE->goal for calories.
-  const wt=+p.weight||170;                                   // lb
+  // Personalized, evidence-bounded engine (audited 2026-10-18).
+  //   Energy:  Mifflin-St Jeor (Frankenfield 2005 — most accurate predictive
+  //            equation in adults) averaged with Katch-McArdle (lean mass);
+  //            ages 13–17 use the IOM/National Academies EER for youth instead.
+  //   Protein: ~1 g per lb lean mass ≈ 2.2 g/kg fat-free mass — inside the
+  //            ISSN 1.4–2.0 g/kg body weight range for active people and the
+  //            2.3–3.1 g/kg FFM range for dieting lifters (Helms 2014).
+  //   Fat:     ~28% of calories, held inside the 20–35% AMDR (IOM), never under
+  //            0.5 g/kg body weight. Carbs fill the rest (≥100 g/day unless
+  //            the person chose low-carb).
+  //   Safety:  calorie floor (NHLBI/AHA-ACC-TOS: ≥1200 women, ≥1500 men, never
+  //            below estimated BMR), deficit capped at 750 kcal/day and ~1% of
+  //            body weight/week, no deficit for under-18s, surplus capped +500.
+  const wt=Math.min(Math.max(+p.weight||170,70),600);       // lb
   const sex=p.sex==='female'?'female':'male';
-  const age=+p.age||35;
+  const age=Math.min(Math.max(+p.age||35,13),100);
   const htIn=((+p.htFt||0)*12+(+p.htIn||0))||(sex==='female'?65:70);
-  const cm=htIn*2.54, kg=wt*0.453592;
+  const cm=htIn*2.54, kg=wt*0.453592, m=cm/100;
   const goal=p.goal||'maintenance';
+  const minor=age<18;
   // Body fat: from the visual picker; fall back to a BMI/age/sex estimate.
   let bf=+p.bodyFat;
   if(!bf||isNaN(bf)){
     const bmi=(wt/(htIn*htIn))*703;
-    bf=1.20*bmi+0.23*age-(sex==='male'?10.8:0)-5.4;   // Deurenberg
+    bf=1.20*bmi+0.23*age-(sex==='male'?10.8:0)-5.4;   // Deurenberg 1991
     bf=Math.min(Math.max(Math.round(bf),5),55);
   }
   const leanLb=wt*(1-bf/100), leanKg=leanLb*0.453592;
   // Protein — FDN anchor: ~1 g per lb of LEAN mass, held constant train & rest.
-  // Diet preference moves the anchor: a high-protein plan asks for more, and a
-  // plant-based one needs a little more to land the same amount of usable
-  // protein (lower digestibility and leucine content per gram).
+  // Diet preference moves the anchor (plant protein is less digestible and
+  // lower in leucine per gram, so it needs a little more).
   const diet=p.diet||'balanced';
   const PROT_MULT={high_protein:1.25, plant_based:1.10, low_carb:1.15, balanced:1.0};
-  const prot=Math.round(leanLb*(PROT_MULT[diet]||1.0));
-  // BMR — Mifflin-St Jeor (weight, height, age, sex) averaged with
-  // Katch-McArdle (lean mass) for robustness.
+  let prot=Math.round(leanLb*(PROT_MULT[diet]||1.0));
+  // BMR / TDEE.
   const bmrMifflin=10*kg+6.25*cm-5*age+(sex==='male'?5:-161);
   const bmrKatch=370+21.6*leanKg;
   const bmr=Math.round((bmrMifflin+bmrKatch)/2);
-  // Activity multiplier — asked at onboarding, refined from logged workouts.
   const ACT={sedentary:1.2,light:1.375,moderate:1.55,active:1.725,very_active:1.9};
   const mult=ACT[p.activity]||1.55;
-  const tdee=bmr*mult;
-  // Goal adjustment.
-  const GOAL={fat_loss:0.82,fitness:0.95,maintenance:1.0,muscle:1.10,strength:1.10};
-  let k=Math.round(tdee*(GOAL[goal]!=null?GOAL[goal]:1.0));
+  let tdee;
+  if(minor){
+    // IOM (2005) Estimated Energy Requirement, ages 9–18, incl. +25 kcal growth.
+    const PA=sex==='male'
+      ?{sedentary:1.0,light:1.13,moderate:1.26,active:1.42,very_active:1.42}
+      :{sedentary:1.0,light:1.16,moderate:1.31,active:1.56,very_active:1.56};
+    const pa=PA[p.activity]||PA.moderate;
+    tdee=sex==='male'
+      ?88.5-61.9*age+pa*(26.7*kg+903*m)+25
+      :135.3-30.8*age+pa*(10.0*kg+934*m)+25;
+  }else{
+    tdee=bmr*mult;
+  }
+  // Goal adjustment. "Fitness & endurance" eats at maintenance — training
+  // for performance in a deficit risks low energy availability (RED-S).
+  const lvl=p.level||'intermediate';
+  const SURPLUS={beginner:0.10,intermediate:0.08,advanced:0.05,athlete:0.05};
+  let k=tdee;
+  if(goal==='fat_loss'){
+    const deficit=Math.min(tdee*0.18, 750, wt*5);    // 18%, ≤750/day, ≤~1% BW/week
+    k=tdee-deficit;
+  }else if(goal==='muscle'||goal==='strength'){
+    k=tdee+Math.min(tdee*(SURPLUS[lvl]!=null?SURPLUS[lvl]:0.08), 500);
+  }
   // FDN safety gate — a depleted body is not dieted. Suppress any deficit when
   // stress is high, sleep is poor, or the nervous-system assessment flags an
   // exhausted/shutdown pattern.
@@ -11141,37 +11173,60 @@ function wizComputeTargets(p){
     const patt=(ns.pattern||ns.result||ns.type||'').toString().toLowerCase();
     if(/exhaust|shutdown|burnout|deplet|freeze|dorsal/.test(patt)) depleted=true;
   }catch(e){}
-  if(depleted && k<tdee) k=Math.round(tdee);
-  // Fat floor — protect hormones: max(0.35 g/lb, 28% of calories).
-  let fat=Math.round(Math.max(wt*0.35, k*0.28/9));
-  // Carbs fill the remainder.
-  let carb=Math.round((k-prot*4-fat*9)/4);
-  if(carb<20)carb=20;
+  if(depleted && k<tdee) k=tdee;
+  // Growing bodies are fuelled, not dieted or bulked.
+  if(minor) k=tdee;
+  // Calorie floor — only ever limits a deficit; never pushes anyone above
+  // their own maintenance.
+  const sexFloor=sex==='female'?1200:1500;
+  const floor=Math.round(Math.min(tdee, Math.max(sexFloor, bmrMifflin)));
+  let floored=false;
+  if(k<floor){k=floor;floored=true;}
+  k=Math.round(k);
 
-  // ── Diet preference actually moves the macros ────────────────────────────
-  // Protein was already raised above for high_protein / plant_based. Low carb
-  // caps the carbohydrate and hands the calories to fat, so total intake and
-  // protein are untouched — only the split changes.
+  // Train vs rest. k is the daily AVERAGE across the week; training days sit
+  // above it and rest days below, so the week still lands on target.
+  const days=Math.min(Math.max(parseInt(p.days)||(Array.isArray(p.dayList)?p.dayList.length:0)||4,0),7);
+  let restCut=Math.min(350,Math.max(120,Math.round(k*0.06)));
+  let trainK=(days>0&&days<7)?Math.round(k+restCut*(7-days)/7):k;
+  let restK=trainK-restCut;
+  const dayFloor=k<tdee?floor:0;
+  if(restK<dayFloor){restK=dayFloor;}
+
+  // Macros. Protein capped at the 35% AMDR ceiling of the average day.
+  prot=Math.min(prot, Math.round(k*0.35/4));
+  let fat=Math.round(Math.min(Math.max(k*0.28/9, kg*0.5), Math.min(k,restK)*0.35/9));
+  const cMin=diet==='low_carb'?50:100;
+  let carb=Math.round((trainK-prot*4-fat*9)/4);
+  let restCarb=Math.round((restK-prot*4-fat*9)/4);
   if(diet==='low_carb'){
-    // ~100 g for a normal intake, scaling up a little for very large eaters so
-    // the fat number stays physiologically sane.
+    // ~100 g/day (more for very large eaters); freed calories go to fat.
     const cap=Math.max(100, Math.round(k*0.12/4));
-    if(carb>cap){
-      const moved=(carb-cap)*4;      // kcal freed by the carbs we removed
-      carb=cap;
-      fat=Math.round(fat+moved/9);
-    }
+    if(carb>cap){ fat=Math.round(fat+(carb-cap)*4/9); carb=cap; }
+    restCarb=Math.round((restK-prot*4-fat*9)/4);
   }
+  // Very small intakes: give carbs room by easing fat toward the 20% floor.
+  if(restCarb<cMin && diet!=='low_carb'){
+    const fatLow=Math.round(Math.max(k*0.20/9, kg*0.5));
+    const give=Math.min(fat-fatLow, Math.ceil((cMin-restCarb)*4/9));
+    if(give>0){ fat-=give; carb=Math.round((trainK-prot*4-fat*9)/4); restCarb=Math.round((restK-prot*4-fat*9)/4); }
+  }
+  carb=Math.max(cMin,carb); restCarb=Math.max(cMin,restCarb);
+  // kcal always equals the macros it is made of.
+  trainK=prot*4+carb*4+fat*9;
+  restK=prot*4+restCarb*4+fat*9;
 
-  // Train vs rest — protein & fat constant; the rest-day trim scales with the
-  // person's intake instead of taking a flat 220 kcal off everyone.
-  const restCut=Math.min(350,Math.max(120,Math.round(k*0.06)));
-  const restCarb=Math.max(20,carb-Math.round(restCut/4));
+  // Water (oz): ~0.5 oz/lb, bounded by the IOM adequate intake for beverages
+  // (~74 oz women / ~101 oz men) and capped so large bodies aren't told to
+  // drink unsafe volumes; +20 oz on training days (ACSM fluid replacement).
+  const wRest=Math.round(Math.min(Math.max(wt*0.5, sex==='female'?74:100), 120));
+  const wTrain=wRest+20;
   return{
     _meta:{bf:Math.round(bf),leanLb:Math.round(leanLb),bmr,tdee:Math.round(tdee),
-           activity:p.activity||'moderate',mult,goal,diet,depleted,computedAt:Date.now()},
-    train:{p:prot,c:carb,f:fat,k:k,w:Math.round(wt*0.67)},
-    rest:{p:prot,c:restCarb,f:fat,k:Math.max(1000,k-restCut),w:Math.round(wt*0.55)}
+           activity:p.activity||'moderate',mult,goal,diet,depleted,minor,floored,
+           avgK:k,days,method:minor?'IOM-EER':'Mifflin+Katch',computedAt:Date.now()},
+    train:{p:prot,c:carb,f:fat,k:trainK,w:wTrain},
+    rest:{p:prot,c:restCarb,f:fat,k:restK,w:wRest}
   };
 }
 
