@@ -1,4 +1,4 @@
-const VERSION = '20261018-macro-audit';
+const VERSION = '20261018-genmsg';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
