@@ -1,4 +1,4 @@
-const VERSION = '20261018-macro-audit2';
+const VERSION = '20261018-weight-adjust';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
