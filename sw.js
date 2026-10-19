@@ -1,4 +1,4 @@
-const VERSION = '20261018-lifestyle';
+const VERSION = '20261019-sharecard';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
