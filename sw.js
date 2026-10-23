@@ -1,4 +1,4 @@
-const VERSION = '20261023-assess-resume';
+const VERSION = '20261023-assess-menu';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
