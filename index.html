@@ -6419,22 +6419,19 @@ function rAssessHub(){
     <div style="font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:16px;padding:12px;background:var(--surface);border-radius:var(--rs);border:1px solid var(--border)">
       These assessments build your health profile. Your scores inform your recommendations, recovery activities, and practitioner reports. Retake any assessment when you notice changes.
     </div>${todoCards}`:''}
-    <div class="card" style="margin-bottom:12px;opacity:0.7">
+    <div class="card" style="margin-bottom:12px">
       <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px">
-        <div style="width:36px;height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg></div>
+        <div style="width:36px;height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6"/><path d="M10 3v6.5L5.5 18a2 2 0 0 0 1.8 3h9.4a2 2 0 0 0 1.8-3L14 9.5V3"/><path d="M7.5 15h9"/></svg></div>
         <div style="flex:1">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
-            <div style="font-size:15px;font-weight:700">Order Labs</div>
-            <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:2px 7px;border-radius:10px;background:var(--surface2);color:var(--sub);border:1px solid var(--border)">Coming Soon</span>
-          </div>
-          <div style="font-size:12px;color:var(--sub);line-height:1.45">Order functional labs and book a 90-minute Results &amp; Review session with a Metastory Health practitioner. You can order multiple labs and combine them into a single session.</div>
+          <div style="font-size:15px;font-weight:700;margin-bottom:3px">Order Labs</div>
+          <div style="font-size:12px;color:var(--sub);line-height:1.45">GI-MAP&reg; gut test — see what's driving digestion, mood and immune symptoms, then go over your results with a Metastory Health practitioner.</div>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surface2);border-radius:var(--rs);margin-bottom:10px">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <div style="font-size:12px;color:var(--sub)">Results &amp; Review Session — <strong style="color:var(--text)">$300</strong> · 90 minutes · covers all ordered labs</div>
+        <div style="font-size:12px;color:var(--sub)">Results &amp; Review Session — <strong style="color:var(--text)">$300</strong> · 90 minutes · covers your lab results</div>
       </div>
-      <button disabled class="btn btn-s btn-sm btn-f" style="opacity:0.45;cursor:not-allowed">Coming Soon</button>
+      <button class="btn btn-g btn-sm btn-f" onclick="openGiMap()">Learn more &amp; order &#8594;</button>
     </div>
   </div>`;
 }
@@ -6588,7 +6585,7 @@ function _assessCTA(id,done,result,compact){
   if(done){
     const due=_assessDueRecheck(result);
     return (due?'<div style="font-size:11.5px;color:var(--green);font-weight:600;margin-bottom:8px">Due for a re-check &middot; '+_assessWeeksSince(result)+' weeks since your last one</div>':'')
-      +'<button class="btn '+(due?'btn-g':'btn-s')+' btn-sm btn-f" onclick="startAssess(\''+id+'\')">&#8617; Retake'+(_assessStateGet().last[id]?' (answers pre-filled)':'')+'</button>';
+      +'<button class="btn '+(due?'btn-g':'btn-s')+' btn-sm btn-f" onclick="startAssess(\''+id+'\')">Retake'+(_assessStateGet().last[id]?' (answers pre-filled)':'')+'</button>';
   }
   return '<button class="btn btn-g btn-sm btn-f" onclick="startAssess(\''+id+'\')">Start Assessment &#8594;</button>';
 }
@@ -6785,7 +6782,7 @@ function rAssessResults(assess){
 
   h += `<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
     <button onclick="_assessPage='hub';document.getElementById('page-assess').innerHTML=rAssess()" style="background:none;border:none;color:var(--sub);font-size:22px;cursor:pointer;padding:0">←</button>
-    <div style="font-size:16px;font-weight:700">${assess.icon} ${assess.title} Results</div>
+    <div style="font-size:16px;font-weight:700;display:flex;align-items:center;gap:7px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${assess.icon}</svg>${assess.title} Results</div>
   </div>`;
 
   h += `<div style="background:var(--surface);border:1px solid var(--green);border-radius:var(--rs);padding:16px;margin-bottom:14px;text-align:center">
@@ -6998,7 +6995,7 @@ function rAssessInsights(){
         </div>
         <div style="background:var(--surface2);border-radius:var(--rs);padding:12px">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--sub);margin-bottom:8px">What Backfires</div>
-          ${profile.backfires.map(n=>`<div style="font-size:11px;line-height:1.55;margin-bottom:5px;padding-left:9px;border-left:2px solid var(--border)">⚠ ${n}</div>`).join('')}
+          ${profile.backfires.map(n=>`<div style="font-size:11px;line-height:1.55;margin-bottom:5px;padding-left:9px;border-left:2px solid var(--border)">${n}</div>`).join('')}
         </div>
       </div>
 
@@ -7038,7 +7035,7 @@ function rAssessInsights(){
       <div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--sub);margin-bottom:8px">Suggested Supplements</div>
         <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px">
-          ${profile.supplements.map(s=>`<div style="font-size:12px;padding:6px 10px;background:var(--surface2);border-radius:8px">💊 ${s}</div>`).join('')}
+          ${profile.supplements.map(s=>`<div style="font-size:12px;padding:6px 10px;background:var(--surface2);border-radius:8px">${s}</div>`).join('')}
         </div>
       </div>
     </div>`;
@@ -7108,10 +7105,10 @@ function rAssessInsights(){
 
 function _renderAIPlanReview(plan){
   const domains = [
-    {key:'workout', label:'Workout', icon:'🏋️', color:'var(--orange)'},
-    {key:'nutrition', label:'Nutrition', icon:'🥗', color:'var(--green)'},
-    {key:'hydration', label:'Hydration', icon:'💧', color:'var(--blue)'},
-    {key:'recovery', label:'Recovery', icon:'🌙', color:'var(--purple)'}
+    {key:'workout', label:'Workout', color:'var(--orange)'},
+    {key:'nutrition', label:'Nutrition', color:'var(--green)'},
+    {key:'hydration', label:'Hydration', color:'var(--blue)'},
+    {key:'recovery', label:'Recovery', color:'var(--purple)'}
   ];
 
   let h = '';
@@ -7120,7 +7117,7 @@ function _renderAIPlanReview(plan){
     if(!section) return;
     h += `<div style="background:var(--surface2);border-radius:var(--rs);padding:12px;margin-bottom:8px">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px">
-        <span style="font-size:14px">${d.icon}</span>
+        <span style="width:8px;height:8px;border-radius:50%;background:${d.color};flex-shrink:0"></span>
         <span style="font-size:13px;font-weight:700">${d.label}</span>
       </div>
       <div style="font-size:12px;line-height:1.6;color:var(--sub);margin-bottom:8px">${section.insight||''}</div>
@@ -7135,7 +7132,7 @@ function _renderAIPlanReview(plan){
 
   if(implemented){
     h += `<div style="background:rgba(171,108,82,.1);border:1px solid rgba(171,108,82,.3);border-radius:var(--rs);padding:12px;margin-top:4px;text-align:center">
-      <div style="font-size:14px;font-weight:700;color:var(--green);margin-bottom:4px">✅ Plan Updated</div>
+      <div style="font-size:14px;font-weight:700;color:var(--green);margin-bottom:4px">Plan updated</div>
       <div style="font-size:12px;color:var(--sub)">Your nutrition targets and recovery routine have been updated.</div>
     </div>`;
   } else if(canImplement){
@@ -7147,7 +7144,7 @@ function _renderAIPlanReview(plan){
     </div>`;
   }
 
-  h += `<button class="btn btn-s btn-f btn-sm" style="margin-top:8px" onclick="_aiPlanReview=null;document.getElementById('page-assess').innerHTML=rAssess()">↩ Clear &amp; Re-run</button>`;
+  h += `<button class="btn btn-s btn-f btn-sm" style="margin-top:8px" onclick="_aiPlanReview=null;document.getElementById('page-assess').innerHTML=rAssess()">Clear &amp; re-run</button>`;
   return h;
 }
 
@@ -7273,7 +7270,7 @@ function implementAIPlan(){
 
   if(implemented.length > 0){
     _aiPlanReview = {..._aiPlanReview, _implemented:true};
-    showToast('Plan updated — ' + implemented.join(' & ') + ' applied ✅');
+    showToast('Plan updated — ' + implemented.join(' & ') + ' applied');
     document.getElementById('page-assess').innerHTML = rAssess();
   }
 }
