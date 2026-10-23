@@ -1414,6 +1414,7 @@ function fbSyncSettings(){
     try { const ns=lsGet('_assess_ns_result',''); if(ns) settings.assessNs=JSON.parse(ns); } catch(e){}
     try { const gut=lsGet('_assess_gut_result',''); if(gut) settings.assessGut=JSON.parse(gut); } catch(e){}
     try { const aa=lsGet('_assess_aa_result',''); if(aa) settings.assessAa=JSON.parse(aa); } catch(e){}
+    try { const ast=lsGet('_assessState',''); if(ast) settings.assessState=JSON.parse(ast); } catch(e){}
     try { const rp=lsGet('_restProfile',''); if(rp) settings.restProfile=JSON.parse(rp); } catch(e){}
     try { const rh=lsGet('_restRhythms',''); if(rh) settings.restRhythms=JSON.parse(rh); } catch(e){}
     try { const rm=lsGet('_restMode',''); if(rm) settings.restMode=rm; } catch(e){}
@@ -1561,6 +1562,7 @@ async function fbPullAll(){
         if(s.assessNs) lsSet('_assess_ns_result', JSON.stringify(s.assessNs));
         if(s.assessGut) lsSet('_assess_gut_result', JSON.stringify(s.assessGut));
         if(s.assessAa) lsSet('_assess_aa_result', JSON.stringify(s.assessAa));
+        if(s.assessState) { try{ _assessStateMerge(s.assessState); }catch(e){} }
         if(s.foodLib && s.foodLib.length) {
           // Cloud is the source of truth — use the cloud library EXACTLY as stored.
           // No client-side merge/recompute, so categories can never drift by version.
@@ -5402,7 +5404,7 @@ function _practicesListHTML(){
   return h;
 }
 
-function stressStartAssess(id){_assessPage=id;_assessAnswers={};_assessSection=0;goPage('assess');}
+function stressStartAssess(id){_assessBegin(id);goPage('assess');}
 function stressOpenInsights(){_assessPage='insights';goPage('assess');}
 
 
@@ -5634,14 +5636,27 @@ function _stressNudge(dat){
   if(!aaDone&&(moodMiss>=0.5||dys>=0.5)){
     cands.push({type:'aa',title:'Amino Acid',strength:0.6,why:'Mood and energy have been swinging — the amino-acid assessment maps the neurotransmitter side of that.'});
   }
+  // Re-check: only for assessments already taken, after ~8 weeks. Low priority.
+  [['ns','Nervous System'],['gut','Gut Health'],['aa','Amino Acid']].forEach(function(x){
+    const r=_parseAssessResult(lsGet('_assess_'+x[0]+'_result',null));
+    if(r&&_assessDueRecheck(r)){
+      cands.push({type:x[0],title:x[1],strength:0.3,recheck:true,why:'It’s been '+_assessWeeksSince(r)+' weeks since your last '+x[1]+' assessment. A quick re-check shows how your story is changing — your last answers are pre-filled, so just update what’s different.'});
+    }
+  });
   let snz={};try{snz=JSON.parse(lsGet('_stressNudgeSnooze','{}'))||{};}catch(e){}
   const now=Date.now();
   const active=cands.filter(c=>!(snz[c.type]&&now<snz[c.type])).sort((a,b)=>b.strength-a.strength);
-  return {pick:active[0]||null,allDone:nsDone&&gutDone&&aaDone,anyDone:nsDone||gutDone||aaDone};
+  // An unfinished assessment always wins — finishing beats starting something new.
+  let resume=null;
+  ['ns','gut','aa'].forEach(function(id){
+    const d=_assessDraft(id);
+    if(d&&(!resume||(d.u||0)>(resume.u||0)))resume={type:id,u:d.u,s:d.s||0,n:_assessById(id).sections.length,title:_assessById(id).title.replace(/ Assessment$/,'')};
+  });
+  return {pick:active[0]||null,resume:resume,allDone:nsDone&&gutDone&&aaDone,anyDone:nsDone||gutDone||aaDone};
 }
-function stressSnoozeNudge(type){
+function stressSnoozeNudge(type,days){
   let s={};try{s=JSON.parse(lsGet('_stressNudgeSnooze','{}'))||{};}catch(e){}
-  s[type]=Date.now()+7*86400000;lsSet('_stressNudgeSnooze',JSON.stringify(s));
+  s[type]=Date.now()+(days||7)*86400000;lsSet('_stressNudgeSnooze',JSON.stringify(s));
   try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}
   try{_repaintRegulation();}catch(e){}
   try{showToast('We’ll bring it back if the pattern holds');}catch(e){}
@@ -5699,12 +5714,19 @@ function rRecovery(){
   }
   // ── Go deeper: staggered, contextual assessment ──
   h+='<div class="ct" style="padding:6px 3px 8px">Go deeper</div>';
-  if(nudge&&nudge.pick){
+  if(nudge&&nudge.resume){
+    const r=nudge.resume;
+    h+='<div style="background:var(--surface2);border:1px solid var(--green);border-radius:var(--rs);padding:14px">'
+      +'<div style="font-size:13.5px;font-weight:700;margin-bottom:3px">Finish your '+r.title+' assessment</div>'
+      +'<div style="font-size:12.5px;color:var(--sub);line-height:1.5;margin-bottom:11px">You’re on section '+(Math.min(r.s+1,r.n))+' of '+r.n+'. Your answers are saved — pick up right where you left off.</div>'
+      +'<div style="display:flex;gap:8px"><button class="btn btn-g btn-sm" style="flex:1" onclick="stressStartAssess(\''+r.type+'\')">Continue &#8594;</button><button class="btn btn-s btn-sm" onclick="assessStartOver(\''+r.type+'\')">Start over</button></div>'
+      +'<div style="margin-top:9px;text-align:center"><span class="mk-link" onclick="stressOpenInsights()">View all assessments →</span></div></div>';
+  }else if(nudge&&nudge.pick){
     const p=nudge.pick;
     h+='<div style="background:var(--surface2);border:1px dashed var(--border);border-radius:var(--rs);padding:14px">'
-      +'<div style="font-size:13.5px;font-weight:700;margin-bottom:3px">'+p.title+' assessment</div>'
+      +'<div style="font-size:13.5px;font-weight:700;margin-bottom:3px">'+(p.recheck?'Time to re-check: ':'')+p.title+' assessment</div>'
       +'<div style="font-size:12.5px;color:var(--sub);line-height:1.5;margin-bottom:11px">'+p.why+'</div>'
-      +'<div style="display:flex;gap:8px"><button class="btn btn-g btn-sm" style="flex:1" onclick="stressStartAssess(\''+p.type+'\')">Take it (~5 min)</button><button class="btn btn-s btn-sm" onclick="stressSnoozeNudge(\''+p.type+'\')">Not now</button></div></div>';
+      +'<div style="display:flex;gap:8px"><button class="btn btn-g btn-sm" style="flex:1" onclick="stressStartAssess(\''+p.type+'\')">'+(p.recheck?'Re-check (~3 min)':'Take it (~5 min)')+'</button><button class="btn btn-s btn-sm" onclick="stressSnoozeNudge(\''+p.type+'\','+(p.recheck?21:7)+')">Not now</button></div></div>';
   }else{
     h+='<div style="background:var(--surface2);border:1px dashed var(--border);border-radius:var(--rs);padding:13px;font-size:12px;color:var(--sub);line-height:1.5;text-align:center">'
       +(nudge&&nudge.allDone?'Your health profile is current. ':'')+'Assessments live quietly here and surface only when your data suggests one would help.'
@@ -6367,7 +6389,7 @@ function rAssessHub(){
       </div>
       ${done ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${renderAssessScoreBadges(assess.id, result)}</div>
         <div style="font-size:11px;color:var(--sub);margin-bottom:10px">Completed ${result.date||'previously'}</div>` : ''}
-      <button class="btn ${done?'btn-s':'btn-g'} btn-sm btn-f" onclick="startAssess('${assess.id}')">${done?'↩ Retake':'Start Assessment →'}</button>
+      ${_assessCTA(assess.id, done, result)}
     </div>`;
   }
 
@@ -6449,11 +6471,125 @@ function renderAssessScoreBadges(id, result){
   return '';
 }
 
-function startAssess(id){
-  _assessPage = id;
-  _assessAnswers = {};
-  _assessSection = 0;
+/* ── ASSESSMENT PROGRESS: auto-saved drafts, pre-filled retakes, re-checks ──
+   _assessState = { drafts:{id:{a:answers,s:section,u:ms}}, last:{id:{a:answers,u:ms}} }
+   A draft is written on every answer and every section change, so leaving
+   mid-way (back arrow, tab switch, app reload, iOS killing the app) never
+   loses work. On completion the draft is cleared and the answers are kept as
+   "last" so a retake starts pre-filled. Synced in settings.assessState and
+   merged per entry by timestamp, so progress follows the person across devices. */
+let _assessPrefilled = false;
+const ASSESS_RECHECK_DAYS = 56;
+function _assessById(id){return id==='ns'?ASSESS_NS:id==='gut'?ASSESS_GUT:ASSESS_AA;}
+function _assessStateGet(){
+  let st={};try{st=JSON.parse(lsGet('_assessState','{}'))||{};}catch(e){st={};}
+  if(!st.drafts||typeof st.drafts!=='object')st.drafts={};
+  if(!st.last||typeof st.last!=='object')st.last={};
+  return st;
+}
+function _assessStatePut(st,sync){
+  lsSet('_assessState',JSON.stringify(st));
+  if(sync){try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}}
+}
+function _assessStateMerge(cloud){
+  if(!cloud||typeof cloud!=='object')return;
+  const st=_assessStateGet();
+  ['last','drafts'].forEach(function(k){
+    const src=cloud[k]||{};
+    Object.keys(src).forEach(function(id){
+      const c=src[id];if(!c)return;const l=st[k][id];
+      if(!l||(c.u||0)>(l.u||0))st[k][id]=c;
+    });
+  });
+  // A draft older than the latest completion is stale (finished on another device).
+  Object.keys(st.drafts).forEach(function(id){
+    const d=st.drafts[id],l=st.last[id];
+    if(d&&l&&(l.u||0)>=(d.u||0))delete st.drafts[id];
+  });
+  lsSet('_assessState',JSON.stringify(st));
+}
+function _assessDraft(id){
+  const d=_assessStateGet().drafts[id];
+  if(!d||!d.a||!Object.keys(d.a).length)return null;
+  return d;
+}
+let _assessSyncT=null;
+function _assessSaveDraft(){
+  const id=_assessPage;if(id!=='ns'&&id!=='gut'&&id!=='aa')return;
+  const assess=_assessById(id);
+  if(_assessSection>=assess.sections.length)return;
+  if(!Object.keys(_assessAnswers).length)return;
+  const st=_assessStateGet();
+  st.drafts[id]={a:Object.assign({},_assessAnswers),s:_assessSection,u:Date.now(),p:_assessPrefilled?1:0};
+  _assessStatePut(st,false);
+  clearTimeout(_assessSyncT);_assessSyncT=setTimeout(function(){try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}},2500);
+}
+function _assessClearDraft(id){
+  const st=_assessStateGet();if(st.drafts[id]){delete st.drafts[id];_assessStatePut(st,true);}
+}
+/* Result dates are stored as "Oct 23, 2026"; parse without relying on Date(string). */
+function _assessResultMs(r){
+  if(!r)return 0;if(r.ts)return r.ts;
+  const m=String(r.date||'').match(/^([A-Za-z]{3})[a-z]*\.? (\d{1,2}), (\d{4})$/);
+  if(!m)return 0;
+  const mi=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(m[1].toLowerCase());
+  return mi<0?0:new Date(+m[3],mi,+m[2]).getTime();
+}
+function _assessWeeksSince(r){const ms=_assessResultMs(r);return ms?Math.floor((Date.now()-ms)/(7*86400000)):null;}
+function _assessDueRecheck(r){const ms=_assessResultMs(r);return !!ms&&(Date.now()-ms)>=ASSESS_RECHECK_DAYS*86400000;}
+/* Set up the in-memory form. mode: undefined = resume draft, else pre-fill from
+   last answers, else blank · 'fresh' = blank, discard any draft. */
+function _assessBegin(id,mode){
+  _assessPage=id;_assessAnswers={};_assessSection=0;_assessPrefilled=false;
+  if(mode==='fresh'){_assessClearDraft(id);return;}
+  const d=_assessDraft(id);
+  if(d){
+    _assessAnswers=Object.assign({},d.a);
+    _assessSection=Math.max(0,Math.min(d.s||0,_assessById(id).sections.length-1));
+    _assessPrefilled=!!d.p;
+    return;
+  }
+  const l=_assessStateGet().last[id];
+  if(l&&l.a&&Object.keys(l.a).length){_assessAnswers=Object.assign({},l.a);_assessPrefilled=true;}
+}
+function startAssess(id,mode){
+  _assessBegin(id,mode);
   document.getElementById('page-assess').innerHTML = rAssess();
+  try{document.getElementById('pages').scrollTop=0;}catch(e){}
+}
+function assessStartOver(id){
+  _assessClearDraft(id);
+  try{showToast('Starting fresh');}catch(e){}
+  if(curPage==='assess'){
+    _assessPage=id;_assessAnswers={};_assessSection=0;_assessPrefilled=false;
+    document.getElementById('page-assess').innerHTML=rAssess();
+    try{document.getElementById('pages').scrollTop=0;}catch(e){}
+  }else{try{_repaintRegulation();}catch(e){}}
+}
+function assessClearPrefill(){
+  _assessAnswers={};_assessPrefilled=false;_assessClearDraft(_assessPage);
+  document.getElementById('page-assess').innerHTML=rAssess();
+}
+function assessLeave(){
+  const had=(_assessPage==='ns'||_assessPage==='gut'||_assessPage==='aa')&&Object.keys(_assessAnswers).length&&_assessSection<_assessById(_assessPage).sections.length;
+  if(had){_assessSaveDraft();try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(e){}}
+  _assessPage='hub';document.getElementById('page-assess').innerHTML=rAssess();
+  if(had){try{showToast('Progress saved — pick up where you left off');}catch(e){}}
+}
+/* Shared button block for an assessment card: Continue / Retake / Start. */
+function _assessCTA(id,done,result,compact){
+  const assess=_assessById(id);const d=_assessDraft(id);
+  if(d){
+    const n=assess.sections.length;const sec=Math.min((d.s||0)+1,n);
+    return '<button class="btn btn-g btn-sm btn-f" onclick="startAssess(\''+id+'\')">Continue &middot; Section '+sec+' of '+n+' &#8594;</button>'
+      +'<div style="text-align:center;margin-top:7px"><span class="mk-link" style="font-size:11.5px" onclick="assessStartOver(\''+id+'\')">Start over</span></div>';
+  }
+  if(done){
+    const due=_assessDueRecheck(result);
+    return (due?'<div style="font-size:11.5px;color:var(--green);font-weight:600;margin-bottom:8px">Due for a re-check &middot; '+_assessWeeksSince(result)+' weeks since your last one</div>':'')
+      +'<button class="btn '+(due?'btn-g':'btn-s')+' btn-sm btn-f" onclick="startAssess(\''+id+'\')">&#8617; Retake'+(_assessStateGet().last[id]?' (answers pre-filled)':'')+'</button>';
+  }
+  return '<button class="btn btn-g btn-sm btn-f" onclick="startAssess(\''+id+'\')">Start Assessment &#8594;</button>';
 }
 
 function rAssessForm(assess){
@@ -6472,7 +6608,7 @@ function rAssessForm(assess){
 
   let h = '';
   h += `<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-    <button onclick="_assessPage='hub';document.getElementById('page-assess').innerHTML=rAssess()" style="background:none;border:none;color:var(--sub);font-size:22px;cursor:pointer;padding:0;line-height:1">←</button>
+    <button onclick="assessLeave()" style="background:none;border:none;color:var(--sub);font-size:22px;cursor:pointer;padding:0;line-height:1">←</button>
     <div style="flex:1">
       <div style="font-size:12px;font-weight:600;color:var(--sub);margin-bottom:5px;display:flex;align-items:center;gap:5px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${assess.icon}</svg>${assess.title} · Section ${_assessSection+1} of ${totalSections}</div>
       <div style="height:4px;background:var(--surface2);border-radius:2px">
@@ -6481,6 +6617,13 @@ function rAssessForm(assess){
     </div>
   </div>`;
 
+  if(_assessPrefilled){
+    const _lr=_parseAssessResult(lsGet('_assess_'+assess.id+'_result',null));
+    h += `<div style="display:flex;gap:10px;align-items:flex-start;background:var(--surface2);border-radius:var(--rs);padding:11px 13px;margin-bottom:12px;font-size:12.5px;color:var(--sub);line-height:1.5">
+      <span style="flex:1">Your answers from ${(_lr&&_lr.date)||'last time'} are filled in. Change anything that's different now, then tap through.</span>
+      <span class="mk-link" style="font-size:11.5px;white-space:nowrap" onclick="assessClearPrefill()">Clear all</span>
+    </div>`;
+  }
   h += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);padding:14px 16px;margin-bottom:16px">
     <div style="font-size:15px;font-weight:700;margin-bottom:3px">${section.name}</div>
     ${section.sub ? `<div style="font-size:12px;color:var(--sub)">${section.sub}</div>` : ''}
@@ -6512,18 +6655,20 @@ function rAssessForm(assess){
     return _assessAnswers[k] !== undefined;
   });
 
-  h += `<div style="display:flex;gap:10px;margin-top:4px;padding-bottom:20px">
+  h += `<div style="display:flex;gap:10px;margin-top:4px;padding-bottom:8px">
     ${_assessSection > 0 ? `<button class="btn btn-s" style="flex:1" onclick="assessPrev()">← Back</button>` : ''}
     <button class="btn btn-g" style="flex:2" onclick="assessNext('${assess.id}')" ${sectionAnswered?'':'disabled'}>
       ${_assessSection < totalSections-1 ? 'Next Section →' : 'See Results →'}
     </button>
-  </div>`;
+  </div>
+  <div style="text-align:center;font-size:11px;color:var(--sub);padding-bottom:20px">Progress saves automatically — you can leave and come back anytime.</div>`;
 
   return h;
 }
 
 function setAssessAnswer(key, val){
   _assessAnswers[key] = val;
+  _assessSaveDraft();
   const savedScroll = document.getElementById('pages').scrollTop;
   document.getElementById('page-assess').innerHTML = rAssess();
   document.getElementById('pages').scrollTop = savedScroll;
@@ -6534,6 +6679,8 @@ function assessNext(assessId){
   _assessSection++;
   if(_assessSection >= assess.sections.length){
     saveAssessResults(assess);
+  } else {
+    _assessSaveDraft();
   }
   document.getElementById('page-assess').innerHTML = rAssess();
   document.getElementById('pages').scrollTop = 0;
@@ -6541,6 +6688,7 @@ function assessNext(assessId){
 
 function assessPrev(){
   _assessSection = Math.max(0, _assessSection-1);
+  _assessSaveDraft();
   document.getElementById('page-assess').innerHTML = rAssess();
   document.getElementById('pages').scrollTop = 0;
 }
@@ -6602,7 +6750,15 @@ function saveAssessResults(assess){
     result.typesOverThreshold = over.length;
   }
 
+  result.ts = Date.now();
   lsSet('_assess_'+id+'_result', JSON.stringify(result));
+  try{
+    const st=_assessStateGet();
+    st.last[id]={a:Object.assign({},_assessAnswers),u:result.ts};
+    delete st.drafts[id];
+    _assessPrefilled=false;
+    _assessStatePut(st,true);
+  }catch(e){try{if(typeof fbSyncSettings==='function')fbSyncSettings();}catch(_){}}
 }
 
 
@@ -6756,7 +6912,7 @@ function rAssessResults(assess){
   h += `<div style="display:flex;gap:8px;flex-wrap:wrap;padding-bottom:20px">
     <button class="btn btn-s btn-sm" style="flex:1" onclick="_assessPage='hub';document.getElementById('page-assess').innerHTML=rAssess()">← Back</button>
     ${assess.id==='ns' ? `<button class="btn btn-b btn-sm" style="flex:1.5" onclick="_assessPage='insights';document.getElementById('page-assess').innerHTML=rAssess()">View Insights →</button>` : ''}
-    <button class="btn btn-g btn-sm" style="flex:1" onclick="startAssess('${assess.id}')">Retake</button>
+    <button class="btn btn-g btn-sm" style="flex:1" onclick="startAssess('${assess.id}')">Retake (pre-filled)</button>
   </div>`;
 
   return h;
