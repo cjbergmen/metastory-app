@@ -1,4 +1,4 @@
-const VERSION = '20261023-assess-tidy';
+const VERSION = '20261023-walkthrough-label';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
