@@ -1,4 +1,4 @@
-const VERSION = '20261103-client-code';
+const VERSION = '20261103-overlap-phases';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
