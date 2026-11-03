@@ -4841,8 +4841,9 @@ function _cpSync(definitive){
       const nw=_cpUnlocked(p.phases[a.idx],a).filter(it=>(+it.wk||1)===Math.floor(a.day/7)+1).map(it=>it.name);
       _labToast(nw.length?('New this week: '+nw.join(', ')):'A new supplement starts this week');
     }else if(prevKey&&prevIdx!==a.idx&&a.idx>=0){
-      lsSet('_cpPhaseNote',JSON.stringify({at:Date.now(),idx:a.idx}));
-      _labToast((p.phases[a.idx].name||('Phase '+(a.idx+1)))+' has started — your supplements are updated');
+      const first=prevIdx<0&&a.idx===0;
+      lsSet('_cpPhaseNote',JSON.stringify({at:Date.now(),idx:a.idx,first}));
+      _labToast(first?'Your plan starts today — your first supplements are in your schedule':((p.phases[a.idx].name||('Phase '+(a.idx+1)))+' has started — your supplements are updated'));
     }else if(!prevKey&&added){
       _labToast('Your practitioner plan is in — '+added+' supplement'+(added===1?'':'s')+' added');
     }else if(prevKey&&prevKey.split(':')[0]!==String(p.version||0)){
@@ -4942,7 +4943,7 @@ function _cpFindingsHTML(p){
 function _cpSuppsCardHTML(){
   const p=_cpGet();if(!p||!Array.isArray(p.phases)||!p.phases.length)return '';
   const a=_cpActive(p);const ph=a.idx>=0?p.phases[a.idx]:null;
-  let note='';try{const n=JSON.parse(lsGet('_cpPhaseNote','null'));if(n&&n.idx===a.idx&&Date.now()-n.at<3*864e5)note=`<div class="fdn-chip" style="margin:10px 0 0;background:rgba(183,186,167,.22)"><span><b>New phase today.</b> Your schedule below has been swapped to ${_labEsc(ph?ph.name||('Phase '+(a.idx+1)):'')}.</span></div>`;}catch(e){}
+  let note='';try{const n=JSON.parse(lsGet('_cpPhaseNote','null'));if(n&&n.idx===a.idx&&Date.now()-n.at<3*864e5)note=n.first?`<div class="fdn-chip" style="margin:10px 0 0;background:rgba(183,186,167,.22)"><span><b>Day one.</b> Your first supplements are in your schedule below. We add one about once a week.</span></div>`:`<div class="fdn-chip" style="margin:10px 0 0;background:rgba(183,186,167,.22)"><span><b>New phase today.</b> Your schedule below has been switched to ${_labEsc(ph?ph.name||('Phase '+(a.idx+1)):'')}.</span></div>`;}catch(e){}
   return `<div class="card" style="border:1.5px solid var(--green)">
     <span class="kicker">Your practitioner plan</span>
     <div style="font-family:var(--font-serif);font-size:19px;margin:6px 0 2px">${ph?_labEsc(ph.name||('Phase '+(a.idx+1))):'Starting soon'}</div>

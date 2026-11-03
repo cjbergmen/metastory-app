@@ -1,4 +1,4 @@
-const VERSION = '20261103-client-plans-2';
+const VERSION = '20261103-client-plans-3';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately
