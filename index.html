@@ -3937,11 +3937,13 @@ function setWODone(v){
   if(v && !was){ try{ _unlockAudio(); }catch(e){} playSessionComplete(); }
   refresh();
 }
-function getTgt(){
+function _getTgtBase(){
   const custom=lsGet('_userTargets','');
   if(custom){try{const t=JSON.parse(custom);if(t&&t.train&&t.rest)return isTrain()?t.train:t.rest;}catch(e){}}
   return isTrain()?{p:150,c:225,f:65,k:2085,w:110}:{p:150,c:165,f:65,k:1845,w:90};
 }
+// A practitioner plan phase can reshape the day's macros (see _cpAdjustTgt).
+function getTgt(){const b=_getTgtBase();try{return _cpAdjustTgt(b,isTrain());}catch(e){return b;}}
 function saveNutritionTargets(){
   const g=(id)=>Math.max(0,+(document.getElementById(id)?.value||0));
   const nt={
@@ -4763,7 +4765,12 @@ function _cpActive(p){
   let acc=0;
   for(let i=0;i<ph.length;i++){
     const w=+ph[i].weeks||0;
-    if(!w)return {idx:i,day:days-acc,len:null,open:true,startedOn:start+acc};
+    if(!w){
+      // Open-ended: runs until the practitioner moves them on (endedOn).
+      const end=_cpDayNum(ph[i].endedOn);
+      if(end==null||end<=start+acc||days<end-start)return {idx:i,day:days-acc,len:null,open:true,startedOn:start+acc};
+      acc=end-start;continue;
+    }
     if(days<acc+w*7)return {idx:i,day:days-acc,len:w*7,startedOn:start+acc,endsOn:start+acc+w*7};
     acc+=w*7;
   }
@@ -4809,7 +4816,8 @@ function _cpSync(definitive){
       return;
     }
     const a=_cpActive(p);
-    const key=(p.version||0)+':'+a.idx;
+    const unl=a.idx>=0?_cpUnlocked(p.phases[a.idx],a).length:0;
+    const key=(p.version||0)+':'+a.idx+':'+unl;
     if(key===prevKey){if(definitive)_cpRerender();return;}
     const keep=cur.filter(s=>s.src!=='plan');
     const next=keep.slice();
@@ -4817,6 +4825,7 @@ function _cpSync(definitive){
     if(a.idx>=0){
       const ph=p.phases[a.idx]||{};
       (ph.items||[]).forEach((it,i)=>{
+        if(!_cpItemOpen(it,a))return;
         const name=String(it.name||'').trim();if(!name)return;
         const slot=_protoSlot(it.slot);
         if(keep.some(s=>String(s.name||'').trim().toLowerCase()===name.toLowerCase()&&s.slot===slot))return;
@@ -4826,8 +4835,12 @@ function _cpSync(definitive){
     }
     _suppSave(next);
     const prevIdx=prevKey?+prevKey.split(':')[1]:null;
+    const prevUnl=prevKey?+(prevKey.split(':')[2]||0):0;
     lsSet('_cpApplied',key);
-    if(prevKey&&prevIdx!==a.idx&&a.idx>=0){
+    if(prevKey&&prevIdx===a.idx&&prevKey.split(':')[0]===String(p.version||0)&&unl>prevUnl){
+      const nw=_cpUnlocked(p.phases[a.idx],a).filter(it=>(+it.wk||1)===Math.floor(a.day/7)+1).map(it=>it.name);
+      _labToast(nw.length?('New this week: '+nw.join(', ')):'A new supplement starts this week');
+    }else if(prevKey&&prevIdx!==a.idx&&a.idx>=0){
       lsSet('_cpPhaseNote',JSON.stringify({at:Date.now(),idx:a.idx}));
       _labToast((p.phases[a.idx].name||('Phase '+(a.idx+1)))+' has started — your supplements are updated');
     }else if(!prevKey&&added){
@@ -4842,6 +4855,61 @@ function _cpRerender(){try{if(curPage==='supps')rSupps();else if(curPage==='food
 // Catch a phase boundary that passes while the app sits open overnight.
 setInterval(()=>{try{if(_cpGet())_cpSync(false);}catch(e){}},30*60*1000);
 document.addEventListener('visibilitychange',()=>{try{if(document.visibilityState==='visible'&&_cpGet())_cpSync(false);}catch(e){}});
+
+/* Supplements come in one at a time: an item with wk:N joins the schedule in
+   week N of its phase. Pinned/undated phases show everything. */
+function _cpItemOpen(it,a){const w=+it.wk||1;if(w<=1||a.day==null)return true;return a.day>=(w-1)*7;}
+function _cpUnlocked(ph,a){return ((ph&&ph.items)||[]).filter(it=>it&&it.name&&_cpItemOpen(it,a));}
+function _cpNextUp(ph,a){
+  if(a.day==null)return null;const wk=Math.floor(a.day/7)+1;
+  const up=((ph&&ph.items)||[]).filter(it=>(+it.wk||1)>wk).sort((x,y)=>(+x.wk||1)-(+y.wk||1));
+  if(!up.length)return null;const w=+up[0].wk;
+  return {wk:w,names:up.filter(i=>+i.wk===w).map(i=>i.name),inDays:(w-1)*7-a.day};
+}
+/* Practitioner macro adjustment for the live phase, layered on top of the
+   app's own engine (so weight-driven recalcs keep working underneath).
+   nut = {carbPct:-20, carbFloorTrain:120, carbFloorRest:100, maxDeficitPct:10, fatMaxPct:35}
+   Protein is left at the engine's FDN anchor (~1 g/lb lean mass). Carbs come
+   down to the floor at most; the calories they free move to fat up to the cap,
+   and anything past the cap stays as carbs, so total calories never drop
+   because of the adjustment. A deficit is limited to maxDeficitPct of TDEE. */
+function _cpPhaseNut(){
+  const p=_cpGet();if(!p||!Array.isArray(p.phases))return null;
+  const a=_cpActive(p);if(a.idx<0)return null;
+  const ph=p.phases[a.idx]||{};const n=ph.nut;
+  if(!n||(!+n.carbPct&&n.maxDeficitPct==null))return null;
+  return {n,ph,a};
+}
+function _cpAdjustTgt(b,train){
+  const x=_cpPhaseNut();if(!x||!b)return b;const n=x.n;
+  let t=Object.assign({},b);
+  let meta=null;try{const u=JSON.parse(lsGet('_userTargets','null'));meta=(u&&u._meta)||null;}catch(e){}
+  if(!meta||!meta.tdee){try{meta=JSON.parse(lsGet('_macroProfile','null'));}catch(e){}}
+  let K=+t.k||0;
+  if(meta&&meta.tdee&&n.maxDeficitPct!=null&&n.maxDeficitPct!==''){
+    const avg=+meta.avgK||K, minAvg=Math.round(meta.tdee*(1-(+n.maxDeficitPct)/100));
+    if(avg<minAvg)K+=minAvg-avg;
+  }
+  const floor=train?(+n.carbFloorTrain||120):(+n.carbFloorRest||100);
+  let c=+t.c||0;
+  if(+n.carbPct){c=Math.round(c*(1+(+n.carbPct)/100));c=Math.max(Math.min(floor,+t.c||floor),c);}
+  const p=+t.p||0;
+  const fatMax=Math.round(K*((+n.fatMaxPct||35)/100)/9);
+  let f=Math.round((K-4*p-4*c)/9);
+  if(f>fatMax){f=Math.max(fatMax,+t.f||0);c=Math.round((K-4*p-9*f)/4);}
+  if(f<(+t.f||0)){f=+t.f||0;}
+  t.p=p;t.c=Math.max(0,c);t.f=f;t.k=p*4+t.c*4+f*9;t._cpAdj=true;
+  return t;
+}
+function _cpNutLineHTML(){
+  const x=_cpPhaseNut();if(!x)return '';
+  const b=_getTgtBase(),t=getTgt();if(!t._cpAdj)return '';
+  const d=(a,c,u)=>a===c?'':`<span style="color:var(--sub)"> (was ${c}${u})</span>`;
+  return `<div style="font-size:12.5px;line-height:1.6;margin-top:10px;padding:9px 11px;background:var(--surface2);border-radius:var(--rs)">
+    <b>Today's targets for this phase</b><br>
+    Calories ${t.k}${d(t.k,b.k,'')} · Protein ${t.p}g · Carbs ${t.c}g${d(t.c,b.c,'g')} · Fat ${t.f}g${d(t.f,b.f,'g')}
+  </div>`;
+}
 
 /* ---- client: what they see ---- */
 function _cpPhaseStrip(p,a){
@@ -4882,7 +4950,9 @@ function _cpSuppsCardHTML(){
     ${_cpPhaseStrip(p,a)}
     ${note}
     ${ph&&ph.goal?`<div style="font-size:13px;line-height:1.55;margin-top:10px;padding-left:10px;border-left:2px solid var(--green)">${_labEsc(ph.goal)}</div>`:''}
-    ${ph?`<div style="font-size:11.5px;color:var(--sub);margin-top:8px">${(ph.items||[]).length} supplement${(ph.items||[]).length===1?'':'s'} in this phase — they're in your schedule below.</div>`:''}
+    ${ph?(()=>{const u=_cpUnlocked(ph,a).length,tot=(ph.items||[]).length,nx=_cpNextUp(ph,a);
+      return `<div style="font-size:11.5px;color:var(--sub);margin-top:8px">${u} of ${tot} supplement${tot===1?'':'s'} in your schedule so far — we add one at a time.</div>`
+       +(nx?`<div style="font-size:12px;margin-top:6px"><b>Next up${nx.inDays>0?' in '+nx.inDays+' day'+(nx.inDays===1?'':'s'):''}:</b> ${nx.names.map(_labEsc).join(', ')}</div>`:'');})():''}
     ${_cpFindingsHTML(p)}
   </div>`;
 }
@@ -4890,10 +4960,15 @@ function _cpTabCardHTML(tab){
   const p=_cpGet();if(!p||!Array.isArray(p.phases))return '';
   const a=_cpActive(p);if(a.idx<0)return '';
   const ph=p.phases[a.idx]||{};
-  const txt=tab==='diet'?ph.diet:ph.move;if(!txt||!String(txt).trim())return '';
+  const txt=tab==='diet'?ph.diet:ph.move;
+  const nut=tab==='diet'?_cpNutLineHTML():'';
+  if((!txt||!String(txt).trim())&&!nut)return '';
+  const long=txt&&String(txt).length>260;
   return `<div class="card" style="border:1px solid var(--green)">
     <span class="kicker">From your practitioner · ${_labEsc(ph.name||('Phase '+(a.idx+1)))}</span>
-    <div style="font-size:13.5px;line-height:1.6;margin-top:6px;white-space:pre-line">${_labEsc(txt)}</div>
+    ${nut}
+    ${txt?(long?`<details style="margin-top:8px"><summary style="font-size:13px;font-weight:700;cursor:pointer">${_labEsc(String(txt).split('\n')[0].slice(0,120))}</summary><div style="font-size:13.5px;line-height:1.6;margin-top:6px;white-space:pre-line">${_labEsc(String(txt).split('\n').slice(1).join('\n'))}</div></details>`
+      :`<div style="font-size:13.5px;line-height:1.6;margin-top:6px;white-space:pre-line">${_labEsc(txt)}</div>`):''}
   </div>`;
 }
 // Fed to the Health Detective so its answers sit inside the practitioner's plan.
@@ -4905,7 +4980,10 @@ function _cpDetContext(){
   if(g.summary||f.length)lines.push('GI-MAP'+(g.date?' ('+g.date+')':'')+', reviewed with their practitioner: '+(f.length?f.join('; ')+'. ':'')+(g.summary?'Practitioner summary: '+g.summary:''));
   if(ph){
     lines.push('Current phase: '+(ph.name||('Phase '+(a.idx+1)))+' ('+(a.idx+1)+' of '+p.phases.length+')'+(ph.goal?' — '+String(ph.goal).replace(/[.\s]+$/,''):'')+'.');
-    if((ph.items||[]).length)lines.push('Phase supplements: '+ph.items.map(i=>i.name+(i.dose?' '+i.dose:'')).join(', ')+'.');
+    const _u=_cpUnlocked(ph,a);
+    if(_u.length)lines.push('Supplements they are on now: '+_u.map(i=>i.name+(i.dose?' '+i.dose:'')).join(', ')+'.');
+    const _nx=_cpNextUp(ph,a);if(_nx)lines.push('Added next (one at a time): '+_nx.names.join(', ')+'.');
+    try{const _t=getTgt(),_b=_getTgtBase();if(_t._cpAdj)lines.push('Their macro targets are adjusted by the practitioner for this phase: today '+_t.k+' kcal, '+_t.p+'g protein, '+_t.c+'g carbs (engine default '+_b.c+'g), '+_t.f+'g fat.');}catch(e){}
     if(ph.diet)lines.push('Practitioner diet guidance for this phase: '+ph.diet);
     if(ph.move)lines.push('Practitioner movement guidance for this phase: '+ph.move);
   }else if(a.pending){lines.push('Their practitioner plan starts '+_cpFmtDay(a.startsOn)+'.');}
@@ -4962,11 +5040,12 @@ function _cpCapture(){
     const ph=e.phases[+r.getAttribute('data-cpp')];if(!ph)return;
     const g=n=>{const el=r.querySelector('[data-k="'+n+'"]');return el?el.value:'';};
     ph.name=g('name');ph.weeks=g('weeks');ph.goal=g('goal');ph.diet=g('diet');ph.move=g('move');
+    ph.nut=ph.nut||{};ph.nut.carbPct=g('carbPct');ph.nut.carbFloorTrain=g('cft');ph.nut.carbFloorRest=g('cfr');ph.nut.maxDeficitPct=g('mdp');
     const ps=r.querySelector('[data-k="paste"]');if(ps)ph._paste=ps.value;
     r.querySelectorAll('[data-cpi]').forEach(ir=>{
       const it=ph.items[+ir.getAttribute('data-cpi')];if(!it)return;
       const gi=n=>{const el=ir.querySelector('[data-k="'+n+'"]');return el?el.value:'';};
-      it.name=gi('name');it.dose=gi('dose');it.slot=gi('slot')||it.slot;it.notes=gi('notes');
+      it.name=gi('name');it.dose=gi('dose');it.slot=gi('slot')||it.slot;it.notes=gi('notes');it.wk=gi('wk');
     });
   });
 }
@@ -4998,7 +5077,10 @@ function _cpClean(e){
       findings:(e.gimap.findings||[]).filter(f=>s(f.m,80)).map(f=>({m:s(f.m,80),r:s(f.r,60),f:s(f.f,12)}))},
     phases:(e.phases||[]).map((p,i)=>({id:p.id||('p'+i),name:s(p.name,60)||('Phase '+(i+1)),weeks:Math.max(0,Math.min(104,parseInt(p.weeks,10)||0)),
       goal:s(p.goal,600),diet:s(p.diet,1500),move:s(p.move,1000),
-      items:(p.items||[]).filter(it=>s(it.name,80)).map(it=>({name:s(it.name,80),dose:s(it.dose,60),slot:_protoSlot(it.slot),notes:s(it.notes,160)}))})),
+      endedOn:s(p.endedOn,10),
+      nut:(()=>{const n=p.nut||{};const num=(v,lo,hi)=>{v=String(v==null?'':v).trim();if(v==='')return null;v=+v;return isNaN(v)?null:Math.max(lo,Math.min(hi,v));};
+        return {carbPct:num(n.carbPct,-60,30),carbFloorTrain:num(n.carbFloorTrain,50,400),carbFloorRest:num(n.carbFloorRest,50,400),maxDeficitPct:num(n.maxDeficitPct,0,25),fatMaxPct:num(n.fatMaxPct,20,40)||35};})(),
+      items:(p.items||[]).filter(it=>s(it.name,80)).map(it=>({name:s(it.name,80),dose:s(it.dose,60),slot:_protoSlot(it.slot),notes:s(it.notes,160),wk:Math.max(1,Math.min(52,parseInt(it.wk,10)||1))}))})),
     version:(+e.version||0)+1,updatedAt:Date.now(),
     updatedBy:(typeof fbUser!=='undefined'&&fbUser)?(fbUser.email||''):''
   };
@@ -5027,6 +5109,11 @@ function _cpDelete(){
   fbDb.collection('clientPlans').doc(_cpEdit.origEmail).delete().then(()=>{_cpEdit=null;rClientPlans();}).catch(()=>_labToast('Could not delete — try again.'));
 }
 function _cpCancel(){_cpEdit=null;rClientPlans();}
+function _cpAdvance(){
+  _cpCapture();const a=_cpActive(_cpEdit);if(a.idx<0||!a.open)return;
+  if(!confirm('Move them on to '+(_cpEdit.phases[a.idx+1].name||'the next phase')+' starting today?'))return;
+  _cpEdit.phases[a.idx].endedOn=dk();_cpEdit.pinPhase=-1;_cpSave();
+}
 function _cpInviteText(e){
   return `Your plan is ready in the Metastory Health app.\n\nSign in with ${_cpEmail(e.email)} — use that exact address (if you sign in with Apple, choose "Share My Email", not "Hide My Email"). Your supplements, phases and guidance will load on their own.\n\nGet the app: https://apps.apple.com/us/app/metastory-health/id6812901357`;
 }
@@ -5093,7 +5180,7 @@ function _cpEditorHTML(){
       <div style="font-size:11px;color:var(--sub);margin-top:4px">0 weeks = open-ended; it holds until you move them on.</div>
       ${_cpFieldLbl('What this phase is for','(shown to client)')}
       <textarea data-k="goal" oninput="_cpCapture()" style="${_cpTA};min-height:56px">${_labEsc(ph.goal)}</textarea>
-      ${_cpFieldLbl('Supplements')}`;
+      ${_cpFieldLbl('Supplements','(last box = week of this phase it starts)')}`;
     if(!ph.items.length)h+=`<p style="font-size:12.5px;color:var(--sub);margin-bottom:8px">None yet.</p>`;
     ph.items.forEach((it,ii)=>{
       h+=`<div data-cpi="${ii}" style="border:1px solid var(--border);border-radius:var(--rs);padding:9px;margin-bottom:7px;background:var(--surface2)">
@@ -5104,6 +5191,7 @@ function _cpEditorHTML(){
         <div style="display:flex;gap:6px;margin-top:6px">
           <input class="fi" data-k="dose" placeholder="Dose" value="${_labEsc(it.dose)}" oninput="_cpCapture()" style="flex:1;font-size:16px;padding:8px 10px;background:var(--surface)">
           <select data-k="slot" onchange="_cpCapture()" style="flex:none;width:104px;padding:8px;border:1.5px solid var(--border);border-radius:var(--rs);font-size:13px;background:var(--surface);color:var(--text)">${slotOpts(it.slot)}</select>
+          <input class="fi" data-k="wk" type="number" min="1" max="52" inputmode="numeric" title="Starts in week" value="${_labEsc(it.wk||1)}" oninput="_cpCapture()" style="flex:none;width:58px;font-size:16px;padding:8px 6px;text-align:center;background:var(--surface)">
         </div>
         <input class="fi" data-k="notes" placeholder="Note (e.g. with food, start day 5)" value="${_labEsc(it.notes)}" oninput="_cpCapture()" style="margin-top:6px;font-size:16px;padding:8px 10px;background:var(--surface)">
       </div>`;
@@ -5120,10 +5208,20 @@ Biocidin LSF | 5 drops | evening | start day 5" style="${_cpTA};min-height:90px;
       <button class="btn btn-s btn-sm btn-f" onclick="_cpImportPaste(${pi})">Import lines</button>`;
     h+=`${_cpFieldLbl('Diet guidance','(shows on their Diet tab)')}
       <textarea data-k="diet" oninput="_cpCapture()" placeholder="Remove gluten, dairy and added sugar. Lower-FODMAP while we clear the overgrowth." style="${_cpTA};min-height:66px">${_labEsc(ph.diet)}</textarea>
+      ${_cpFieldLbl('Macro adjustment','(on top of their own targets)')}
+      <div style="display:flex;gap:6px">
+        <label style="flex:1;font-size:11px;color:var(--sub)">Carbs %<input class="fi" data-k="carbPct" type="number" inputmode="numeric" placeholder="-20" value="${_labEsc((ph.nut||{}).carbPct??'')}" oninput="_cpCapture()" style="font-size:16px;padding:8px 6px;margin-top:3px"></label>
+        <label style="flex:1;font-size:11px;color:var(--sub)">Floor train g<input class="fi" data-k="cft" type="number" inputmode="numeric" placeholder="120" value="${_labEsc((ph.nut||{}).carbFloorTrain??'')}" oninput="_cpCapture()" style="font-size:16px;padding:8px 6px;margin-top:3px"></label>
+        <label style="flex:1;font-size:11px;color:var(--sub)">Floor rest g<input class="fi" data-k="cfr" type="number" inputmode="numeric" placeholder="100" value="${_labEsc((ph.nut||{}).carbFloorRest??'')}" oninput="_cpCapture()" style="font-size:16px;padding:8px 6px;margin-top:3px"></label>
+        <label style="flex:1;font-size:11px;color:var(--sub)">Max deficit %<input class="fi" data-k="mdp" type="number" inputmode="numeric" placeholder="—" value="${_labEsc((ph.nut||{}).maxDeficitPct??'')}" oninput="_cpCapture()" style="font-size:16px;padding:8px 6px;margin-top:3px"></label>
+      </div>
+      <div style="font-size:11px;color:var(--sub);margin-top:4px;line-height:1.45">Protein stays at their FDN anchor. Freed carb calories go to fat (up to the fat cap, 35% default). Max deficit 0 = eat at maintenance.</div>
       ${_cpFieldLbl('Movement guidance','(shows on their Exercise tab)')}
       <textarea data-k="move" oninput="_cpCapture()" placeholder="Keep intensity moderate during this phase — walks and lighter lifting. Rest if die-off symptoms flare." style="${_cpTA};min-height:56px">${_labEsc(ph.move)}</textarea>
     </div>`;
   });
+  if(!e.isNew){const a=_cpActive(e);const cur=a.idx>=0?e.phases[a.idx]:null;
+    if(cur&&a.open&&a.idx<e.phases.length-1)h+=`<div class="card" style="border:1.5px solid var(--green)"><span class="kicker">Practitioner gate</span><div style="font-size:13px;line-height:1.5;margin:6px 0 10px">${_labEsc(cur.name)} is open-ended. When they're ready, move them on — ${_labEsc(e.phases[a.idx+1].name)} starts today and the rest of the calendar runs from there.</div><button class="btn btn-b btn-f" onclick="_cpAdvance()">Start ${_labEsc(e.phases[a.idx+1].name)} today</button></div>`;}
   h+=`<button class="btn btn-s btn-f" onclick="_cpAddPhase()">+ Add phase</button>
     <button class="btn btn-b btn-f" style="margin-top:12px" onclick="_cpSave()">Save plan</button>
     <button class="btn btn-s btn-f" style="margin-top:8px" onclick="_cpCopyInvite()">Copy sign-in instructions for the client</button>
