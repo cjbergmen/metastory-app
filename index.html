@@ -4741,6 +4741,8 @@ Biocidin LSF | 5 drops | morning | start day 5" style="width:100%;min-height:96p
           version, updatedAt, updatedBy }
    Supplements the plan adds carry src:'plan' so they can be swapped out at a
    phase change without touching anything the client added themselves. */
+const CP_CLIENT_CODE='METACLIENT';
+const CP_REDEEM_URL='https://apps.apple.com/redeem?ctx=offercodes&id=6812901357&code='+CP_CLIENT_CODE;
 const CP_FLAGS=[['high','High'],['low','Low'],['positive','Positive'],['detected','Detected'],['normal','Normal']];
 let _cpUnsub=null, _cpWatchingEmail='';
 let _cpList=[], _cpListOn=false, _cpEdit=null, _cpPasteFor=-1;
@@ -5116,7 +5118,7 @@ function _cpAdvance(){
   _cpEdit.phases[a.idx].endedOn=dk();_cpEdit.pinPhase=-1;_cpSave();
 }
 function _cpInviteText(e){
-  return `Your plan is ready in the Metastory Health app.\n\nSign in with ${_cpEmail(e.email)} — use that exact address (if you sign in with Apple, choose "Share My Email", not "Hide My Email"). Your supplements, phases and guidance will load on their own.\n\nGet the app: https://apps.apple.com/us/app/metastory-health/id6812901357`;
+  return `Your plan is ready in the Metastory Health app.\n\n1. Download the app: https://apps.apple.com/us/app/metastory-health/id6812901357\n2. Sign in with ${_cpEmail(e.email)}. If you use Apple, choose "Share My Email".\n3. Unlock your free access with code ${CP_CLIENT_CODE}: ${CP_REDEEM_URL}\n\nYour supplements, phase guidance and nutrition targets load on their own. Open the Supps tab to see your plan.`;
 }
 function _cpCopyInvite(){_cpCapture();_protoCopy(_cpInviteText(_cpEdit),'Invite copied — paste into a text or email');}
 
