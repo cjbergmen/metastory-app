@@ -705,6 +705,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     <div class="page" id="page-labs"></div>
     <div class="page" id="page-labsadmin"></div>
     <div class="page" id="page-protoadmin"></div>
+    <div class="page" id="page-clientplans"></div>
   </div>
   <div id="mini-player">
     <div id="mp-prog" onclick="musSeekBar(event)"><div id="mp-fill"></div></div>
@@ -1292,6 +1293,7 @@ function rSettingsModal(){
     ${sec('Supplements', _supps?_supps+' configured':'', `
       <div style="font-size:12px;color:var(--sub);margin-bottom:10px;line-height:1.5">Add supplements from Fullscript or anywhere else, then track them on the Today tab.</div>
       <button class="btn btn-s btn-sm btn-f" onclick="closeSettings();openSuppModal()">Manage supplements</button>
+      ${fbUser?`<div style="font-size:11.5px;color:var(--sub);margin-top:8px;line-height:1.45">${_cpGet()?'Linked to your practitioner plan.':'Working with a practitioner? Your plan links to the email you sign in with: <b>'+_labEsc(fbUser.email||'(none shared)')+'</b>'}</div>`:''}
       <details class="set-sub">
         <summary><span>I have a report code from my practitioner</span><span class="set-chev"></span></summary>
         ${lsGet('_practitionerReport',null) ? `<div style="font-size:12px;font-weight:600;color:var(--text);margin:8px 0">Report imported — ${lsGet('_practitionerReport',{}).sessionDate||'date unknown'}</div>` : ''}
@@ -1800,11 +1802,13 @@ if(fbAuth) {
           else fbPushAll();
         }
         refresh();
+        try{ _cpStart(); }catch(e){}
         // Trigger onboarding for fresh/switched accounts after cloud pull completes
         if(freshSignIn) checkOnboarding();
       });
     } else {
       hideSyncVeil();
+      try{ _cpStop(); }catch(e){}
       // Only a sign-out the person asked for wipes this phone's copy. A null from
       // the SDK on launch is not a sign-out, and must leave their data alone.
       if(window._signOutIntent){
@@ -3973,9 +3977,9 @@ function pct(v,t){return Math.min(100,Math.round(v/t*100))}
 
 // ── NAV ───────────────────────────────────────────────────────────────────────
 let curPage='today';
-const TITLES={today:'Today',workout:'Exercise',food:'Diet',water:'Water',recovery:'Stress',assess:'Assessments',rest:'Rest',supps:'Supplements',detective:'Health Detective',summary:'My DRESS Summary',journal:'Reflections',labs:'Functional Lab Testing',labsadmin:'Lab Order Queue',protoadmin:'Protocol Codes'};
+const TITLES={today:'Today',workout:'Exercise',food:'Diet',water:'Water',recovery:'Stress',assess:'Assessments',rest:'Rest',supps:'Supplements',detective:'Health Detective',summary:'My DRESS Summary',journal:'Reflections',labs:'Functional Lab Testing',labsadmin:'Lab Order Queue',protoadmin:'Protocol Codes',clientplans:'Client Plans'};
 // Pages we never restore into on launch: admin-only, or meaningless cold.
-const NO_RESTORE_PAGES={labsadmin:1,protoadmin:1};
+const NO_RESTORE_PAGES={labsadmin:1,protoadmin:1,clientplans:1};
 function goPage(p){
   // Remember where we are so a refresh (or the service worker's post-update
   // reload) comes back here instead of dropping to Today. Device-local: the
@@ -4005,6 +4009,7 @@ function render(p){
   else if(p==='labs')rLabs();
   else if(p==='labsadmin')rLabsAdmin();
   else if(p==='protoadmin')rProtoAdmin();
+  else if(p==='clientplans')rClientPlans();
 }
 function refresh(){render(curPage)}
 /* ═══════════════════ FUNCTIONAL LAB ORDERING (GI-MAP) ═══════════════════
@@ -4225,6 +4230,7 @@ function rLabsAdmin(){
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <button onclick="_labCopy('${o.id}')" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer">Copy for Evexia</button>
         <select onchange="_labSetStatus('${o.id}',this.value)" style="padding:8px;border:1px solid var(--border);border-radius:8px;font-size:12px;background:var(--surface)">${LAB_STATUSES.map(s=>`<option value="${s.key}" ${s.key===o.status?'selected':''}>${s.label}</option>`).join('')}</select>
+        <button onclick="_cpFromOrder('${o.id}')" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer">Client plan</button>
         <button onclick="_labAdminDelete('${o.id}')" style="background:rgba(196,112,112,.14);color:var(--red);border:none;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer">Delete</button>
       </div>
     </div>`;
@@ -4353,7 +4359,7 @@ function _protoEntryCardHTML(){
     <div style="font-family:var(--font-serif);font-size:19px;margin:6px 0 4px">Have a protocol code?</div>
     <p style="font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:12px">After your Results &amp; Review you'll get a short code. Enter it and your protocol lands in the schedule below — dose, timing and all. You type it in yourself, so nothing personal travels with it.</p>
     <button onclick="openProtoModal()" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--rs);padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font-sans)">Enter a protocol code</button>
-    ${admin?`<button onclick="goPage('protoadmin')" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--rs);padding:11px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;font-family:var(--font-sans)">Practitioner: issue a protocol code</button>`:''}
+    ${admin?`<button onclick="goPage('protoadmin')" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--rs);padding:11px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;font-family:var(--font-sans)">Practitioner: issue a protocol code</button><button onclick="_cpEdit=null;goPage('clientplans')" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--rs);padding:11px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;font-family:var(--font-sans)">Practitioner: client plans (by email)</button>`:''}
   </div>`;
 }
 // Shown on the Supps tab for two weeks after a redemption, so the
@@ -4708,6 +4714,452 @@ Biocidin LSF | 5 drops | morning | start day 5" style="width:100%;min-height:96p
 }
 /* ═══════════════════ END PRACTITIONER PROTOCOL CODES ═══════════════════ */
 
+/* ═══════════════════ CLIENT PLANS (email-linked, phased) ═══════════════════
+   The practitioner builds a client's whole plan once — GI-MAP findings plus a
+   phased supplement regimen with diet and movement guidance per phase — and
+   keys it to the email the client signs in with. When that person signs in,
+   the plan finds them: the current phase drops into Supplements, the diet and
+   movement guidance shows on those tabs, the Health Detective reads the
+   findings, and the next phase takes over on its own when the weeks are up.
+
+   This is the opposite trade-off from protocol codes (which stay anonymous):
+   the doc holds the client's email and lab findings, so the rules only let a
+   client read the doc whose id is their own VERIFIED sign-in email.
+
+   Firestore: collection `clientPlans`, doc id = lower-cased email.
+     match /clientPlans/{email} {
+       allow get: if request.auth != null
+                  && request.auth.token.email_verified == true
+                  && request.auth.token.email.lower() == email;
+       allow list, create, update, delete: if <practitioner, email_verified>;
+     }
+   Doc: { email, clientName, startDate:'YYYY-MM-DD', pinPhase:-1|n,
+          shareFindings, gimap:{date,summary,findings:[{m,r,f}]},
+          phases:[{id,name,weeks,goal,diet,move,items:[{name,dose,slot,notes}]}],
+          version, updatedAt, updatedBy }
+   Supplements the plan adds carry src:'plan' so they can be swapped out at a
+   phase change without touching anything the client added themselves. */
+const CP_FLAGS=[['high','High'],['low','Low'],['positive','Positive'],['detected','Detected'],['normal','Normal']];
+let _cpUnsub=null, _cpWatchingEmail='';
+let _cpList=[], _cpListOn=false, _cpEdit=null, _cpPasteFor=-1;
+
+function _cpEmail(e){return String(e||'').trim().toLowerCase();}
+function _cpGet(){try{return JSON.parse(lsGet('_clientPlan','null'));}catch(e){return null;}}
+function _cpDayNum(s){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||''));if(!m)return null;return Math.round(Date.UTC(+m[1],+m[2]-1,+m[3])/864e5);}
+function _cpTodayNum(){return _cpDayNum(dk());}
+function _cpFmtDay(n){try{const d=new Date(n*864e5);return d.toLocaleDateString(undefined,{month:'short',day:'numeric',timeZone:'UTC'});}catch(e){return '';}}
+
+/* Which phase is live today. Weeks blank/0 = open-ended: it stays until the
+   practitioner moves them on. pinPhase overrides the calendar. */
+function _cpActive(p){
+  const ph=(p&&Array.isArray(p.phases))?p.phases:[];
+  if(!ph.length)return {idx:-1,none:true};
+  const pin=(p.pinPhase==null?-1:+p.pinPhase);
+  const start=_cpDayNum(p.startDate), today=_cpTodayNum();
+  if(pin>=0&&pin<ph.length)return {idx:pin,pinned:true,day:null,len:null};
+  if(start==null||today==null)return {idx:0,day:null,len:null};
+  const days=today-start;
+  if(days<0)return {idx:-1,pending:true,startsOn:start};
+  let acc=0;
+  for(let i=0;i<ph.length;i++){
+    const w=+ph[i].weeks||0;
+    if(!w)return {idx:i,day:days-acc,len:null,open:true,startedOn:start+acc};
+    if(days<acc+w*7)return {idx:i,day:days-acc,len:w*7,startedOn:start+acc,endsOn:start+acc+w*7};
+    acc+=w*7;
+  }
+  return {idx:ph.length-1,done:true,day:days,len:null};
+}
+
+/* ---- client: watch for a plan under this account's email ---- */
+function _cpStart(){
+  if(typeof fbDb==='undefined'||!fbDb||!fbUser)return;
+  const em=_cpEmail(fbUser.email);
+  if(!em||(_cpUnsub&&_cpWatchingEmail===em))return;
+  _cpStop();
+  _cpWatchingEmail=em;
+  try{
+    _cpUnsub=fbDb.collection('clientPlans').doc(em).onSnapshot(d=>{
+      if(!fbUser||_cpEmail(fbUser.email)!==em)return;
+      if(d.exists){lsSet('_clientPlan',JSON.stringify(d.data()));}
+      else{lsSet('_clientPlan','null');}
+      _cpSync(true);
+    },err=>{
+      // Rules not published yet, or Apple Hide-My-Email / unverified address:
+      // leave whatever is on the phone alone.
+      console.warn('client plan listen',err&&err.code);
+    });
+  }catch(e){_cpUnsub=null;_cpWatchingEmail='';}
+}
+function _cpStop(){try{if(_cpUnsub)_cpUnsub();}catch(e){}_cpUnsub=null;_cpWatchingEmail='';}
+
+/* Put the live phase's supplements into the schedule. Only runs when the plan
+   version or the phase actually changed, so a client's own edits between
+   changes are left alone. `definitive` = a server answer, which is the only
+   thing allowed to strip plan items when the plan has been deleted. */
+function _cpSync(definitive){
+  try{
+    const p=_cpGet();
+    const prevKey=lsGet('_cpApplied','');
+    const cur=_suppPlan();
+    if(!p){
+      if(definitive&&prevKey&&cur.some(s=>s.src==='plan')){
+        _suppSave(cur.filter(s=>s.src!=='plan'));lsSet('_cpApplied','');
+        if(curPage==='supps')rSupps();
+      }
+      return;
+    }
+    const a=_cpActive(p);
+    const key=(p.version||0)+':'+a.idx;
+    if(key===prevKey){if(definitive)_cpRerender();return;}
+    const keep=cur.filter(s=>s.src!=='plan');
+    const next=keep.slice();
+    let added=0;
+    if(a.idx>=0){
+      const ph=p.phases[a.idx]||{};
+      (ph.items||[]).forEach((it,i)=>{
+        const name=String(it.name||'').trim();if(!name)return;
+        const slot=_protoSlot(it.slot);
+        if(keep.some(s=>String(s.name||'').trim().toLowerCase()===name.toLowerCase()&&s.slot===slot))return;
+        next.push({id:'cp_'+(ph.id||a.idx)+'_'+i,name,dose:it.dose||'',notes:it.notes||'',slot,emoji:'💊',src:'plan',phase:a.idx});
+        added++;
+      });
+    }
+    _suppSave(next);
+    const prevIdx=prevKey?+prevKey.split(':')[1]:null;
+    lsSet('_cpApplied',key);
+    if(prevKey&&prevIdx!==a.idx&&a.idx>=0){
+      lsSet('_cpPhaseNote',JSON.stringify({at:Date.now(),idx:a.idx}));
+      _labToast((p.phases[a.idx].name||('Phase '+(a.idx+1)))+' has started — your supplements are updated');
+    }else if(!prevKey&&added){
+      _labToast('Your practitioner plan is in — '+added+' supplement'+(added===1?'':'s')+' added');
+    }else if(prevKey&&prevKey.split(':')[0]!==String(p.version||0)){
+      _labToast('Your practitioner updated your plan');
+    }
+    _cpRerender();
+  }catch(e){console.warn('client plan sync',e);}
+}
+function _cpRerender(){try{if(curPage==='supps')rSupps();else if(curPage==='food')rDiet();else if(curPage==='workout')rWorkout();else if(curPage==='today')rToday();}catch(e){}}
+// Catch a phase boundary that passes while the app sits open overnight.
+setInterval(()=>{try{if(_cpGet())_cpSync(false);}catch(e){}},30*60*1000);
+document.addEventListener('visibilitychange',()=>{try{if(document.visibilityState==='visible'&&_cpGet())_cpSync(false);}catch(e){}});
+
+/* ---- client: what they see ---- */
+function _cpPhaseStrip(p,a){
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 2px">${p.phases.map((ph,i)=>{
+    const on=i===a.idx, past=a.idx>i;
+    const bg=on?'var(--green)':past?'var(--surface3)':'var(--surface2)';
+    const col=on?'#fff':'var(--sub)';
+    return `<span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;background:${bg};color:${col};border:1px solid ${on?'var(--green)':'var(--border)'}">${past?'✓ ':''}${_labEsc(ph.name||('Phase '+(i+1)))}</span>`;
+  }).join('')}</div>`;
+}
+function _cpWhenLine(p,a){
+  if(a.pending)return 'Your plan starts '+_cpFmtDay(a.startsOn)+'.';
+  if(a.pinned)return 'Phase '+(a.idx+1)+' of '+p.phases.length+'.';
+  if(a.done)return 'Final phase — the scheduled weeks are complete. Check in with your practitioner about what comes next.';
+  if(a.open)return 'Phase '+(a.idx+1)+' of '+p.phases.length+' · day '+(a.day+1)+'. Your practitioner will move you on when you’re ready.';
+  if(a.len){const wk=Math.floor(a.day/7)+1,of=Math.round(a.len/7);
+    return 'Phase '+(a.idx+1)+' of '+p.phases.length+' · week '+wk+' of '+of+(a.idx<p.phases.length-1?' · next phase starts '+_cpFmtDay(a.endsOn):'');}
+  return '';
+}
+function _cpFindingsHTML(p){
+  const g=p.gimap||{};if(p.shareFindings===false)return '';
+  const f=(g.findings||[]).filter(x=>x&&x.m);
+  if(!g.summary&&!f.length)return '';
+  const col={high:'#a5563d',low:'#4f6f80',positive:'#a5563d',detected:'#a5563d',normal:'var(--sub)'};
+  return `<details style="margin-top:10px"><summary style="font-size:12.5px;font-weight:700;cursor:pointer;color:var(--text)">Your GI-MAP findings${g.date?' · '+_labEsc(g.date):''}</summary>
+    ${g.summary?`<div style="font-size:13px;line-height:1.55;margin:8px 0">${_labEsc(g.summary)}</div>`:''}
+    ${f.map(x=>`<div style="display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:6px 0;border-top:1px solid var(--border)"><span>${_labEsc(x.m)}${x.r?` <span style="color:var(--sub)">· ${_labEsc(x.r)}</span>`:''}</span>${x.f?`<b style="color:${col[x.f]||'var(--sub)'};white-space:nowrap">${_labEsc((CP_FLAGS.find(c=>c[0]===x.f)||[x.f,x.f])[1])}</b>`:''}</div>`).join('')}
+  </details>`;
+}
+function _cpSuppsCardHTML(){
+  const p=_cpGet();if(!p||!Array.isArray(p.phases)||!p.phases.length)return '';
+  const a=_cpActive(p);const ph=a.idx>=0?p.phases[a.idx]:null;
+  let note='';try{const n=JSON.parse(lsGet('_cpPhaseNote','null'));if(n&&n.idx===a.idx&&Date.now()-n.at<3*864e5)note=`<div class="fdn-chip" style="margin:10px 0 0;background:rgba(183,186,167,.22)"><span><b>New phase today.</b> Your schedule below has been swapped to ${_labEsc(ph?ph.name||('Phase '+(a.idx+1)):'')}.</span></div>`;}catch(e){}
+  return `<div class="card" style="border:1.5px solid var(--green)">
+    <span class="kicker">Your practitioner plan</span>
+    <div style="font-family:var(--font-serif);font-size:19px;margin:6px 0 2px">${ph?_labEsc(ph.name||('Phase '+(a.idx+1))):'Starting soon'}</div>
+    <div style="font-size:12px;color:var(--sub)">${_cpWhenLine(p,a)}</div>
+    ${_cpPhaseStrip(p,a)}
+    ${note}
+    ${ph&&ph.goal?`<div style="font-size:13px;line-height:1.55;margin-top:10px;padding-left:10px;border-left:2px solid var(--green)">${_labEsc(ph.goal)}</div>`:''}
+    ${ph?`<div style="font-size:11.5px;color:var(--sub);margin-top:8px">${(ph.items||[]).length} supplement${(ph.items||[]).length===1?'':'s'} in this phase — they're in your schedule below.</div>`:''}
+    ${_cpFindingsHTML(p)}
+  </div>`;
+}
+function _cpTabCardHTML(tab){
+  const p=_cpGet();if(!p||!Array.isArray(p.phases))return '';
+  const a=_cpActive(p);if(a.idx<0)return '';
+  const ph=p.phases[a.idx]||{};
+  const txt=tab==='diet'?ph.diet:ph.move;if(!txt||!String(txt).trim())return '';
+  return `<div class="card" style="border:1px solid var(--green)">
+    <span class="kicker">From your practitioner · ${_labEsc(ph.name||('Phase '+(a.idx+1)))}</span>
+    <div style="font-size:13.5px;line-height:1.6;margin-top:6px;white-space:pre-line">${_labEsc(txt)}</div>
+  </div>`;
+}
+// Fed to the Health Detective so its answers sit inside the practitioner's plan.
+function _cpDetContext(){
+  const p=_cpGet();if(!p||!Array.isArray(p.phases)||!p.phases.length)return '';
+  const a=_cpActive(p);const ph=a.idx>=0?p.phases[a.idx]:null;
+  const g=p.gimap||{};const lines=[];
+  const f=(g.findings||[]).filter(x=>x&&x.m).map(x=>x.m+(x.r?' '+x.r:'')+(x.f?' ('+x.f+')':''));
+  if(g.summary||f.length)lines.push('GI-MAP'+(g.date?' ('+g.date+')':'')+', reviewed with their practitioner: '+(f.length?f.join('; ')+'. ':'')+(g.summary?'Practitioner summary: '+g.summary:''));
+  if(ph){
+    lines.push('Current phase: '+(ph.name||('Phase '+(a.idx+1)))+' ('+(a.idx+1)+' of '+p.phases.length+')'+(ph.goal?' — '+String(ph.goal).replace(/[.\s]+$/,''):'')+'.');
+    if((ph.items||[]).length)lines.push('Phase supplements: '+ph.items.map(i=>i.name+(i.dose?' '+i.dose:'')).join(', ')+'.');
+    if(ph.diet)lines.push('Practitioner diet guidance for this phase: '+ph.diet);
+    if(ph.move)lines.push('Practitioner movement guidance for this phase: '+ph.move);
+  }else if(a.pending){lines.push('Their practitioner plan starts '+_cpFmtDay(a.startsOn)+'.');}
+  const nx=a.idx>=0&&a.idx<p.phases.length-1?p.phases[a.idx+1]:null;
+  if(nx)lines.push('Next phase: '+(nx.name||('Phase '+(a.idx+2)))+'.');
+  lines.push('This plan was set by their practitioner. Work inside it: never change, add to, or contradict the protocol or its doses — questions about changing it go back to the practitioner.');
+  return 'PRACTITIONER PLAN: '+lines.join(' ');
+}
+
+/* ---- practitioner: list + editor ---- */
+function _cpStartList(){
+  if(_cpListOn||typeof fbDb==='undefined'||!fbDb)return;
+  _cpListOn=true;
+  try{fbDb.collection('clientPlans').orderBy('updatedAt','desc').limit(100).onSnapshot(s=>{
+    _cpList=s.docs.map(d=>Object.assign({id:d.id},d.data()));
+    if(curPage==='clientplans'&&!_cpEdit)rClientPlans();
+  },err=>{console.warn('client plans list',err);_cpListOn=false;});}catch(e){_cpListOn=false;}
+}
+function _cpBlankPhase(n){return {id:'p'+Date.now().toString(36)+n,name:'Phase '+n,weeks:4,goal:'',diet:'',move:'',items:[]};}
+function _cpNew(prefill){
+  _cpEdit={isNew:true,email:'',clientName:'',startDate:dk(),pinPhase:-1,shareFindings:true,
+    gimap:{date:'',summary:'',findings:[]},phases:[_cpBlankPhase(1)],version:0};
+  if(prefill)Object.assign(_cpEdit,prefill);
+  goPage('clientplans');
+}
+function _cpOpen(id){
+  const p=_cpList.find(x=>x.id===id);if(!p)return;
+  _cpEdit=JSON.parse(JSON.stringify(p));_cpEdit.isNew=false;_cpEdit.origEmail=p.id;
+  rClientPlans();try{document.getElementById('pages').scrollTop=0;}catch(e){}
+}
+function _cpFromOrder(id){
+  const o=(typeof _labOrders!=='undefined'?_labOrders:[]).find(x=>x.id===id);if(!o)return;
+  const ex=_cpList.find(x=>x.id===_cpEmail(o.email));
+  if(ex){goPage('clientplans');_cpOpen(ex.id);return;}
+  _cpNew({email:_cpEmail(o.email),clientName:o.fullName||''});
+}
+function _cpCapture(){
+  const e=_cpEdit;if(!e)return;
+  const v=id=>{const el=document.getElementById(id);return el?el.value:null;};
+  const c=id=>{const el=document.getElementById(id);return el?el.checked:null;};
+  if(v('cp-email')!=null)e.email=v('cp-email');
+  if(v('cp-name')!=null)e.clientName=v('cp-name');
+  if(v('cp-start')!=null)e.startDate=v('cp-start');
+  if(v('cp-pin')!=null)e.pinPhase=+v('cp-pin');
+  if(c('cp-share')!=null)e.shareFindings=c('cp-share');
+  if(v('cp-gdate')!=null)e.gimap.date=v('cp-gdate');
+  if(v('cp-gsum')!=null)e.gimap.summary=v('cp-gsum');
+  document.querySelectorAll('[data-cpf]').forEach(r=>{
+    const f=e.gimap.findings[+r.getAttribute('data-cpf')];if(!f)return;
+    const g=n=>{const el=r.querySelector('[data-k="'+n+'"]');return el?el.value:'';};
+    f.m=g('m');f.r=g('r');f.f=g('f');
+  });
+  document.querySelectorAll('[data-cpp]').forEach(r=>{
+    const ph=e.phases[+r.getAttribute('data-cpp')];if(!ph)return;
+    const g=n=>{const el=r.querySelector('[data-k="'+n+'"]');return el?el.value:'';};
+    ph.name=g('name');ph.weeks=g('weeks');ph.goal=g('goal');ph.diet=g('diet');ph.move=g('move');
+    const ps=r.querySelector('[data-k="paste"]');if(ps)ph._paste=ps.value;
+    r.querySelectorAll('[data-cpi]').forEach(ir=>{
+      const it=ph.items[+ir.getAttribute('data-cpi')];if(!it)return;
+      const gi=n=>{const el=ir.querySelector('[data-k="'+n+'"]');return el?el.value:'';};
+      it.name=gi('name');it.dose=gi('dose');it.slot=gi('slot')||it.slot;it.notes=gi('notes');
+    });
+  });
+}
+function _cpAddFinding(){_cpCapture();_cpEdit.gimap.findings.push({m:'',r:'',f:'high'});rClientPlans();}
+function _cpDelFinding(i){_cpCapture();_cpEdit.gimap.findings.splice(i,1);rClientPlans();}
+function _cpAddPhase(){_cpCapture();_cpEdit.phases.push(_cpBlankPhase(_cpEdit.phases.length+1));rClientPlans();}
+function _cpDelPhase(i){_cpCapture();if(!confirm('Remove '+(_cpEdit.phases[i].name||'this phase')+'?'))return;_cpEdit.phases.splice(i,1);rClientPlans();}
+function _cpMovePhase(i,d){_cpCapture();const a=_cpEdit.phases,j=i+d;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];rClientPlans();}
+function _cpAddItem(pi){_cpCapture();_cpEdit.phases[pi].items.push({name:'',dose:'',slot:'morning',notes:''});rClientPlans();}
+function _cpDelItem(pi,ii){_cpCapture();_cpEdit.phases[pi].items.splice(ii,1);rClientPlans();}
+function _cpCopyPrev(pi){_cpCapture();if(pi<1)return;_cpEdit.phases[pi].items=JSON.parse(JSON.stringify(_cpEdit.phases[pi-1].items||[]));rClientPlans();}
+function _cpTogglePaste(pi){_cpCapture();_cpPasteFor=_cpPasteFor===pi?-1:pi;rClientPlans();}
+function _cpImportPaste(pi){
+  _cpCapture();const ph=_cpEdit.phases[pi];
+  const rows=String(ph._paste||'').split('\n').map(l=>l.trim()).filter(Boolean);
+  if(!rows.length){_labToast('Paste a few lines first.');return;}
+  let n=0;rows.forEach(line=>{
+    const parts=line.split(/\s*[|\t]\s*/);const name=(parts[0]||'').replace(/^[-•*\d.\s]+/,'').trim();if(!name)return;
+    ph.items.push({name,dose:(parts[1]||'').trim(),slot:_protoSlot(parts[2]||''),notes:(parts[3]||'').trim()});n++;
+  });
+  ph._paste='';_cpPasteFor=-1;_labToast(n+' line'+(n===1?'':'s')+' imported — check the timing');rClientPlans();
+}
+function _cpClean(e){
+  const s=(x,n)=>String(x||'').trim().slice(0,n);
+  return {
+    email:_cpEmail(e.email),clientName:s(e.clientName,80),startDate:s(e.startDate,10),
+    pinPhase:(e.pinPhase==null||isNaN(+e.pinPhase))?-1:+e.pinPhase,shareFindings:e.shareFindings!==false,
+    gimap:{date:s(e.gimap.date,20),summary:s(e.gimap.summary,1500),
+      findings:(e.gimap.findings||[]).filter(f=>s(f.m,80)).map(f=>({m:s(f.m,80),r:s(f.r,60),f:s(f.f,12)}))},
+    phases:(e.phases||[]).map((p,i)=>({id:p.id||('p'+i),name:s(p.name,60)||('Phase '+(i+1)),weeks:Math.max(0,Math.min(104,parseInt(p.weeks,10)||0)),
+      goal:s(p.goal,600),diet:s(p.diet,1500),move:s(p.move,1000),
+      items:(p.items||[]).filter(it=>s(it.name,80)).map(it=>({name:s(it.name,80),dose:s(it.dose,60),slot:_protoSlot(it.slot),notes:s(it.notes,160)}))})),
+    version:(+e.version||0)+1,updatedAt:Date.now(),
+    updatedBy:(typeof fbUser!=='undefined'&&fbUser)?(fbUser.email||''):''
+  };
+}
+function _cpSave(){
+  _cpCapture();
+  const doc=_cpClean(_cpEdit);
+  if(!/^[^@\s\/]+@[^@\s\/]+\.[^@\s\/]+$/.test(doc.email)){_labToast('Enter the email they sign in with.');return;}
+  if(!doc.phases.length){_labToast('Add at least one phase.');return;}
+  if(!_cpDayNum(doc.startDate)){_labToast('Pick a start date.');return;}
+  if(_cpEdit.isNew&&_cpList.some(x=>x.id===doc.email)&&!confirm('There is already a plan for '+doc.email+'. Replace it?'))return;
+  if(typeof fbDb==='undefined'||!fbDb){_labToast('Not connected — sign in first.');return;}
+  const old=_cpEdit.origEmail;
+  fbDb.collection('clientPlans').doc(doc.email).set(doc).then(()=>{
+    if(old&&old!==doc.email)fbDb.collection('clientPlans').doc(old).delete().catch(()=>{});
+    _labToast('Saved — it will appear in their app the next time they open it');
+    _cpEdit=null;rClientPlans();
+  }).catch(err=>{
+    console.warn('client plan save',err);
+    _labToast(err&&err.code==='permission-denied'?'Not allowed — the clientPlans rules need publishing in Firebase.':'Could not save — try again.');
+  });
+}
+function _cpDelete(){
+  if(!_cpEdit||_cpEdit.isNew){_cpEdit=null;rClientPlans();return;}
+  if(!confirm('Delete this client plan? Their phase supplements will be removed from their app.'))return;
+  fbDb.collection('clientPlans').doc(_cpEdit.origEmail).delete().then(()=>{_cpEdit=null;rClientPlans();}).catch(()=>_labToast('Could not delete — try again.'));
+}
+function _cpCancel(){_cpEdit=null;rClientPlans();}
+function _cpInviteText(e){
+  return `Your plan is ready in the Metastory Health app.\n\nSign in with ${_cpEmail(e.email)} — use that exact address (if you sign in with Apple, choose "Share My Email", not "Hide My Email"). Your supplements, phases and guidance will load on their own.\n\nGet the app: https://apps.apple.com/us/app/metastory-health/id6812901357`;
+}
+function _cpCopyInvite(){_cpCapture();_protoCopy(_cpInviteText(_cpEdit),'Invite copied — paste into a text or email');}
+
+function _cpFieldLbl(t,sub){return `<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--sub);margin:14px 0 6px">${t}${sub?` <span style="font-weight:400;text-transform:none">${sub}</span>`:''}</div>`;}
+const _cpTA='width:100%;padding:11px;border:1.5px solid var(--border);border-radius:var(--rs);font-size:16px;background:var(--surface2);color:var(--text);font-family:var(--font-sans)';
+const _cpMini='background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer';
+
+function _cpEditorHTML(){
+  const e=_cpEdit;
+  let h=`<div class="card">
+    <span class="kicker">${e.isNew?'New client plan':'Edit client plan'}</span>
+    ${_cpFieldLbl('Their sign-in email')}
+    <input id="cp-email" class="fi" type="email" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="name@example.com" value="${_labEsc(e.email)}" oninput="_cpCapture()" style="font-size:16px;padding:10px 11px">
+    <div style="font-size:11px;color:var(--sub);margin-top:5px;line-height:1.45">Must match the Apple or Google account they sign in with. Apple “Hide My Email” sign-ins get a relay address and won't match.</div>
+    ${_cpFieldLbl('Name','(for your list)')}
+    <input id="cp-name" class="fi" value="${_labEsc(e.clientName)}" oninput="_cpCapture()" style="font-size:16px;padding:10px 11px">
+    <div style="display:flex;gap:10px">
+      <div style="flex:1">${_cpFieldLbl('Phase 1 starts')}<input id="cp-start" class="fi" type="date" value="${_labEsc(e.startDate)}" oninput="_cpCapture()" style="font-size:16px;padding:9px 10px"></div>
+      <div style="flex:1">${_cpFieldLbl('Current phase')}<select id="cp-pin" onchange="_cpCapture()" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:var(--rs);font-size:14px;background:var(--surface);color:var(--text)">
+        <option value="-1" ${(+e.pinPhase)<0?'selected':''}>Auto (by weeks)</option>
+        ${e.phases.map((p,i)=>`<option value="${i}" ${(+e.pinPhase)===i?'selected':''}>Hold on ${_labEsc(p.name||('Phase '+(i+1)))}</option>`).join('')}
+      </select></div>
+    </div>
+  </div>`;
+  // GI-MAP
+  h+=`<div class="card"><span class="kicker">GI-MAP results</span>
+    <div style="display:flex;gap:10px;align-items:flex-end">
+      <div style="flex:1">${_cpFieldLbl('Collected')}<input id="cp-gdate" class="fi" type="date" value="${_labEsc(e.gimap.date)}" oninput="_cpCapture()" style="font-size:16px;padding:9px 10px"></div>
+    </div>
+    ${_cpFieldLbl('Key findings')}`;
+  if(!e.gimap.findings.length)h+=`<p style="font-size:12.5px;color:var(--sub);margin-bottom:8px">Add only the markers that drive the plan.</p>`;
+  e.gimap.findings.forEach((f,i)=>{
+    h+=`<div data-cpf="${i}" style="display:flex;gap:6px;margin-bottom:6px;align-items:center">
+      <input class="fi" data-k="m" placeholder="Marker (e.g. H. pylori)" value="${_labEsc(f.m)}" oninput="_cpCapture()" style="flex:2;font-size:16px;padding:8px 9px">
+      <input class="fi" data-k="r" placeholder="Value" value="${_labEsc(f.r)}" oninput="_cpCapture()" style="flex:1;font-size:16px;padding:8px 9px;min-width:0">
+      <select data-k="f" onchange="_cpCapture()" style="flex:none;width:96px;padding:8px;border:1.5px solid var(--border);border-radius:var(--rs);font-size:13px;background:var(--surface);color:var(--text)">${CP_FLAGS.map(([k,l])=>`<option value="${k}" ${f.f===k?'selected':''}>${l}</option>`).join('')}</select>
+      <button onclick="_cpDelFinding(${i})" style="flex:none;background:none;border:none;color:var(--red);font-size:16px;cursor:pointer">✕</button>
+    </div>`;
+  });
+  h+=`<button class="btn btn-s btn-sm btn-f" onclick="_cpAddFinding()">+ Add finding</button>
+    ${_cpFieldLbl('Summary for the client','(plain language)')}
+    <textarea id="cp-gsum" oninput="_cpCapture()" placeholder="Your results show H. pylori and some yeast overgrowth, with low digestive enzymes. We'll clear the overgrowth first, then rebuild." style="${_cpTA};min-height:76px">${_labEsc(e.gimap.summary)}</textarea>
+    <label style="display:flex;gap:10px;align-items:flex-start;font-size:13px;margin-top:12px;line-height:1.45"><input type="checkbox" id="cp-share" ${e.shareFindings!==false?'checked':''} onchange="_cpCapture()" style="width:20px;height:20px;flex:none;margin-top:1px"><span>Show the findings to the client in the app. (The Health Detective uses them either way.)</span></label>
+  </div>`;
+  // Phases
+  const slotOpts=v=>PROTO_SLOT_OPTS.map(([k,l])=>`<option value="${k}" ${_protoSlot(v)===k?'selected':''}>${l}</option>`).join('');
+  e.phases.forEach((ph,pi)=>{
+    h+=`<div class="card" data-cpp="${pi}">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+        <span class="kicker">Phase ${pi+1}</span>
+        <span style="display:flex;gap:4px">
+          ${pi>0?`<button onclick="_cpMovePhase(${pi},-1)" style="${_cpMini}">↑</button>`:''}
+          ${pi<e.phases.length-1?`<button onclick="_cpMovePhase(${pi},1)" style="${_cpMini}">↓</button>`:''}
+          ${e.phases.length>1?`<button onclick="_cpDelPhase(${pi})" style="${_cpMini};color:var(--red)">Remove</button>`:''}
+        </span>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <input class="fi" data-k="name" placeholder="Name (e.g. Kill / Clear)" value="${_labEsc(ph.name)}" oninput="_cpCapture()" style="flex:1;font-size:16px;padding:9px 11px">
+        <input class="fi" data-k="weeks" type="number" min="0" max="104" inputmode="numeric" value="${_labEsc(ph.weeks)}" oninput="_cpCapture()" style="flex:none;width:74px;font-size:16px;padding:9px 8px;text-align:center">
+        <span style="align-self:center;font-size:12px;color:var(--sub)">wks</span>
+      </div>
+      <div style="font-size:11px;color:var(--sub);margin-top:4px">0 weeks = open-ended; it holds until you move them on.</div>
+      ${_cpFieldLbl('What this phase is for','(shown to client)')}
+      <textarea data-k="goal" oninput="_cpCapture()" style="${_cpTA};min-height:56px">${_labEsc(ph.goal)}</textarea>
+      ${_cpFieldLbl('Supplements')}`;
+    if(!ph.items.length)h+=`<p style="font-size:12.5px;color:var(--sub);margin-bottom:8px">None yet.</p>`;
+    ph.items.forEach((it,ii)=>{
+      h+=`<div data-cpi="${ii}" style="border:1px solid var(--border);border-radius:var(--rs);padding:9px;margin-bottom:7px;background:var(--surface2)">
+        <div style="display:flex;gap:6px;align-items:center">
+          <input class="fi" data-k="name" placeholder="Supplement" value="${_labEsc(it.name)}" oninput="_cpCapture()" style="flex:1;font-size:16px;padding:8px 10px;background:var(--surface)">
+          <button onclick="_cpDelItem(${pi},${ii})" style="flex:none;background:none;border:none;color:var(--red);font-size:16px;cursor:pointer">✕</button>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <input class="fi" data-k="dose" placeholder="Dose" value="${_labEsc(it.dose)}" oninput="_cpCapture()" style="flex:1;font-size:16px;padding:8px 10px;background:var(--surface)">
+          <select data-k="slot" onchange="_cpCapture()" style="flex:none;width:104px;padding:8px;border:1.5px solid var(--border);border-radius:var(--rs);font-size:13px;background:var(--surface);color:var(--text)">${slotOpts(it.slot)}</select>
+        </div>
+        <input class="fi" data-k="notes" placeholder="Note (e.g. with food, start day 5)" value="${_labEsc(it.notes)}" oninput="_cpCapture()" style="margin-top:6px;font-size:16px;padding:8px 10px;background:var(--surface)">
+      </div>`;
+    });
+    h+=`<div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-s btn-sm" style="flex:1" onclick="_cpAddItem(${pi})">+ Add supplement</button>
+        <button class="btn btn-s btn-sm" onclick="_cpTogglePaste(${pi})">${_cpPasteFor===pi?'Hide paste':'Paste list'}</button>
+        ${pi>0?`<button class="btn btn-s btn-sm" onclick="_cpCopyPrev(${pi})">Copy from phase ${pi}</button>`:''}
+      </div>`;
+    if(_cpPasteFor===pi)h+=`<textarea data-k="paste" oninput="_cpCapture()" placeholder="One per line:
+Mastic gum | 1g | morning | empty stomach
+Biocidin LSF | 5 drops | evening | start day 5" style="${_cpTA};min-height:90px;margin-top:8px">${_labEsc(ph._paste||'')}</textarea>
+      <div style="font-size:11px;color:var(--sub);margin:4px 0 8px">Name | dose | morning/midday/evening | note</div>
+      <button class="btn btn-s btn-sm btn-f" onclick="_cpImportPaste(${pi})">Import lines</button>`;
+    h+=`${_cpFieldLbl('Diet guidance','(shows on their Diet tab)')}
+      <textarea data-k="diet" oninput="_cpCapture()" placeholder="Remove gluten, dairy and added sugar. Lower-FODMAP while we clear the overgrowth." style="${_cpTA};min-height:66px">${_labEsc(ph.diet)}</textarea>
+      ${_cpFieldLbl('Movement guidance','(shows on their Exercise tab)')}
+      <textarea data-k="move" oninput="_cpCapture()" placeholder="Keep intensity moderate during this phase — walks and lighter lifting. Rest if die-off symptoms flare." style="${_cpTA};min-height:56px">${_labEsc(ph.move)}</textarea>
+    </div>`;
+  });
+  h+=`<button class="btn btn-s btn-f" onclick="_cpAddPhase()">+ Add phase</button>
+    <button class="btn btn-b btn-f" style="margin-top:12px" onclick="_cpSave()">Save plan</button>
+    <button class="btn btn-s btn-f" style="margin-top:8px" onclick="_cpCopyInvite()">Copy sign-in instructions for the client</button>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn btn-s" style="flex:1" onclick="_cpCancel()">Cancel</button>
+      ${e.isNew?'':`<button class="btn btn-s" style="flex:1;color:var(--red)" onclick="_cpDelete()">Delete plan</button>`}
+    </div>`;
+  return h;
+}
+function rClientPlans(){
+  const el=document.getElementById('page-clientplans');if(!el)return;
+  if(!_labIsAdmin()){el.innerHTML=`<div class="card">Sign in as a practitioner to manage client plans.</div>`;return;}
+  _cpStartList();
+  if(_cpEdit){el.innerHTML=_cpEditorHTML();return;}
+  let h=`<div class="card">
+    <span class="kicker">Client plans</span>
+    <div style="font-family:var(--font-serif);font-size:20px;margin:6px 0 4px">Linked to their sign-in email</div>
+    <p style="font-size:12.5px;color:var(--sub);line-height:1.5">Enter their GI-MAP findings and a phased protocol once. When they sign in with that email, the current phase fills their Supplements tab, diet and movement guidance shows on those tabs, and the next phase takes over when the weeks are up. Edits reach them live.</p>
+    <button class="btn btn-b btn-f" style="margin-top:12px" onclick="_cpNew()">+ New client plan</button>
+  </div>`;
+  if(!_cpList.length)h+=`<div class="card" style="color:var(--sub);font-size:13px">No client plans yet.</div>`;
+  _cpList.forEach(p=>{
+    const a=_cpActive(p);const ph=a.idx>=0?(p.phases||[])[a.idx]:null;
+    h+=`<div class="card" style="cursor:pointer" onclick="_cpOpen('${_labEsc(p.id)}')">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+        <b style="font-size:15px">${_labEsc(p.clientName||p.id)}</b>
+        <span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;color:#fff;background:${a.pending?'var(--sub)':'var(--green)'}">${a.pending?'Starts '+_cpFmtDay(a.startsOn):_labEsc(ph?(ph.name||('Phase '+(a.idx+1))):'—')}</span>
+      </div>
+      <div style="font-size:12px;color:var(--sub);margin-top:4px">${_labEsc(p.id)} · ${(p.phases||[]).length} phase${(p.phases||[]).length===1?'':'s'}${a.pinned?' · held':''}${a.len?' · week '+(Math.floor(a.day/7)+1)+' of '+Math.round(a.len/7):''}</div>
+    </div>`;
+  });
+  h+=`<button onclick="goPage('supps')" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--rs);padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-top:6px;font-family:var(--font-sans)">← Back</button>`;
+  el.innerHTML=h;
+}
+/* ═══════════════════ END CLIENT PLANS ═══════════════════ */
+
 // ── DATE NAV ──────────────────────────────────────────────────────────────────
 const _D=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const _M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -5058,7 +5510,7 @@ function rWorkout(){
       </div>`;
     });
     h+=`</div>`;
-    document.getElementById('page-workout').innerHTML=h;return;
+    document.getElementById('page-workout').innerHTML=_cpTabCardHTML('move')+h;return;
   }
   const wdone=isWODone();
   if(wdone){
@@ -5139,7 +5591,7 @@ function rWorkout(){
     if(!wdone){
       h+=`<button class="btn btn-g" style="width:100%;margin-top:9px" onclick="setWODone(true)">✓ Mark Session Complete</button>`;
     }
-    document.getElementById('page-workout').innerHTML=h;
+    document.getElementById('page-workout').innerHTML=_cpTabCardHTML('move')+h;
     return;
   }
   // ── Phase-based session (yoga / hiit / cardio / mobility) ────────────────
@@ -5169,7 +5621,7 @@ function rWorkout(){
     if(!wdone){
       h+=`<button class="btn btn-g" style="width:100%;margin-top:14px" onclick="setWODone(true)">✓ Mark Session Complete</button>`;
     }
-    document.getElementById('page-workout').innerHTML=h;
+    document.getElementById('page-workout').innerHTML=_cpTabCardHTML('move')+h;
     return;
   }
   // ── Strength session: exercise cards ────────────────────────────────────
@@ -5207,7 +5659,7 @@ function rWorkout(){
       ${_woSaveBarBtns()}
     </div>`;
   }
-  document.getElementById('page-workout').innerHTML=h;
+  document.getElementById('page-workout').innerHTML=_cpTabCardHTML('move')+h;
   // Cards can change position on any re-render (marking one done sinks it to the
   // bottom), so re-key any running rest timer to where its exercise sits now.
   _ctRemap();
@@ -14179,9 +14631,13 @@ function startTitr(id){
 function rSupps(){
   const plan=_suppPlan();const taken=_suppTaken();const t=_titr();
   let h=_tabRoutineHTML('supps');
+  h+=_cpSuppsCardHTML();
   h+=_protoLastCardHTML();
-  h+=_protoEntryCardHTML();
-  h+=_labEntryCardHTML();
+  // A client on a linked plan already has their protocol and their test.
+  if(!_cpGet()||_labIsAdmin()){
+    h+=_protoEntryCardHTML();
+    h+=_labEntryCardHTML();
+  }
   // Safety banner — reflects the user's health flags so gating is visible on this tab
   try{
     const f=_detFlags();
@@ -14319,7 +14775,7 @@ function rDiet(){
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M12 9v6"/></svg>
       <div style="flex:1"><h4>Blood sugar <span style="font-weight:500;color:var(--sub)">(optional)</span></h4><small>${last?'Last: '+last.v+' mg/dL'+(hk?' · monitor avg '+hk.avg:''):(hk?'From your monitor: avg '+hk.avg+' mg/dL'+(hk.min!=null&&hk.max!=null?' ('+hk.min+'–'+hk.max+')':''):'Target 80–90 before meals')}</small></div>
       <span class="mk-link">Add</span></div>`;
-  h+=_bmCard();document.getElementById('page-food').innerHTML=h;
+  h+=_bmCard();document.getElementById('page-food').innerHTML=_cpTabCardHTML('diet')+h;
 }
 
 /* ════════════ EXERCISE how-to silhouette ════════════ */
@@ -15128,6 +15584,7 @@ function _detContext(){
     if(aa && aa.primaryType) asr.push('Amino acid: ' + aa.primaryType + (aa.typesOverThreshold ? ' (' + aa.typesOverThreshold + ' types over threshold)' : ''));
     if(asr.length) out.push('ASSESSMENTS THEY HAVE TAKEN: ' + asr.join(' · ') + '.');
   }catch(e){}
+  try{ var _cpx=_cpDetContext(); if(_cpx) out.push(_cpx); }catch(e){}
 
   out.push('TODAY (' + viewDate + '): ' + _detToday().join(' '));
 

@@ -1,4 +1,4 @@
-const VERSION = '20261023-walkthrough-label';
+const VERSION = '20261103-client-plans';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately

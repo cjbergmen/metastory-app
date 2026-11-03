@@ -37,6 +37,19 @@ service cloud.firestore {
                   && request.resource.data.redeemed == resource.data.redeemed + 1;
     }
 
+    // ── Client plans (practitioner → client, linked by sign-in email) ────────
+    // Doc id = the client's lower-cased email. Holds their GI-MAP findings and
+    // phased protocol, so a client may read ONLY the doc whose id is their own
+    // verified sign-in email. Practitioners list, write and delete.
+    match /clientPlans/{email} {
+      allow get: if request.auth != null
+                 && request.auth.token.email_verified == true
+                 && request.auth.token.email.lower() == email;
+      allow list, create, update, delete: if request.auth != null
+                 && request.auth.token.email in ['cjbergmen@gmail.com']
+                 && request.auth.token.email_verified == true;
+    }
+
     function isPractitioner() {
       return request.auth != null
              && request.auth.token.email in ['cjbergmen@gmail.com'];
