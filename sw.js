@@ -1,4 +1,4 @@
-const VERSION = '20261103-overlap-phases';
+const VERSION = '20261104-item-carryover';
 const CACHE = 'cjf-v' + VERSION;
 
 // Install: skip waiting so new SW activates immediately

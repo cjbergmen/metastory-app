@@ -4803,6 +4803,32 @@ function _cpView(p){
     next:upcoming[0]||null,held:sc.filter(x=>x.status==='ready'||x.status==='waiting')};
 }
 function _cpPName(p,i){const n=String((p.phases[i]||{}).name||'').trim();return /^phase\b/i.test(n)?n:('Phase '+(i+1)+(n?' · '+n:''));}
+/* Which plan supplements are on today. An item belongs to its phase, and can
+   also carry thru:<phaseId> (keeps going until that phase ends, bridging any
+   gap) or after:<phaseId> (waits until that phase has ended). */
+function _cpPhaseById(p,id){return (p.phases||[]).findIndex(x=>x&&x.id===id);}
+function _cpItemsNow(p,v){
+  v=v||_cpView(p);if(!v)return [];
+  const st=i=>(i>=0&&v.sc[i])?v.sc[i].status:null;
+  const out=[];
+  (p.phases||[]).forEach((ph,pi)=>{
+    const own=st(pi);if(own!=='active'&&own!=='done')return;
+    (ph.items||[]).forEach((it,ii)=>{
+      if(!it||!String(it.name||'').trim())return;
+      if(it.after){const a=_cpPhaseById(p,it.after);if(a>=0&&st(a)!=='done')return;}
+      let on=own==='active';
+      if(!on&&it.thru){const t=_cpPhaseById(p,it.thru);on=t>=0&&st(t)!=='done';}
+      if(on)out.push({pi,ii,it,id:'cp_'+(ph.id||pi)+'_'+ii});
+    });
+  });
+  return out;
+}
+function _cpItemNote(p,it){
+  const bits=[];if(it.notes)bits.push(it.notes);
+  if(it.thru){const t=_cpPhaseById(p,it.thru);if(t>=0)bits.push('Continues through Phase '+(t+1));}
+  if(it.after){const a=_cpPhaseById(p,it.after);if(a>=0)bits.push('Starts after Phase '+(a+1)+' ends');}
+  return bits.join(' · ');
+}
 function _cpRel(n,today){const d=n-today;return d<=0?'today':d===1?'tomorrow':'in '+d+' days';}
 
 /* ---- client: watch for a plan under this account's email ---- */
@@ -4844,33 +4870,38 @@ function _cpSync(definitive){
       return;
     }
     const v=_cpView(p);if(!v)return;
-    const key=(p.version||0)+'|'+v.active.join(',');
+    const now=_cpItemsNow(p,v);
+    const key=(p.version||0)+'|'+v.active.join(',')+'|'+now.map(x=>x.id).join(',');
     if(key===prevKey){if(definitive)_cpRerender();return;}
     const keep=cur.filter(s=>s.src!=='plan');
     const next=keep.slice();
-    v.active.forEach(pi=>{
-      const ph=p.phases[pi]||{};
-      (ph.items||[]).forEach((it,i)=>{
-        const name=String(it.name||'').trim();if(!name)return;
-        const slot=_protoSlot(it.slot);
-        if(next.some(s=>String(s.name||'').trim().toLowerCase()===name.toLowerCase()&&s.slot===slot))return;
-        next.push({id:'cp_'+(ph.id||pi)+'_'+i,name,dose:it.dose||'',notes:it.notes||'',slot,emoji:'💊',src:'plan',phase:pi});
-      });
+    now.forEach(x=>{
+      const name=String(x.it.name).trim(),slot=_protoSlot(x.it.slot);
+      if(next.some(s=>String(s.name||'').trim().toLowerCase()===name.toLowerCase()&&s.slot===slot))return;
+      next.push({id:x.id,name,dose:x.it.dose||'',notes:_cpItemNote(p,x.it),slot,emoji:'💊',src:'plan',phase:x.pi});
     });
     _suppSave(next);
     lsSet('_cpApplied',key);
-    const [pv,pa]=prevKey?prevKey.split('|'):[null,''];
-    const prevAct=prevKey&&pa?pa.split(',').map(Number):[];
+    const parts=prevKey?prevKey.split('|'):[null,'',''];
+    const pv=parts[0];
+    const prevAct=parts[1]?parts[1].split(',').map(Number):[];
+    const prevIds=parts[2]?parts[2].split(','):[];
     const started=v.active.filter(i=>!prevAct.includes(i));
     const ended=prevAct.filter(i=>!v.active.includes(i));
-    const cnt=i=>((p.phases[i]||{}).items||[]).filter(x=>x&&x.name).length;
-    if(started.length||ended.length)lsSet('_cpPhaseNote',JSON.stringify({at:Date.now(),started,ended,first:!prevAct.length&&started.includes(0)}));
+    const nowIds=now.map(x=>x.id);
+    const addedN=nowIds.filter(id=>!prevIds.includes(id));
+    const goneN=prevIds.filter(id=>!nowIds.includes(id));
+    const nm=id=>{const x=now.find(y=>y.id===id);if(x)return x.it.name;const m=/^cp_(.+)_(\d+)$/.exec(id);if(!m)return '';const pi=_cpPhaseById(p,m[1]);const it=pi>=0?(p.phases[pi].items||[])[+m[2]]:null;return it?it.name:'';};
+    const short=n=>String(n).split(' (')[0];
+    if(started.length||ended.length||addedN.length||goneN.length)lsSet('_cpPhaseNote',JSON.stringify({at:Date.now(),started,ended,first:!prevAct.length&&started.includes(0),added:addedN.map(nm).filter(Boolean).map(short),gone:goneN.map(nm).filter(Boolean).map(short)}));
     if(started.length){
       if(!prevAct.length&&started.includes(0)&&v.today===v.start)_labToast('Your plan starts today — Phase 1 supplements are in your schedule');
       else if(!prevKey)_labToast('Your practitioner plan is in — your supplements are in your schedule');
-      else _labToast(started.map(i=>_cpPName(p,i)).join(' and ')+' starts today — '+started.reduce((t,i)=>t+cnt(i),0)+' supplements added');
+      else _labToast(started.map(i=>_cpPName(p,i)).join(' and ')+' starts today — your schedule is updated');
     }else if(ended.length){
-      _labToast(ended.map(i=>_cpPName(p,i)).join(' and ')+' is complete — those supplements are off your schedule');
+      _labToast(ended.map(i=>_cpPName(p,i)).join(' and ')+' is complete — your schedule is updated');
+    }else if(prevKey&&(addedN.length||goneN.length)&&pv===String(p.version||0)){
+      _labToast(addedN.length?('New today: '+addedN.map(nm).map(short).join(', ')):('Finished: '+goneN.map(nm).map(short).join(', ')));
     }else if(prevKey&&pv!==String(p.version||0)){
       _labToast('Your practitioner updated your plan');
     }
@@ -4960,8 +4991,10 @@ function _cpSuppsCardHTML(){
   try{const n=JSON.parse(lsGet('_cpPhaseNote','null'));
     if(n&&Date.now()-n.at<3*864e5){
       if(n.first)note='<b>Day one.</b> Your Phase 1 supplements are in your schedule below.';
-      else if(n.started&&n.started.length)note='<b>New today:</b> '+n.started.map(i=>_labEsc(_cpPName(p,i))).join(' and ')+' started. Its supplements are in your schedule below.';
-      else if(n.ended&&n.ended.length)note='<b>Complete:</b> '+n.ended.map(i=>_labEsc(_cpPName(p,i))).join(' and ')+'. Those supplements are off your schedule.';
+      else if(n.started&&n.started.length)note='<b>New today:</b> '+n.started.map(i=>_labEsc(_cpPName(p,i))).join(' and ')+' started.';
+      else if(n.ended&&n.ended.length)note='<b>Complete:</b> '+n.ended.map(i=>_labEsc(_cpPName(p,i))).join(' and ')+'.';
+      if(n.added&&n.added.length)note+=(note?' ':'')+'<b>Added:</b> '+n.added.map(_labEsc).join(', ')+'.';
+      if(n.gone&&n.gone.length)note+=(note?' ':'')+'<b>Finished:</b> '+n.gone.map(_labEsc).join(', ')+'.';
       if(note)note=`<div class="fdn-chip" style="margin:10px 0 0;background:rgba(183,186,167,.22)"><span>${note}</span></div>`;
     }}catch(e){}
   let heads='';
@@ -5009,7 +5042,7 @@ function _cpDetContext(){
   if(v.notStarted)lines.push('Their practitioner plan starts '+_cpFmtDay(v.start)+'.');
   if(v.active.length){
     lines.push('Week '+v.planWk+' of the plan. Phases running now: '+v.active.map(i=>{const ph=p.phases[i];return _cpPName(p,i)+(ph.goal?' — '+String(ph.goal).replace(/[.\s]+$/,''):'');}).join('; ')+'.');
-    const on=[];v.active.forEach(i=>(p.phases[i].items||[]).forEach(it=>{if(it&&it.name)on.push(it.name+(it.dose?' '+it.dose:''));}));
+    const on=_cpItemsNow(p,v).map(x=>x.it.name+(x.it.dose?' '+x.it.dose:''));
     if(on.length)lines.push('Supplements they are on now: '+on.join(', ')+'.');
     try{const _t=getTgt(),_b=_getTgtBase();if(_t._cpAdj)lines.push('Their macro targets are adjusted by the practitioner: today '+_t.k+' kcal, '+_t.p+'g protein, '+_t.c+'g carbs (engine default '+_b.c+'g), '+_t.f+'g fat.');}catch(e){}
     const gp=v.gov>=0?p.phases[v.gov]:p.phases[v.active[0]];
@@ -5075,6 +5108,7 @@ function _cpCapture(){
       const it=ph.items[+ir.getAttribute('data-cpi')];if(!it)return;
       const gi=n=>{const el=ir.querySelector('[data-k="'+n+'"]');return el?el.value:'';};
       it.name=gi('name');it.dose=gi('dose');it.slot=gi('slot')||it.slot;it.notes=gi('notes');
+      const tm=ir.querySelector('[data-k="timing"]');if(tm){const t=tm.value||'';it.thru=t.startsWith('thru:')?t.slice(5):'';it.after=t.startsWith('after:')?t.slice(6):'';}
     });
   });
 }
@@ -5110,7 +5144,7 @@ function _cpClean(e){
       endedOn:s(p.endedOn,10),
       nut:(()=>{const n=p.nut||{};const num=(v,lo,hi)=>{v=String(v==null?'':v).trim();if(v==='')return null;v=+v;return isNaN(v)?null:Math.max(lo,Math.min(hi,v));};
         return {carbPct:num(n.carbPct,-60,30),carbFloorTrain:num(n.carbFloorTrain,50,400),carbFloorRest:num(n.carbFloorRest,50,400),maxDeficitPct:num(n.maxDeficitPct,0,25),fatMaxPct:num(n.fatMaxPct,20,40)||35};})(),
-      items:(p.items||[]).filter(it=>s(it.name,80)).map(it=>({name:s(it.name,80),dose:s(it.dose,60),slot:_protoSlot(it.slot),notes:s(it.notes,160)}))})),
+      items:(p.items||[]).filter(it=>s(it.name,80)).map(it=>({name:s(it.name,80),dose:s(it.dose,60),slot:_protoSlot(it.slot),notes:s(it.notes,160),thru:s(it.thru,40),after:s(it.after,40)}))})),
     version:(+e.version||0)+1,updatedAt:Date.now(),
     updatedBy:(typeof fbUser!=='undefined'&&fbUser)?(fbUser.email||''):''
   };
@@ -5223,6 +5257,11 @@ function _cpEditorHTML(){
           <select data-k="slot" onchange="_cpCapture()" style="flex:none;width:104px;padding:8px;border:1.5px solid var(--border);border-radius:var(--rs);font-size:13px;background:var(--surface);color:var(--text)">${slotOpts(it.slot)}</select>
         </div>
         <input class="fi" data-k="notes" placeholder="Note (e.g. with food, start day 5)" value="${_labEsc(it.notes)}" oninput="_cpCapture()" style="margin-top:6px;font-size:16px;padding:8px 10px;background:var(--surface)">
+        <select data-k="timing" onchange="_cpCapture()" style="width:100%;margin-top:6px;padding:8px;border:1.5px solid var(--border);border-radius:var(--rs);font-size:13px;background:var(--surface);color:var(--text)">
+          <option value="">Runs with this phase</option>
+          ${e.phases.map((q,qi)=>qi>pi&&q.id?`<option value="thru:${_labEsc(q.id)}" ${it.thru===q.id?'selected':''}>Continues through ${_labEsc(_cpPName(e,qi))}</option>`:'').join('')}
+          ${e.phases.map((q,qi)=>qi!==pi&&q.id?`<option value="after:${_labEsc(q.id)}" ${it.after===q.id?'selected':''}>Starts when ${_labEsc(_cpPName(e,qi))} ends</option>`:'').join('')}
+        </select>
       </div>`;
     });
     h+=`<div style="display:flex;gap:6px;flex-wrap:wrap">
