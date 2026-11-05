@@ -5184,7 +5184,7 @@ function _cpEndPhase(i){
   ph.endedOn=dk();_cpSave();
 }
 function _cpInviteText(e){
-  return `Your plan is ready in the Metastory Health app.\n\n1. Download the app: https://apps.apple.com/us/app/metastory-health/id6812901357\n2. Sign in with ${_cpEmail(e.email)}. If you use Apple, choose "Share My Email".\n3. Unlock your free access with code ${CP_CLIENT_CODE}: ${CP_REDEEM_URL}\n\nYour supplements, phase guidance and nutrition targets load on their own. Open the Supps tab to see your plan.`;
+  return `Your plan is ready in the Metastory Health app.\n\n1. Download the app: https://apps.apple.com/us/app/metastory-health/id6812901357\n2. Sign in with ${_cpEmail(e.email)}. If you use Apple, choose "Share My Email".\n3. Unlock your free access with code ${CP_CLIENT_CODE}: ${CP_REDEEM_URL}\n\nYour supplements, phase guidance and nutrition targets load on their own. Open the Supps tab to see your plan.\n\nNo iPhone? Open https://app.metastoryhealth.com in any browser and sign in with Google using ${_cpEmail(e.email)} — no code needed.`;
 }
 function _cpCopyInvite(){_cpCapture();_protoCopy(_cpInviteText(_cpEdit),'Invite copied — paste into a text or email');}
 
@@ -5327,10 +5327,177 @@ function rClientPlans(){
       ${ready.length?`<div style="font-size:12px;font-weight:700;color:var(--green);margin-top:6px">Waiting on you: ${_labEsc(ready.map(x=>_cpPName(p,x.i)).join(', '))}</div>`:''}
     </div>`;
   });
+  h+=_waCardHTML();
   h+=`<button onclick="goPage('supps')" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--rs);padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-top:6px;font-family:var(--font-sans)">← Back</button>`;
   el.innerHTML=h;
 }
 /* ═══════════════════ END CLIENT PLANS ═══════════════════ */
+
+/* ═══════════════════ WEB ACCESS GATE ═══════════════════
+   The iPhone app sells membership through the App Store (Metastory Membership,
+   in the native adapter). A browser has no App Store, so on the web only these
+   accounts get past sign-in:
+     • the practitioner (LAB_CONFIG.adminEmails)
+     • anyone with a client plan under their sign-in email  (clientPlans/{email})
+     • anyone the practitioner added by hand                  (webAccess/{email})
+   Everyone else signed in on the web gets a screen pointing them to the iPhone
+   app. Inside the iPhone app this block does nothing.
+
+   Firestore: collection `webAccess`, doc id = lower-cased email.
+     match /webAccess/{email} {
+       allow get: if <own verified email>;
+       allow list, create, update, delete: if <practitioner, email_verified>;
+     }
+   Doc: { email, name, addedAt, addedBy }
+   A yes is remembered for 14 days so someone offline still gets in; a no is
+   never remembered, and every launch asks the server again. */
+const WA_CACHE='_webAccessOK';
+const WA_APP_URL='https://apps.apple.com/us/app/metastory-health/id6812901357';
+let _waList=[],_waListOn=false,_waSeq=0;
+function _waIsNative(){try{return !!(window.Metastory&&window.Metastory.isNative);}catch(e){return false;}}
+function _waIsAdminEmail(em){try{return LAB_CONFIG.adminEmails.map(e=>e.toLowerCase()).includes(_cpEmail(em));}catch(e){return false;}}
+function _waCacheOK(uid){try{const c=JSON.parse(lsGet(WA_CACHE,'null'));return !!(c&&c.uid===uid&&c.until>Date.now());}catch(e){return false;}}
+function _waCacheSet(uid,ok){lsSet(WA_CACHE,ok?JSON.stringify({uid:uid,until:Date.now()+14*864e5}):'null');}
+
+(function injectWebGateStyles(){
+  const css=
+    '#web-gate{position:fixed;inset:0;z-index:100002;background:var(--bg);display:none;overflow-y:auto;-webkit-overflow-scrolling:touch}'+
+    '#web-gate.open{display:block}'+
+    '#web-gate .wg-in{min-height:100%;max-width:440px;margin:0 auto;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;padding:48px 24px 40px}'+
+    '#web-gate h1{font-family:var(--font-serif);font-weight:500;font-size:30px;line-height:1.15;color:var(--text);text-align:center;margin:0 0 12px;text-wrap:balance}'+
+    '#web-gate .wg-sub{font-size:15px;line-height:1.55;color:var(--sub);text-align:center;margin:0 auto 26px;max-width:340px;text-wrap:balance}'+
+    '#web-gate .wg-who{font-size:13px;color:var(--sub);text-align:center;margin-bottom:22px}'+
+    '#web-gate .wg-who b{color:var(--text)}'+
+    '#web-gate .wg-btn{display:block;width:100%;box-sizing:border-box;height:52px;line-height:52px;border:0;border-radius:14px;background:var(--green);color:#fff;font-family:var(--font-sans);font-size:16px;font-weight:700;text-align:center;text-decoration:none;cursor:pointer;margin-bottom:12px}'+
+    '#web-gate .wg-btn.alt{background:var(--surface);color:var(--text);border:1px solid var(--border)}'+
+    '#web-gate .wg-btn:disabled{opacity:.55}'+
+    '#web-gate .wg-fine{font-size:12.5px;line-height:1.55;color:var(--sub);text-align:center;margin-top:14px}'+
+    '#web-gate .wg-spin{width:28px;height:28px;margin:0 auto 18px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--green);animation:wgspin .9s linear infinite}'+
+    '@keyframes wgspin{to{transform:rotate(360deg)}}';
+  const s=document.createElement('style');s.textContent=css;(document.head||document.documentElement).appendChild(s);
+})();
+
+function _waEl(){
+  let el=document.getElementById('web-gate');
+  if(el)return el;
+  el=document.createElement('div');el.id='web-gate';el.setAttribute('role','dialog');el.setAttribute('aria-modal','true');
+  document.body.appendChild(el);
+  return el;
+}
+function _waRender(state,email){
+  const el=_waEl(), who=`<div class="wg-who">Signed in as <b>${_labEsc(email||'')}</b></div>`;
+  let h;
+  if(state==='checking'){
+    h=`<div class="wg-spin" aria-hidden="true"></div><div class="wg-sub" style="margin-bottom:0">Checking your access…</div>`;
+  }else if(state==='offline'){
+    h=`<h1>Couldn’t check your access</h1>
+      <div class="wg-sub">Metastory couldn’t reach the server just now. Check your connection and try again.</div>${who}
+      <button class="wg-btn" onclick="_waRecheck()">Try again</button>
+      <button class="wg-btn alt" onclick="_waSignOut()">Sign out</button>`;
+  }else{
+    h=`<h1>Metastory lives on iPhone</h1>
+      <div class="wg-sub">This account doesn’t have web access. Download Metastory Health from the App Store to start your free month.</div>${who}
+      <a class="wg-btn" href="${WA_APP_URL}" target="_blank" rel="noopener">Get the iPhone app</a>
+      <button class="wg-btn alt" onclick="_waSignOut()">Use a different account</button>
+      <div class="wg-fine">Working with a Metastory practitioner? Ask them to turn on web access for this email, then <a href="#" onclick="_waRecheck();return false" style="color:var(--green);font-weight:700">check again</a>.</div>`;
+  }
+  el.innerHTML=`<div class="wg-in">${h}</div>`;
+}
+function _waShow(state,email){
+  _waRender(state,email);
+  _waEl().classList.add('open');
+  try{document.documentElement.style.overflow='hidden';}catch(e){}
+}
+function _waHide(){
+  const el=document.getElementById('web-gate');
+  if(el)el.classList.remove('open');
+  try{if(!document.getElementById('ms-paywall')||!document.getElementById('ms-paywall').classList.contains('open'))document.documentElement.style.overflow='';}catch(e){}
+}
+function _waSignOut(){_waHide();window._signOutIntent=true;try{fbAuth.signOut();}catch(e){}}
+
+/* true = has a doc, false = no doc (or not allowed to read one), null = couldn't ask */
+function _waHasDoc(coll,em){
+  return fbDb.collection(coll).doc(em).get({source:'server'})
+    .then(d=>d.exists)
+    .catch(err=>(err&&err.code==='permission-denied')?false:null);
+}
+function _waCheck(user){
+  const seq=++_waSeq;
+  if(_waIsNative()||PREVIEW_SANDBOX||!user){_waHide();return Promise.resolve(true);}
+  const em=_cpEmail(user.email);
+  if(_waIsAdminEmail(em)){_waCacheSet(user.uid,true);_waHide();return Promise.resolve(true);}
+  const cached=_waCacheOK(user.uid);
+  if(cached)_waHide();else _waShow('checking',em);
+  if(!em||!fbDb){_waCacheSet(user.uid,false);_waShow('denied',em);return Promise.resolve(false);}
+  return Promise.all([_waHasDoc('clientPlans',em),_waHasDoc('webAccess',em)]).then(r=>{
+    if(seq!==_waSeq||!fbUser||fbUser.uid!==user.uid)return false;
+    if(r[0]===true||r[1]===true){_waCacheSet(user.uid,true);_waHide();return true;}
+    if(r[0]===null||r[1]===null){ // couldn't reach the server
+      if(cached)return true;
+      _waShow('offline',em);return false;
+    }
+    _waCacheSet(user.uid,false);_waShow('denied',em);return false;
+  });
+}
+function _waRecheck(){if(fbUser)_waCheck(fbUser);}
+window._waRecheck=_waRecheck;window._waSignOut=_waSignOut;
+if(fbAuth&&!_waIsNative()){
+  fbAuth.onAuthStateChanged(user=>{if(user)_waCheck(user);else{_waSeq++;_waHide();}});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&fbUser)_waCheck(fbUser);});
+}
+
+/* ---- practitioner: who has web access ---- */
+function _waStartList(){
+  if(_waListOn||typeof fbDb==='undefined'||!fbDb)return;
+  _waListOn=true;
+  try{fbDb.collection('webAccess').onSnapshot(s=>{
+    _waList=s.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>(b.addedAt||0)-(a.addedAt||0));
+    if(curPage==='clientplans'&&!_cpEdit)rClientPlans();
+  },err=>{console.warn('web access list',err&&err.code);_waListOn=false;});}catch(e){_waListOn=false;}
+}
+function _waAdd(){
+  const emEl=document.getElementById('wa-email'),nmEl=document.getElementById('wa-name');
+  const em=_cpEmail(emEl&&emEl.value),nm=String((nmEl&&nmEl.value)||'').trim().slice(0,80);
+  if(!/^[^\s@'"<>]+@[^\s@'"<>]+\.[^\s@'"<>]+$/.test(em)){_labToast('Enter a valid email');return;}
+  fbDb.collection('webAccess').doc(em).set({email:em,name:nm,addedAt:Date.now(),addedBy:_cpEmail(fbUser&&fbUser.email)}).then(()=>{
+    _labToast('Web access on for '+em);
+    if(emEl)emEl.value='';if(nmEl)nmEl.value='';
+  }).catch(err=>{
+    _labToast(err&&err.code==='permission-denied'?'Not allowed — the webAccess rules need publishing in Firebase.':'Could not save — try again.');
+  });
+}
+function _waRemove(id){
+  if(!confirm('Turn off web access for '+id+'?'))return;
+  fbDb.collection('webAccess').doc(id).delete().then(()=>_labToast('Web access removed')).catch(()=>_labToast('Could not remove — try again.'));
+}
+function _waInviteText(em){
+  return `You have access to Metastory Health on the web.\n\n1. Open https://app.metastoryhealth.com in any browser (Chrome works well on Android — tap "Add to Home screen" to keep it like an app).\n2. Tap Sign in and choose Google, using ${em}.\n\nThat's it — everything is free for you.`;
+}
+function _waCopyInvite(id){_protoCopy(_waInviteText(id),'Invite copied — paste into a text or email');}
+function _waCardHTML(){
+  _waStartList();
+  let h=`<div class="card">
+    <span class="kicker">Web access</span>
+    <div style="font-family:var(--font-serif);font-size:20px;margin:6px 0 4px">For people without an iPhone</div>
+    <p style="font-size:12.5px;color:var(--sub);line-height:1.5">Anyone with a client plan above can already use app.metastoryhealth.com in a browser. Add anyone else here — family, friends, clients without a plan. Web sign-in is Google only, so use the email of their Google account. Everyone else who signs in on the web is sent to the App Store.</p>
+    <input id="wa-email" type="email" autocomplete="off" placeholder="their Google email" style="${_cpTA};margin-top:10px">
+    <input id="wa-name" type="text" autocomplete="off" placeholder="name (optional)" style="${_cpTA};margin-top:8px">
+    <button class="btn btn-b btn-f" style="margin-top:10px" onclick="_waAdd()">+ Give web access</button>`;
+  if(_waList.length){
+    h+=`<div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">`;
+    _waList.forEach(w=>{
+      h+=`<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:var(--rs);padding:10px 12px;background:var(--surface2)">
+        <div style="flex:1;min-width:0"><b style="font-size:14px">${_labEsc(w.name||w.id)}</b>${w.name?`<div style="font-size:12px;color:var(--sub);overflow:hidden;text-overflow:ellipsis">${_labEsc(w.id)}</div>`:''}</div>
+        <button style="${_cpMini}" onclick="_waCopyInvite('${_labEsc(w.id)}')">Copy invite</button>
+        <button style="${_cpMini};color:var(--red)" onclick="_waRemove('${_labEsc(w.id)}')">Remove</button>
+      </div>`;
+    });
+    h+=`</div>`;
+  }
+  return h+`</div>`;
+}
+/* ═══════════════════ END WEB ACCESS GATE ═══════════════════ */
+
 
 // ── DATE NAV ──────────────────────────────────────────────────────────────────
 const _D=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];

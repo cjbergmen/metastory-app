@@ -50,6 +50,20 @@ service cloud.firestore {
                  && request.auth.token.email_verified == true;
     }
 
+    // ── Web access (people without an iPhone) ────────────────────────────────
+    // Doc id = lower-cased email. The web app lets a signed-in account past the
+    // sign-in screen only if it is the practitioner, has a clientPlans doc, or
+    // has a doc here. A person may check ONLY their own verified email;
+    // practitioners list, add and remove.
+    match /webAccess/{email} {
+      allow get: if request.auth != null
+                 && request.auth.token.email_verified == true
+                 && request.auth.token.email.lower() == email;
+      allow list, create, update, delete: if request.auth != null
+                 && request.auth.token.email in ['cjbergmen@gmail.com']
+                 && request.auth.token.email_verified == true;
+    }
+
     function isPractitioner() {
       return request.auth != null
              && request.auth.token.email in ['cjbergmen@gmail.com'];
